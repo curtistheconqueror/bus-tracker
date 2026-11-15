@@ -796,12 +796,47 @@ driven in a browser with the route's answer stubbed; `/api/heat-sheet-scan`
 needs the OpenRouter key and has not seen a real photograph. Its first real
 sheet is the test of its prompt.
 
-**THE A/C CARD CLAIMS NO NUMBER, ON PURPOSE.** The only definition of an A/C bus
-is the Defect Log's A/C Buses filter, and it matches the CATEGORY "A/C and HVAC"
-— so it counts every heating repair too. Measured: one cooling fault and two
-no-heat buses read as three. Narrowing that filter changes an existing list and
-is Curtis's call; until it is settled, a heat campaign's results would have
-appeared on the A/C card.
+**THE WALK HOLDS STILL ONCE IT HAS STARTED.** `heatRoster` ranks worst-first,
+which is what somebody wants when a walk starts and not once it is under way: a
+NO HEAT tap sent that bus to the top and slid every row it passed down one,
+under the thumb that had just tapped. Curtis, asked: *the row stays where it is
+and just changes how it's marked; the list only re-sorts when you leave and
+come back.* So `heatWalkRoster` (`heat-check-log.ts`) draws the walk's own
+order — bus numbers pinned at the first RECORDED check, not on mount, so the
+list still opens ranked — and it is dropped on a lane change or on closing the
+list. A held row stays even when its new standing would take it out of the
+lane; a bus that arrives mid-walk from another device goes on the end.
+
+**Only a recorded check pins it.** `checkHeat` reports whether it filed, because
+a tap can be refused — no initials, a cancelled NO HEAT question, a log that
+will not take the check — and a refused tap that pinned froze the list on a
+gesture that wrote nothing. **One case is left:** when the check could not be
+saved but its No Heat defect WAS opened, `checkHeat` also reports false, so the
+board changes and the list is not held. Read, not measured.
+
+**The held order is in-memory and nowhere else** — not stored, not synced, and
+not answerable by the MCP route. And **the lane tab counts the whole roster
+while the rows come from the held order**, so TO DO can read 6 above eight
+rows, two of them marked HEAT OK. That follows from what was chosen; making the
+count follow the held list is a second decision and Curtis's.
+
+**A/C BUSES IS COOLING, NOT THE WHOLE CATEGORY.** The filter's words match the
+CATEGORY "A/C and HVAC", so every heating repair in it answered too — measured,
+one cooling fault and two no-heat buses read as three A/C buses. Curtis chose
+to narrow it. Heating is excluded by the catalog's HEATING GROUP and nothing
+else, through the one expression the heat walk also turns on
+(`HVAC_HEATING_GROUP` in `quick-filters.ts`): two spellings of "this is the
+heating group" would eventually disagree, and a bus on both lists or neither is
+how that shows up. Run over the whole catalog: the 24 repairs under A/C and HVAC
+split 18 to A/C and 6 to the heat walk, none on both, none on neither.
+**Controls and Blowers stays A/C on purpose** — one of its repairs is "Operator
+A/C blower". **It moves three surfaces:** the Defect Log's A/C Buses list, the
+campaigns card that links to it, and the Facility Map's A/C highlight and
+quick-filter count.
+
+**THE A/C CARD STILL PRINTS NO NUMBER, for a different reason.** It is an idle
+spring campaign whose own text says it is not running; a live count on it is a
+question for whoever starts that walk, not a leftover of the counting bug.
 
 **`pace-incidents-v1` and `pace-shop-talk-v1` are about PEOPLE AND PLACES, not
 buses.** Added the night Curtis slipped on oil in the shop. A defect is attached

@@ -342,6 +342,33 @@ export function heatRosterLane(rows:HeatRosterRow[],lane:HeatLane){
  return rows.filter(row=>lane==="todo"?row.status!=="ok":row.status===lane);
 }
 
+/* HOLDING THE WALK STILL. `heatRoster` ranks worst-first, which is what somebody
+   wants when a walk STARTS and exactly what they do not want once it is under
+   way: a NO HEAT tap moved that bus to the top and slid every row it had passed
+   down one, under the thumb that had just tapped it — and a HEAT OK in TO DO
+   took its row out from under the next one entirely. `HEAT_TAP_GUARD_MS` was the
+   mitigation for that; this is the fix. Curtis chose it when asked: the row
+   stays where it is and only changes how it is marked, and the list re-sorts
+   when somebody leaves and comes back.
+
+   `held` is the WALK'S OWN ORDER — bus numbers, pinned at the first tap, which
+   is the moment the ranking stops helping and starts moving things. null means
+   no walk is under way, and the ranked order is what to draw.
+
+   A held row is KEPT even when its new standing would have taken it out of the
+   lane, because that is the whole point of holding it. A bus the held order has
+   never seen — one that arrived from another device mid-walk — goes on the END,
+   where it can be seen without moving anything above it: dropping it would hide
+   a bus from a walk, which is worse than a row turning up at the bottom. */
+export function heatWalkRoster(rows:HeatRosterRow[],lane:HeatLane,held:string[]|null):HeatRosterRow[]{
+ const fresh=heatRosterLane(rows,lane);
+ if(!held)return fresh;
+ const byNumber=new Map(rows.map(row=>[row.busNumber,row]));
+ const kept=held.map(number=>byNumber.get(number)).filter((row):row is HeatRosterRow=>!!row);
+ const seen=new Set(held);
+ return [...kept,...fresh.filter(row=>!seen.has(row.busNumber))];
+}
+
 /* How long the tap buttons stay dead after a tap, in milliseconds. Long enough
    that a double-tap cannot land on the row that slid up into place, short
    enough that somebody walking a lane of buses never waits on it. */
@@ -493,6 +520,37 @@ export function heatLogProblemWords(why:HeatLogProblem|undefined){
  return why==="unreadable"
   ?"the heat check log on this device could not be read, so it was left alone rather than written over"
   :"this device's storage is full";
+}
+
+/* WHAT A REFUSED CLEANUP LEFT BEHIND, in the words BOTH doors use. The Defect
+   Log's SCAN BATCHES and the AI Operator both take a scan out through
+   `dropScanChecks`, and when the log refuses the write both leave exactly the
+   same thing behind — so the facts are stated here rather than typed into two
+   page components. `scanBatchWords` and `heatLogProblemWords` exist for the
+   same reason, and for one commit the operator said more about this failure
+   than the panel did, which is how that drift starts.
+
+   THE RETRY IS OFFERED ONLY FOR A FULL LOG, and that is the whole care here.
+   Once the defects are off the board `scanBatches` no longer offers that batch,
+   so the one way back to the cleanup is to put the scan back and remove it
+   again — which works when the log was FULL and room has since been freed. For
+   an UNREADABLE log it is a circle: the way back in reads the same unreadable
+   log with the same code and refuses identically, and nothing in this app makes
+   an unreadable log readable, so every pass also re-runs the board write and
+   the tombstone ledger for nothing.
+
+   And only when the way back was actually WRITTEN. The snapshot under
+   `pace-scan-batch-undo-v1` is what PUT BACK reads, and a storage that took the
+   board and then refused the snapshot has nothing to put back — naming it as
+   the retry would be the app promising a door it had just failed to build.
+
+   `removed` is what the write WOULD have taken off, so it pluralises this; an
+   unreadable log knows nothing and reports 0, which reads as the plural. */
+export function heatCleanupLeftBehind(why:HeatLogProblem|undefined,removed:number,scanWords:string,wayBackHeld:boolean):string{
+ const one=removed===1;
+ const left=" "+(one?"It is":"They are")+" still in it, so "+(one?"that bus":"those buses")+" still "+(one?"reads":"read")+" as checked.";
+ if(why!=="full"||!wayBackHeld)return left;
+ return left+" Putting the "+scanWords+" back and removing it again is the way to try that part once more.";
 }
 
 /* Reported, not thrown. The caller is in the middle of filing a scan or

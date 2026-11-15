@@ -163,20 +163,27 @@ export default function Lists(){
     the one question only a person can answer, hands the tap over, and shows
     what came back. The clock is taken AFTER the question, so a confirm left
     open for ten minutes does not date the check ten minutes early. */
- const checkHeat=(row:HeatRosterRow,result:HeatResult)=>{
-  if(!initials.trim()){alert(HEAT_TAP_PROBLEM["no-initials"]);return}
-  if(result==="no-heat"&&!row.openHeat.length&&!confirm("Log bus "+row.busNumber+" as NO HEAT?\n\nThis opens a No Heat defect on the Defect Log. It is an ordinary defect — add details, or mark it fixed, there."))return;
+ /* IT REPORTS WHETHER A CHECK WAS RECORDED, and the board needs that rather
+    than the gesture: a tap can be refused four ways here — no initials, a
+    cancelled question, a log that would not take the check, and any other
+    refusal `recordHeatTap` reports — and a refused tap changed nothing, so it
+    must not pin the walk's order either. It returned void, so the board could
+    not tell, and froze the list on a gesture that recorded nothing. */
+ const checkHeat=(row:HeatRosterRow,result:HeatResult):boolean=>{
+  if(!initials.trim()){alert(HEAT_TAP_PROBLEM["no-initials"]);return false}
+  if(result==="no-heat"&&!row.openHeat.length&&!confirm("Log bus "+row.busNumber+" as NO HEAT?\n\nThis opens a No Heat defect on the Defect Log. It is an ordinary defect — add details, or mark it fixed, there."))return false;
   const tap=recordHeatTap(localStorage,row.busNumber,result,initials);
   if(!tap.ok&&tap.why==="check-not-saved"){
    /* The board may hold a defect this tap opened, so the page re-reads it
       before saying anything, and the words come from what the tap reports. */
    refreshFromStorage();
    alert("The check could not be saved — "+heatLogProblemWords(tap.log)+"."+(tap.filed?" The No Heat defect WAS opened on the Defect Log for bus "+row.busNumber+", and it is still there.":" Nothing was changed."));
-   return;
+   return false;
   }
-  if(!tap.ok){alert(HEAT_TAP_PROBLEM[tap.why].replace("{bus}",row.busNumber));return}
+  if(!tap.ok){alert(HEAT_TAP_PROBLEM[tap.why].replace("{bus}",row.busNumber));return false}
   refreshFromStorage();
   setLastTap({checkId:tap.checkId,busNumber:row.busNumber,result,filed:tap.filed});
+  return true;
  };
  /* Taking the last tap back. The CHECK goes; a defect that tap opened does not,
     and the button says so before it is pressed — a defect is the Defect Log's
