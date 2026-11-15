@@ -5348,6 +5348,11 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  inOrder(executor,"writeFleetStorageResult(","dropScanChecks(","the operator takes the checks only once the board has let the defects go");
  assert.match(executor,/scanBatchWords\(batch\)/);
  assert.match(executor,/\+\(cut\.removed\|\|!cut\.ok\?\(cut\.ok\?/,"the operator says so too");
+ /* And a refused cleanup says the checks are STILL IN THE LOG and names the one
+    way to try again. It used to stop at why it failed: once the defects are off
+    the board, `scanBatches` no longer offers that batch, so the only retry is to
+    put the scan back and remove it again — and nothing told anybody that. */
+ assert.match(executor,/so they are still in it and those buses still read as checked\. Putting the "\+words\.short\+" back and removing it again is the way to try that part once more\./,"a refused check cleanup names its retry route");
  assert.doesNotMatch(executor,/scan sweep record|from that sweep|"[^"]*That scan sweep/,"the executor names the scan it removed, not always a sweep");
  assert.match(panel,/scanBatchWords\(batch\)/);
  assert.doesNotMatch(code(panel),/SCAN SWEEP FILED|this sweep/,"the panel lists two kinds of scan now and must not call both a sweep");
@@ -5390,6 +5395,18 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  assert.doesNotMatch(boardCode,/role="tablist"|role="tab"/,"buttons that filter a list are not tabs without panels");
  const listsCode=code(lists);
  assert.doesNotMatch(listsCode,/writeFleetStorage|serializeFleetPayload|setItem\(\s*FLEET_STORAGE_KEY|pace-board-v1/,"Fleet Campaigns never writes the board itself — by the constant, or by the key spelled out");
+ /* The line above bans the write spellings somebody would reach for, and a ban
+    list is not a proof: `localStorage["setItem"](FLEET_STORAGE_KEY,…)` and a key
+    held in a local both walked straight past it, and so did `removeItem` and a
+    destructured `setItem`. Reproduced as planted mutants, not reasoned about.
+    So COUNT as well — every mention of the board key on this page has to be one
+    of the reads. The two assertions catch different things and both are needed:
+    the count cannot see the key spelled out as a literal, and the ban list
+    cannot tell a read from a write. A new READ spelling is listed here on
+    purpose; a write does not belong on this page at all. */
+ const keyUses=(listsCode.match(/\bFLEET_STORAGE_KEY\b/g)||[]).length;
+ const keyReads=(listsCode.match(/getItem\(\s*FLEET_STORAGE_KEY\s*\)|event\.key!==\s*FLEET_STORAGE_KEY|import\s*\{[^}]*\bFLEET_STORAGE_KEY\b/g)||[]).length;
+ assert.equal(keyUses,keyReads,"every use of the board key on Fleet Campaigns is a read — if a READ spelling was added, list it in this assertion; if a WRITE was added, it does not belong on this page");
  assert.doesNotMatch(listsCode,/fileHeatTap|recordHeatCheck|writeHeatChecks/,"nor does it sequence a tap: recordHeatTap does");
  const checkHeat=lists.slice(lists.indexOf(" const checkHeat="),lists.indexOf(" const undoHeatTap="));
  assert.match(checkHeat,/const tap=recordHeatTap\(localStorage,row.busNumber,result,initials\);/);
