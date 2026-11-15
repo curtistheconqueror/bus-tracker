@@ -116,8 +116,8 @@ check a fix on his phone that has not been published.
 | PR | Branch | Head | Ahead | CI | Threads | What it is |
 | --- | --- | --- | --- | --- | --- | --- |
 | **#45** | `claude/typecheck-gate-windows` | `a7b7152` | 2 | not re-read | **1, answered** — the reviewer's to close | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
-| **#46** | `claude/heat-check-domain` | `cd21990` | see below | not re-read | **14, all answered** — the reviewers' to close | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules and limits are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`** |
-| **#47** | `claude/scan-paper` | `3b5eb67` | 1, **on #46** | not read | none yet | **SCAN PAPER.** One button on the Defect Log and the Down Sheet in front of the three scanners: take the photo, the app works out which sheet it is and opens that sheet's own scanner with the photos loaded. **Stacked on #46 — its base is `claude/heat-check-domain`, not `main`** |
+| **#46** | `claude/heat-check-domain` | `d1d1b05` | see below | not re-read | **14, all answered** — the reviewers' to close | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules and limits are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`** |
+| **#47** | `claude/scan-paper` | `63d10bf` | 2, **on #46** | not read | none yet | **SCAN PAPER.** One button on the Defect Log and the Down Sheet in front of the three scanners: take the photo, the app works out which sheet it is and opens that sheet's own scanner with the photos loaded. **Stacked on #46 — its base is `claude/heat-check-domain`, not `main`** |
 | **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
 Heads, commits ahead, CI and thread counts were read from GitHub on 2026-11-13
@@ -155,15 +155,40 @@ that before calling it ready. The branch now CONTAINS `main` (`43e9594` merges
 it in, because the branch is published and is not rebased), so "ahead" is no
 longer one commit.
 
-**Three things on #46 are with Curtis and not built:** whether each OK row in
-the scan review needs its own way to be turned down (a UI change); whether the
-heat list should hold its order still — a NO HEAT tap sends the bus to the top
-of TO DO and every row it passes slides down one; and the two from before,
-whether a struck-through row means fixed and whether to narrow the A/C Buses
-filter. **What it has never done is read a real photograph**:
-`/api/heat-sheet-scan` needs the OpenRouter key, which the development machine
-does not have. Curtis has photographed the real sheet twice — the second, from
-an iPad, shows all 108 printed bus numbers.
+**WHAT CURTIS DECIDED ON 2026-11-15, so nobody re-asks:** land #45 and #46;
+**hold #47** (SCAN PAPER) — it stays open and is kept current with #46, and is
+not to be merged until he says; leave #39 (the MCP route) until later, with
+READ solved before any write.
+
+**#46 moved four commits on 2026-11-15, to `d1d1b05`.** `db185e6` and `0770ca5`
+answer BT46-F3 and a cold read of that answer. `af4925f` builds two calls he
+made: **the heat walk holds its order once a check is recorded** (measured
+before: a NO HEAT tap moved 5 of 8 rows; after: 0 of 8), and **A/C Buses is
+cooling, not the whole category** (the 24 A/C and HVAC repairs split 18 and 6,
+none on both — re-run by a second session, not quoted). `d1d1b05` is the
+`CLAUDE.md` correction those needed: it still said the A/C change was waiting
+on him. Gates on Windows at that head: 445 of 446, the one failure being the
+type-check test #45 fixes. **No review bot has read the four commits and CI on
+them was not read.**
+
+**Still with Curtis on #46, not built:** whether each OK row in the scan review
+needs its own way to be turned down; whether a struck-through row means fixed;
+and, new, whether the lane tab's count should follow the held walk — it counts
+the whole roster, so TO DO can read 6 above eight rows. **What it has never
+done is read a real photograph**: `/api/heat-sheet-scan` needs the OpenRouter
+key, which the development machine does not have. Curtis has photographed the
+real sheet twice — the second, from an iPad, shows all 108 printed bus numbers.
+
+**A DOWN SHEET SCAN ONLY IMPORTS BUSES THE SCANNING DEVICE ALREADY HAS.**
+`mergeReviewedRows` keeps rows whose bus matched that device's board; a row
+for a bus it does not know is drawn in the review as NOT IN FLEET with its
+tick box disabled, and is counted in "flagged", but it cannot be imported.
+Curtis met this scanning a 30-bus sheet on an iPad whose board held 64 buses
+against the phone's 100-plus. **Until its board is full, do not scan from the
+iPad.** Whether a sheet should be allowed to introduce a bus is his design
+call and nothing is built. Two more scanner faults are recorded and not
+built: LINES NOT READ cannot see a read that gives up partway down the page,
+and the sweep and Down Sheet scanners do not freeze their photos mid-read.
 
 **Found while answering #46 and NOT fixed, because it is older than that
 branch:** `put()` in `src/lib/storage/fleet-restore.ts` ignores
