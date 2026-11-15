@@ -58,8 +58,29 @@ export const QUICK_FILTERS:{key:QuickFilterKey;label:string;shortLabel:string}[]
  {key:"logged",label:"Defects Logged",shortLabel:"Logged"},
 ];
 
+/* THE CATALOG'S OWN HEATING GROUP, anchored to where the category sits. Named
+   once because TWO filters now turn on it and they must not disagree: a bus is
+   on the heat walk BECAUSE of this group and is kept off the A/C list BY it.
+   Spelled out twice, the day somebody edits one is the day a no-heat bus is on
+   both lists or neither.
+
+   Anchored with ^ for the reason recorded against `no-cabin-heat` below: the
+   category is joined FIRST, so an unanchored group match also reads free text a
+   mechanic typed, and "floor heating - works fine" in the details of a COOLING
+   record satisfied it. */
+const HVAC_HEATING_GROUP=/^a\/c and hvac heating\s*-\s/i;
+
 function quickFilterTextMatch(text:string,key:QuickFilterKey){
- if(key==="ac")return /\b(?:a\/c|ac|hvac|air conditioning)\b/i.test(text);
+ /* A/C BUSES IS COOLING, NOT THE WHOLE CATEGORY. The words alone match the
+    CATEGORY "A/C and HVAC", so every heating repair in it answered this filter
+    too: measured, one cooling fault and two no-heat buses read as three A/C
+    buses. Curtis chose to narrow it when asked — it changes a list he already
+    uses, which is why it was his call and not a tidy-up.
+
+    Heating is excluded by the GROUP and nothing else. Controls and Blowers
+    stays in: one of its repairs is "Operator A/C blower", and a blower that
+    does not run is an A/C bus whichever season it is. */
+ if(key==="ac")return /\b(?:a\/c|ac|hvac|air conditioning)\b/i.test(text)&&!HVAC_HEATING_GROUP.test(text);
  if(key==="check-engine")return /\b(?:check|stop)\s+(?:engine|eng)\b|\bengine\s+light\b/i.test(text);
  if(key==="bad-ramp")return /\b(?:ramp|kneeler|wheelchair lift|wheelchair ramp)\b/i.test(text);
  if(key==="no-horn")return /\bhorn\b/i.test(text);
@@ -119,7 +140,7 @@ function quickFilterTextMatch(text:string,key:QuickFilterKey){
     string at the bottom of quickFilterDefects never passes through
     migrateRepairIdentity, so a bus carrying the old bare wording there would
     drop off this list the day the catalog was grouped. */
- if(key==="no-cabin-heat")return /^a\/c and hvac heating\s*-\s/i.test(text)
+ if(key==="no-cabin-heat")return HVAC_HEATING_GROUP.test(text)
   ||/\bsurge tank\s*-\s*(?:heating side|both sides)\b/i.test(text)
   ||/\bcoolant leak\s*-\s*heating side\b/i.test(text)
   ||/\bheater\s*\/\s*defroster\b/i.test(text)

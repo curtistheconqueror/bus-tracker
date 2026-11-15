@@ -341,6 +341,33 @@ export function heatRosterLane(rows:HeatRosterRow[],lane:HeatLane){
  return rows.filter(row=>lane==="todo"?row.status!=="ok":row.status===lane);
 }
 
+/* HOLDING THE WALK STILL. `heatRoster` ranks worst-first, which is what somebody
+   wants when a walk STARTS and exactly what they do not want once it is under
+   way: a NO HEAT tap moved that bus to the top and slid every row it had passed
+   down one, under the thumb that had just tapped it — and a HEAT OK in TO DO
+   took its row out from under the next one entirely. `HEAT_TAP_GUARD_MS` was the
+   mitigation for that; this is the fix. Curtis chose it when asked: the row
+   stays where it is and only changes how it is marked, and the list re-sorts
+   when somebody leaves and comes back.
+
+   `held` is the WALK'S OWN ORDER — bus numbers, pinned at the first tap, which
+   is the moment the ranking stops helping and starts moving things. null means
+   no walk is under way, and the ranked order is what to draw.
+
+   A held row is KEPT even when its new standing would have taken it out of the
+   lane, because that is the whole point of holding it. A bus the held order has
+   never seen — one that arrived from another device mid-walk — goes on the END,
+   where it can be seen without moving anything above it: dropping it would hide
+   a bus from a walk, which is worse than a row turning up at the bottom. */
+export function heatWalkRoster(rows:HeatRosterRow[],lane:HeatLane,held:string[]|null):HeatRosterRow[]{
+ const fresh=heatRosterLane(rows,lane);
+ if(!held)return fresh;
+ const byNumber=new Map(rows.map(row=>[row.busNumber,row]));
+ const kept=held.map(number=>byNumber.get(number)).filter((row):row is HeatRosterRow=>!!row);
+ const seen=new Set(held);
+ return [...kept,...fresh.filter(row=>!seen.has(row.busNumber))];
+}
+
 /* How long the tap buttons stay dead after a tap, in milliseconds. Long enough
    that a double-tap cannot land on the row that slid up into place, short
    enough that somebody walking a lane of buses never waits on it. */

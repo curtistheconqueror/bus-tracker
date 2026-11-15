@@ -3,7 +3,7 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {quickFilterHref} from "@/src/lib/defects/quick-filters";
 import type {HeatFleetBus} from "@/src/lib/defects/heat-check-import";
-import {HEAT_STANDING_LABEL,HEAT_TAP_GUARD_MS,heatRoster,heatRosterCounts,heatRosterLane,heatRowDetail,heatScanHref,heatShareText,type HeatCheck,type HeatLane,type HeatResult,type HeatRosterRow} from "@/src/lib/defects/heat-check-log";
+import {HEAT_STANDING_LABEL,HEAT_TAP_GUARD_MS,heatRoster,heatRosterCounts,heatRowDetail,heatScanHref,heatShareText,heatWalkRoster,type HeatCheck,type HeatLane,type HeatResult,type HeatRosterRow} from "@/src/lib/defects/heat-check-log";
 import {copyText} from "@/src/lib/shared/share-file";
 
 /* THE CAMPAIGNS BOARD: the seasonal walks, above the working lists.
@@ -33,7 +33,7 @@ type Props={
  checks:HeatCheck[];
  initials:string;
  onInitials:(value:string)=>void;
- onCheck:(row:HeatRosterRow,result:HeatResult)=>void;
+ onCheck:(row:HeatRosterRow,result:HeatResult)=>boolean;
  /* The one tap that can still be taken back, and the way to take it back. */
  lastTap:{busNumber:string;result:HeatResult;filed:boolean}|null;
  onUndo:()=>void;
@@ -46,6 +46,12 @@ const LANES:HeatLane[]=["todo","no-heat","verify","unchecked","ok"];
 export default function CampaignBoard({fleet,checks,initials,onInitials,onCheck,lastTap,onUndo}:Props){
  const [open,setOpen]=useState(false);
  const [lane,setLane]=useState<HeatLane>("todo");
+ /* THE WALK'S OWN ORDER, pinned at the first tap and dropped when somebody
+    leaves the walk — which is changing lane, or closing the card. Pinned at
+    the TAP rather than on mount so the list is still ranked worst-first when
+    it opens, which is what it is for before anybody has started walking.
+    `heatWalkRoster` holds the rule; this only remembers the order. */
+ const [held,setHeld]=useState<string[]|null>(null);
  const [copied,setCopied]=useState("");
  /* THE SECOND TAP IS NOT FOR THE NEXT BUS. In TO DO a bus tapped HEAT OK leaves
     the list, and the row beneath it slides up under the thumb that is still
@@ -69,7 +75,23 @@ export default function CampaignBoard({fleet,checks,initials,onInitials,onCheck,
    guard.current=setTimeout(()=>setGuarded(false),HEAT_TAP_GUARD_MS);
   }
  };
- const tap=(row:HeatRosterRow,result:HeatResult)=>guardedPress(()=>onCheck(row,result));
+ const roster=useMemo(()=>heatRoster(fleet,checks),[fleet,checks]);
+ const counts=useMemo(()=>heatRosterCounts(roster),[roster]);
+ const shown=useMemo(()=>heatWalkRoster(roster,lane,held),[roster,lane,held]);
+ /* The first RECORDED check of a walk pins the order that is on screen at that
+    moment — so the row tapped stays under the thumb instead of flying to the
+    top of TO DO. `order` is read off the committed render, so it is the
+    pre-tap order whether it is taken before or after the check.
+
+    ONLY A RECORDED CHECK PINS IT. `onCheck` reports whether it filed, because
+    a tap refused for missing initials or a cancelled question changed nothing
+    — and pinning on it froze the list for the rest of the lane view on a
+    gesture that wrote nothing at all. The no-initials path is the live one:
+    the default is empty. */
+ const tap=(row:HeatRosterRow,result:HeatResult)=>guardedPress(()=>{
+  const order=shown.map(item=>item.busNumber);
+  if(onCheck(row,result)&&held===null)setHeld(order);
+ });
  /* UNDO IS GUARDED BOTH WAYS, because the bar now floats over live tap
     buttons. Dead while a tap's guard runs: the bar mounts under the thumb
     that just tapped a row near the bottom of the screen, and the second touch
@@ -77,9 +99,6 @@ export default function CampaignBoard({fleet,checks,initials,onInitials,onCheck,
     itself: pressing it unmounts the bar, and a second touch landed on the
     HEAT OK that had been underneath it. */
  const undo=()=>guardedPress(onUndo);
- const roster=useMemo(()=>heatRoster(fleet,checks),[fleet,checks]);
- const counts=useMemo(()=>heatRosterCounts(roster),[roster]);
- const shown=useMemo(()=>heatRosterLane(roster,lane),[roster,lane]);
  const laneCount:Record<HeatLane,number>={todo:counts.todo,"no-heat":counts.noHeat,verify:counts.verify,unchecked:counts.unchecked,ok:counts.ok};
  const copy=async(mode:"remaining"|"full")=>{
   try{await copyText(heatShareText(roster,mode));setCopied(mode==="full"?"FULL LIST COPIED":"TO-DO LIST COPIED")}catch{setCopied("COULD NOT COPY")}
@@ -99,19 +118,20 @@ export default function CampaignBoard({fleet,checks,initials,onInitials,onCheck,
     </div>
     <div className="campaign-actions">
      <a className="campaign-scan" href={heatScanHref()} title="Opens the heat sheet scanner on the Defect Log, where its results are filed">📷 SCAN HEAT SHEET</a>
-     <button type="button" aria-expanded={open} onClick={()=>setOpen(current=>!current)}>{open?"CLOSE LIST":"OPEN LIST"}</button>
+     <button type="button" aria-expanded={open} onClick={()=>{setOpen(current=>!current);setHeld(null)}}>{open?"CLOSE LIST":"OPEN LIST"}</button>
     </div>
    </div>
    <div className="campaign-card ac">
     <div className="campaign-title"><b>A/C</b><small>SPRING</small></div>
-    {/* NO COUNT, ON PURPOSE. The only definition of an A/C bus this app has is
-        the Defect Log's A/C Buses filter, and measured in a browser it counts
-        every record under the "A/C and HVAC" category — heating repairs
-        included, so a board with one cooling fault and two no-heat buses read
-        "3 A/C BUSES". Printing that here would put the heat campaign's own
-        results on the A/C card. Narrowing that filter is a change to an
-        existing list and Curtis's call; until then this card links to the list
-        and claims no number. */}
+    {/* NO COUNT, BECAUSE THE WALK IS NOT RUNNING — which is a different reason
+        from the one that used to be here. A/C Buses counted every record under
+        the "A/C and HVAC" category, heating included, so a board with one
+        cooling fault and two no-heat buses read "3 A/C BUSES" and a count here
+        would have put the heat campaign's results on the A/C card. Curtis chose
+        to narrow it when asked, so that is fixed in `quick-filters.ts` and the
+        same board now reads 1. What is left is that this is an idle SPRING
+        campaign: a live number on a card that says "Not running" is a question
+        for whoever starts that walk, not a leftover of the counting bug. */}
     <p className="campaign-idle">Not running. The A/C walk starts in spring.</p>
     <div className="campaign-actions">
      <a href={quickFilterHref("ac")} title="Opens the A/C Buses list on the Defect Log">OPEN A/C BUSES</a>
@@ -130,7 +150,7 @@ export default function CampaignBoard({fleet,checks,initials,onInitials,onCheck,
    </div>
    <p className="heat-list-note">Tap what you found at the bus. <b>NO HEAT</b> opens a No Heat defect on the Defect Log unless the bus already has one. <b>HEAT OK</b> only records that you checked — it never closes a repair. Every tap is kept with your initials and today&apos;s date.</p>
    <div className="heat-lanes" aria-label="Which buses to show">{LANES.map(key=>
-    <button type="button" aria-pressed={lane===key} className={lane===key?"active":""} key={key} onClick={()=>setLane(key)}>{key==="todo"?"TO DO":HEAT_STANDING_LABEL[key]} <strong>{laneCount[key]}</strong></button>)}</div>
+    <button type="button" aria-pressed={lane===key} className={lane===key?"active":""} key={key} onClick={()=>{setLane(key);setHeld(null)}}>{key==="todo"?"TO DO":HEAT_STANDING_LABEL[key]} <strong>{laneCount[key]}</strong></button>)}</div>
    {shown.length?<ul className="heat-roster">{shown.map(row=><li className={"standing-"+row.status} key={row.busNumber}>
     <span className="heat-bus"><b>{row.busNumber}</b><em>{HEAT_STANDING_LABEL[row.status]}</em></span>
     <span className="heat-detail">{heatRowDetail(row)}{row.checkedOkWhileOpen&&<a href={quickFilterHref("no-cabin-heat")}>OPEN NO HEAT BUSES TO MARK IT FIXED</a>}</span>

@@ -57,6 +57,32 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
   assert.deepEqual(QUICK_FILTERS.slice(-3).map(item=>item.key),["down-sheet-recommended","deferred","logged"]);
   assert.equal(QUICK_FILTERS.at(-1).key,"logged");
   assert.equal(quickFilterMatch(buses[0],"ac"),true);
+  /* A/C BUSES IS COOLING, AND NOT THE WHOLE "A/C and HVAC" CATEGORY. The words
+     alone matched the category, so every heating repair in it answered this
+     filter: a board with one cooling fault and two no-heat buses read as three
+     A/C buses, which is why the campaigns A/C card refused to print a number.
+     Curtis chose to narrow it when asked. Driven over the catalog rather than
+     on a couple of examples: all 24 repairs under that category partition, 18
+     to A/C and 6 to the heat walk, with none on both and none on neither. */
+  const acFleet=[
+   {id:"cool",n:"101",defects:[{id:"c1",category:"A/C and HVAC",issue:"Cooling - No cooling",state:"open"}]},
+   {id:"cold1",n:"102",defects:[{id:"h1",category:"A/C and HVAC",issue:"Heating - No heat",state:"open"}]},
+   {id:"cold2",n:"103",defects:[{id:"h2",category:"A/C and HVAC",issue:"Heating - No heat",state:"open"}]},
+  ];
+  assert.deepEqual(quickFilterBusIds(acFleet,"ac"),["cool"],"the two no-heat buses are not A/C buses — this read 3 before");
+  assert.deepEqual(quickFilterBusIds(acFleet,"no-cabin-heat"),["cold1","cold2"],"and they are still the heat walk's");
+  for(const issue of REPAIR_OPTIONS["A/C and HVAC"]){
+   const one={id:"one",n:"1",defects:[{id:"d",category:"A/C and HVAC",issue,state:"open"}]};
+   const onAc=!!quickFilterDefects(one,"ac").length,onHeat=!!quickFilterDefects(one,"no-cabin-heat").length;
+   assert.notEqual(onAc,onHeat,issue+" belongs to exactly one of the two lists");
+   assert.equal(onHeat,issue.startsWith("Heating - "),issue+" is on the heat walk only if it is in the catalog's Heating group");
+  }
+  /* CONTROLS AND BLOWERS STAYS AN A/C BUS. One of its repairs is literally
+     "Operator A/C blower", and a blower that will not run is an A/C problem
+     whichever season it is — narrowing to the Cooling group alone would have
+     dropped five live repairs off a list Curtis uses. */
+  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].filter(issue=>issue.startsWith("Controls and Blowers - ")).every(issue=>
+   quickFilterDefects({id:"cb",n:"1",defects:[{id:"d",category:"A/C and HVAC",issue,state:"open"}]},"ac").length),"every Controls and Blowers repair is still an A/C bus");
   assert.deepEqual(quickFilterBusIds(buses,"check-engine"),["engine"]);
   assert.deepEqual(quickFilterBusIds(buses,"bad-ramp"),["ramp"]);
   assert.deepEqual(quickFilterBusIds(buses,"no-horn"),["horn"]);
@@ -4608,6 +4634,40 @@ test("the heat check log keeps every check as its own event, and reading the sam
  assert.match(heatCleanupLeftBehind("full",1,"heat sheet scan",true),/It is still in it, so that bus still reads as checked\./);
  assert.doesNotMatch(heatCleanupLeftBehind("full",1,"heat sheet scan",true),/They are|those buses|read as checked/);
 
+ /* HOLDING THE WALK STILL. Curtis asked for this when told that a NO HEAT tap
+    sent the bus to the top of TO DO and slid every row it passed down one,
+    under the thumb that had just tapped it. Driven on rows rather than reasoned
+    about: the ROW INDEX of a tapped bus must not move. */
+ const {heatWalkRoster}=await import("../src/lib/defects/heat-check-log.ts");
+ const row=(busNumber,status)=>({busNumber,status,openHeat:[],latest:null,checks:0,checkedOkWhileOpen:false});
+ /* Four buses nobody has walked yet, in bus-number order the way `heatRoster`
+    would hand them over when every standing is the same. */
+ const before=[row("101","unchecked"),row("102","unchecked"),row("103","unchecked"),row("104","unchecked")];
+ assert.deepEqual(heatWalkRoster(before,"todo",null).map(item=>item.busNumber),["101","102","103","104"],"with no walk under way the ranked order is what is drawn");
+ /* 103 is tapped NO HEAT. Unheld, it climbs to the top and moves 101 and 102
+    down one each — which is the bug. */
+ const after=[row("103","no-heat"),row("101","unchecked"),row("102","unchecked"),row("104","unchecked")];
+ assert.deepEqual(heatWalkRoster(after,"todo",null).map(item=>item.busNumber),["103","101","102","104"],"this is what it did before: the tapped bus jumps the queue");
+ const walk=["101","102","103","104"];
+ assert.deepEqual(heatWalkRoster(after,"todo",walk).map(item=>item.busNumber),walk,"held, every row stays exactly where it was");
+ assert.equal(heatWalkRoster(after,"todo",walk)[2].status,"no-heat","and the tapped row is re-marked in place");
+ /* A HEAT OK IN TO DO USED TO TAKE ITS ROW OUT FROM UNDER THE NEXT ONE. Held,
+    it stays and is re-marked: that is what "the row stays where it is" means,
+    and it is why the hold is not just a sort order. */
+ const okd=[row("101","unchecked"),row("102","unchecked"),row("104","unchecked"),row("103","ok")];
+ assert.deepEqual(heatWalkRoster(okd,"todo",null).map(item=>item.busNumber),["101","102","104"],"unheld, an OK bus leaves TO DO");
+ assert.deepEqual(heatWalkRoster(okd,"todo",walk).map(item=>item.busNumber),walk,"held, it stays in its own place");
+ assert.equal(heatWalkRoster(okd,"todo",walk)[2].status,"ok");
+ /* A BUS THAT ARRIVES MID-WALK GOES ON THE END, where it can be seen without
+    moving anything above it. Dropping it would hide a bus from a walk. */
+ const arrived=[...after,row("099","no-heat")];
+ const withNew=heatWalkRoster(arrived,"todo",walk).map(item=>item.busNumber);
+ assert.deepEqual(withNew,[...walk,"099"],"the newcomer is last, not first, even though its standing ranks it first");
+ /* A bus that has LEFT the board is simply gone; the hold never invents a row. */
+ assert.deepEqual(heatWalkRoster([row("101","unchecked"),row("102","unchecked")],"todo",walk).map(item=>item.busNumber),["101","102"]);
+ /* The hold is the walk's, not the lane's: a lane asked for fresh still ranks. */
+ assert.deepEqual(heatWalkRoster(after,"no-heat",null).map(item=>item.busNumber),["103"]);
+
  /* ADDING TO THE LOG ON DISK merges, and reports what was NEW. */
  const shelf=new Map(),shelfStorage={getItem:key=>shelf.has(key)?shelf.get(key):null,setItem:(key,value)=>{shelf.set(key,value)}};
  assert.deepEqual(addHeatChecks(shelfStorage,walked),{ok:true,added:1,total:1});
@@ -5396,9 +5456,29 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
     tap whole to the one function that owns it. */
  const boardCode=code(board);
  assert.doesNotMatch(boardCode,/localStorage|setItem/,"the campaigns board hands taps up; it stores nothing");
- for(const name of ["heatRoster","heatRosterCounts","heatRosterLane","heatRowDetail","heatShareText","heatScanHref","HEAT_STANDING_LABEL","HEAT_TAP_GUARD_MS"])assert.match(board,new RegExp("\\b"+name+"\\b"),name);
+ for(const name of ["heatRoster","heatRosterCounts","heatWalkRoster","heatRowDetail","heatShareText","heatScanHref","HEAT_STANDING_LABEL","HEAT_TAP_GUARD_MS"])assert.match(board,new RegExp("\\b"+name+"\\b"),name);
+ /* THE WALK'S ORDER IS HELD, and the component only REMEMBERS it — the rule is
+    `heatWalkRoster`. Pinned at the first tap, so the list is still ranked when
+    it opens; dropped on a lane change and on closing the card, which are the
+    two ways somebody leaves a walk. */
+ assert.doesNotMatch(board,/heatRosterLane/,"the board draws the held walk, not the raw lane");
+ assert.match(board,/const shown=useMemo\(\(\)=>heatWalkRoster\(roster,lane,held\),\[roster,lane,held\]\);/);
+ /* ONLY A RECORDED CHECK PINS THE WALK. A tap can be refused four ways — no
+    initials (the live one: the default is empty), a cancelled NO HEAT question,
+    a log that would not take the check, and anything else `recordHeatTap`
+    reports — and a refused tap wrote nothing, so it must not freeze the order
+    either. It did: `onCheck` returned void, the board pinned regardless, and a
+    cancelled question left the list frozen for the rest of that lane view. */
+ assert.match(board,/const order=shown\.map\(item=>item\.busNumber\);\s*if\(onCheck\(row,result\)&&held===null\)setHeld\(order\);/,"the order is taken off the committed render and pinned only when the check filed");
+ assert.match(board,/onCheck:\(row:HeatRosterRow,result:HeatResult\)=>boolean;/,"so the board can tell a recorded check from a refused one");
+ const listsPage=lists;
+ assert.match(listsPage,/const checkHeat=\(row:HeatRosterRow,result:HeatResult\):boolean=>\{/,"and the page reports it");
+ assert.equal((listsPage.slice(listsPage.indexOf(" const checkHeat="),listsPage.indexOf(" const undoHeatTap=")).match(/return false/g)||[]).length,4,"every one of the four refusals says so");
+ assert.match(listsPage.slice(listsPage.indexOf(" const checkHeat="),listsPage.indexOf(" const undoHeatTap=")),/setLastTap\(\{checkId:tap\.checkId[^}]*\}\);\s*return true;/,"and only the recorded path returns true");
+ assert.match(board,/onClick=\{\(\)=>\{setLane\(key\);setHeld\(null\)\}\}/,"a lane change leaves the walk");
+ assert.match(board,/onClick=\{\(\)=>\{setOpen\(current=>!current\);setHeld\(null\)\}\}/,"and so does closing the list");
  assert.doesNotMatch(boardCode,/\.filter\(row=>|status===|\.length\+/,"no group, count or filter is worked out in the component");
- assert.doesNotMatch(boardCode,/quickFilterBusIds/,"the A/C card claims no number while the A/C filter still counts heating repairs");
+ assert.doesNotMatch(boardCode,/quickFilterBusIds/,"the A/C card claims no number because its walk is not running — the counting bug it used to be waiting on is fixed in quick-filters.ts");
  assert.match(board,/<a className="campaign-scan" href=\{heatScanHref\(\)\}/);
  /* A double-tap must not land on the row that slid up: both buttons go dead. */
  assert.match(board,/className="tap-ok" disabled=\{guarded\} onClick=\{\(\)=>tap\(row,"ok"\)\}/);
@@ -5426,7 +5506,7 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
     nor fall through an unmounted bar onto the row beneath. */
  assert.match(board,/<button type="button" disabled=\{guarded\} onClick=\{undo\}>UNDO THIS TAP</);
  assert.match(board,/const undo=\(\)=>guardedPress\(onUndo\);/);
- assert.match(board,/const tap=\(row:HeatRosterRow,result:HeatResult\)=>guardedPress\(\(\)=>onCheck\(row,result\)\);/);
+ assert.match(board,/const tap=\(row:HeatRosterRow,result:HeatResult\)=>guardedPress\(/,"a tap is still inside the guard — what it does inside it is asserted with the held order below");
  assert.doesNotMatch(boardCode,/role="tablist"|role="tab"/,"buttons that filter a list are not tabs without panels");
  /* STRING-AWARE, because `code()` above is the naive non-greedy regex and both
     locks below read this string: a line holding "https://wiki/*" opens a
@@ -5454,7 +5534,7 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  assert.doesNotMatch(listsCode,/fileHeatTap|recordHeatCheck|writeHeatChecks/,"nor does it sequence a tap: recordHeatTap does");
  const checkHeat=lists.slice(lists.indexOf(" const checkHeat="),lists.indexOf(" const undoHeatTap="));
  assert.match(checkHeat,/const tap=recordHeatTap\(localStorage,row.busNumber,result,initials\);/);
- assert.match(checkHeat,/if\(!tap.ok\)\{alert\(HEAT_TAP_PROBLEM\[tap.why\][^;]*;return\}/,"a tap that failed is said to have failed");
+ assert.match(checkHeat,/if\(!tap.ok\)\{alert\(HEAT_TAP_PROBLEM\[tap.why\][^;]*;return false\}/,"a tap that failed is said to have failed — and reports the failure to the board, which must not pin the walk on it");
  inOrder(checkHeat,"confirm(","recordHeatTap(","the clock is taken after the question, not before");
  /* The one failure that can leave a defect behind re-reads the board BEFORE it
     speaks, and says what the tap reports rather than "nothing was changed". */
