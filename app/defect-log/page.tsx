@@ -27,7 +27,7 @@ import SweepScanner from "./_components/sweep-scanner";
 import HeatScanner from "./_components/heat-scanner";
 import {heatFiling,type HeatFinding} from "@/src/lib/defects/heat-check-import";
 import {applyHeatFiling} from "@/src/lib/defects/heat-check-apply";
-import {HEAT_SCAN_PARAM,HEAT_SCAN_VALUE,addHeatChecks,dropScanChecks,heatChecksFromFindings,heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
+import {HEAT_SCAN_PARAM,HEAT_SCAN_VALUE,addHeatChecks,dropScanChecks,heatChecksFromFindings,heatCleanupLeftBehind,heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
 import {sweepDefect,type SweepFinding} from "@/src/lib/defects/sweep-scan-import";
 import ScanBatchesPanel from "./_components/scan-batches-panel";
 import {findScanBatch,readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,scanBatchWords,scanRestoreLeftOff,type ScanBatch,type ScanBatchUndo} from "@/src/lib/defects/scan-batches";
@@ -1538,7 +1538,10 @@ export default function DefectLog(){
   if(!written.ok)return;
   const label="Removed "+result.removed.length+" "+scanBatchWords(batch).noun+" record"+(result.removed.length===1?"":"s");
   const snapshot=scanBatchUndoSnapshot(result.removed,label,now);
-  writeSetting(localStorage,SCAN_BATCH_UNDO_KEY,JSON.stringify(snapshot));setBatchUndo(snapshot);
+  /* The disk copy of the way back can be refused. PUT BACK still works in this
+     page from `batchUndo` in state, but it is gone on the next load — so a
+     retry offered for LATER is only honest if this write landed. */
+  const wayBack=writeSetting(localStorage,SCAN_BATCH_UNDO_KEY,JSON.stringify(snapshot));setBatchUndo(snapshot);
   writeMergedAway(localStorage,{...readMergedAway(localStorage),...Object.fromEntries(result.removed.map(record=>[record.defect.id,now]))});
   setUndoSnapshot({fleet,downEntries,label,scanBatch:true});
   setBatchesOpen(false);
@@ -1551,7 +1554,7 @@ export default function DefectLog(){
      learned to leave off a repair the bus already has open. */
   const cut=dropScanChecks(localStorage,batch);
   alert(result.removed.length+" record"+(result.removed.length===1?"":"s")+" removed from "+buses+" bus"+(buses===1?"":"es")+"."+(result.kept?" "+result.kept+" kept.":"")
-   +(cut.removed||!cut.ok?(cut.ok?" The "+cut.removed+" heat check"+(cut.removed===1?"":"s")+" that scan logged "+(cut.removed===1?"was":"were")+" taken out too.":" ITS HEAT CHECKS COULD NOT BE TAKEN OUT — "+heatLogProblemWords(cut.why)+"."):"")
+   +(cut.removed||!cut.ok?(cut.ok?" The "+cut.removed+" heat check"+(cut.removed===1?"":"s")+" that scan logged "+(cut.removed===1?"was":"were")+" taken out too.":" ITS HEAT CHECKS COULD NOT BE TAKEN OUT — "+heatLogProblemWords(cut.why)+"."+heatCleanupLeftBehind(cut.why,cut.removed,scanBatchWords(batch).noun,wayBack.ok)):"")
    +" PUT BACK under SCAN BATCHES returns the records"+(cut.removed&&cut.ok?"; the checks come back by scanning the sheet again":"")+".");
  };
  /* The records go back stamped as new work — newer than the tombstones the

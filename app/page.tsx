@@ -49,7 +49,7 @@ import SaveAlert from "@/src/components/shared/save-alert";
 import ShopCloudLive from "@/src/components/shared/shop-cloud-live";
 import RefreshButton,{refreshTrackerApp} from "@/src/components/shared/refresh-button";
 import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,scanBatchWords,scanRestoreLeftOff} from "@/src/lib/defects/scan-batches";
-import {dropScanChecks,heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
+import {dropScanChecks,heatCleanupLeftBehind,heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
 import {forgetRemovedEntries,readMergedAway,rememberRemovedEntries,writeMergedAway} from "@/src/lib/cloud/cloud-sync";
 import AppName from "@/src/components/shared/app-name";
 import WelcomeGate from "@/src/components/shared/welcome-gate";
@@ -495,10 +495,14 @@ const executeOperator=(plan:OperatorPlan):{ok:boolean;message:string}=>{
      This door took the defects and left every check behind until a cold read
      ran it: each bus the removed scan had called N/R dropped into VERIFY. */
   const cut=dropScanChecks(localStorage,batch);
-  writeSetting(localStorage,SCAN_BATCH_UNDO_KEY,JSON.stringify(scanBatchUndoSnapshot(result.removed,label,now)));
+  /* The way back is a WRITE and it can be refused. A storage that took the
+     board and then refuses this snapshot leaves nothing for PUT BACK to read,
+     so its result decides what the message is allowed to promise — it was
+     thrown away here, under a message that promised PUT BACK regardless. */
+  const wayBack=writeSetting(localStorage,SCAN_BATCH_UNDO_KEY,JSON.stringify(scanBatchUndoSnapshot(result.removed,label,now)));
   writeMergedAway(localStorage,{...readMergedAway(localStorage),...Object.fromEntries(result.removed.map(record=>[record.defect.id,now]))});
   setBuses(result.fleet as B[]);
-  return {ok:true,message:result.removed.length+" record"+(result.removed.length===1?"":"s")+" from that "+words.short+" "+(result.removed.length===1?"was":"were")+" taken off "+new Set(result.removed.map(record=>record.busId)).size+" bus"+(new Set(result.removed.map(record=>record.busId)).size===1?"":"es")+"."+(result.kept?" "+result.kept+" worked on since "+(result.kept===1?"was":"were")+" kept.":"")+(cut.removed||!cut.ok?(cut.ok?" The "+cut.removed+" heat check"+(cut.removed===1?"":"s")+" that scan logged "+(cut.removed===1?"was":"were")+" taken off the check log too.":" Its heat checks could not be taken off the check log — "+heatLogProblemWords(cut.why)+", so they are still in it and those buses still read as checked. Putting the "+words.short+" back and removing it again is the way to try that part once more."):"")+" The shop cloud will drop them on the other devices. To put them back, tell me to put the "+words.short+" back, or use SCAN BATCHES on the Defect Log."};
+  return {ok:true,message:result.removed.length+" record"+(result.removed.length===1?"":"s")+" from that "+words.short+" "+(result.removed.length===1?"was":"were")+" taken off "+new Set(result.removed.map(record=>record.busId)).size+" bus"+(new Set(result.removed.map(record=>record.busId)).size===1?"":"es")+"."+(result.kept?" "+result.kept+" worked on since "+(result.kept===1?"was":"were")+" kept.":"")+(cut.removed||!cut.ok?(cut.ok?" The "+cut.removed+" heat check"+(cut.removed===1?"":"s")+" that scan logged "+(cut.removed===1?"was":"were")+" taken off the check log too.":" Its heat checks could not be taken off the check log — "+heatLogProblemWords(cut.why)+"."+heatCleanupLeftBehind(cut.why,cut.removed,words.short,wayBack.ok)):"")+" The shop cloud will drop them on the other devices."+(wayBack.ok?" To put them back, tell me to put the "+words.short+" back, or use SCAN BATCHES on the Defect Log.":" The way back could not be saved on this device, so there is no PUT BACK for this one.")};
  }
  if(plan.kind==="restoreScanBatch"){
   const snapshot=readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY));

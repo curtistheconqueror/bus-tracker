@@ -4586,9 +4586,27 @@ test("the heat check log keeps every check as its own event, and reading the sam
  /* Nothing stored, or an empty string, is an EMPTY log and takes a write. */
  disk.set(HEAT_CHECKS_KEY,"");
  assert.deepEqual(writeHeatChecks(storage,mine),{ok:true});
- const {heatLogProblemWords}=await import("../src/lib/defects/heat-check-log.ts");
+ const {heatLogProblemWords,heatCleanupLeftBehind}=await import("../src/lib/defects/heat-check-log.ts");
  assert.match(heatLogProblemWords("full"),/storage is full/);
  assert.match(heatLogProblemWords("unreadable"),/could not be read.*left alone/);
+
+ /* WHAT A REFUSED CLEANUP LEFT BEHIND. Both doors say this, so it is one
+    function and not two sentences that must agree. Three rules, each of which
+    was got wrong by the version that only reported why the write failed:
+    the checks are STILL IN THE LOG and those buses still read as checked;
+    the retry is offered ONLY where it can work; and it pluralises. */
+ assert.match(heatCleanupLeftBehind("full",3,"heat sheet scan",true),/They are still in it, so those buses still read as checked\. Putting the heat sheet scan back and removing it again is the way to try that part once more\./);
+ /* AN UNREADABLE LOG IS A CIRCLE, so it is never offered the retry: the way
+    back in reads the same log with the same code and refuses identically, and
+    nothing in the app makes an unreadable log readable. */
+ assert.doesNotMatch(heatCleanupLeftBehind("unreadable",0,"heat sheet scan",true),/try that part once more|Putting the/,"an unreadable log is not sent round the loop");
+ assert.match(heatCleanupLeftBehind("unreadable",0,"heat sheet scan",true),/They are still in it, so those buses still read as checked\./,"it still says what was left behind");
+ /* AND NEVER WHEN THE WAY BACK WAS NOT WRITTEN: PUT BACK reads that snapshot,
+    so naming it would promise a door the app had just failed to build. */
+ assert.doesNotMatch(heatCleanupLeftBehind("full",3,"heat sheet scan",false),/try that part once more|Putting the/,"no retry through a snapshot that was refused");
+ /* One check, one bus. The clause was plural-only and `removed` can be 1. */
+ assert.match(heatCleanupLeftBehind("full",1,"heat sheet scan",true),/It is still in it, so that bus still reads as checked\./);
+ assert.doesNotMatch(heatCleanupLeftBehind("full",1,"heat sheet scan",true),/They are|those buses|read as checked/);
 
  /* ADDING TO THE LOG ON DISK merges, and reports what was NEW. */
  const shelf=new Map(),shelfStorage={getItem:key=>shelf.has(key)?shelf.get(key):null,setItem:(key,value)=>{shelf.set(key,value)}};
@@ -5348,11 +5366,28 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  inOrder(executor,"writeFleetStorageResult(","dropScanChecks(","the operator takes the checks only once the board has let the defects go");
  assert.match(executor,/scanBatchWords\(batch\)/);
  assert.match(executor,/\+\(cut\.removed\|\|!cut\.ok\?\(cut\.ok\?/,"the operator says so too");
- /* And a refused cleanup says the checks are STILL IN THE LOG and names the one
-    way to try again. It used to stop at why it failed: once the defects are off
-    the board, `scanBatches` no longer offers that batch, so the only retry is to
-    put the scan back and remove it again — and nothing told anybody that. */
- assert.match(executor,/so they are still in it and those buses still read as checked\. Putting the "\+words\.short\+" back and removing it again is the way to try that part once more\./,"a refused check cleanup names its retry route");
+ /* A refused cleanup says what it left behind and, where it can work, the one
+    way to try again — through the LIB function both doors use, never a sentence
+    typed into a page. It used to stop at why the write failed: once the defects
+    are off the board `scanBatches` no longer offers that batch, so nothing in
+    the app named the retry at all. */
+ assert.match(executor,/heatCleanupLeftBehind\(cut\.why,cut\.removed,words\.short,wayBack\.ok\)/,"the operator says what was left behind in the shared words");
+ assert.doesNotMatch(executor,/still in it|read as checked|try that part once more/,"and does not type that sentence into the page");
+ /* THE WAY BACK IS A WRITE AND ITS REFUSAL DECIDES THE PROMISE. This result was
+    discarded under a message that offered PUT BACK regardless: on a storage that
+    took the board and then refused the snapshot, PUT BACK answers "there is no
+    removed scan to put back" over an operator that reported success. */
+ assert.match(executor,/const wayBack=writeSetting\(localStorage,SCAN_BATCH_UNDO_KEY,/,"the way-back write is not thrown away");
+ assert.match(executor,/wayBack\.ok\?" To put them back/,"PUT BACK is offered only when the snapshot landed");
+ assert.match(executor,/:" The way back could not be saved on this device, so there is no PUT BACK for this one\."/,"and said plainly when it did not");
+ /* THE OTHER DOOR SAYS THE SAME THING. The Defect Log's SCAN BATCHES runs the
+    identical `dropScanChecks` and left exactly the same checks behind while
+    saying less about it — which is the drift one shared function exists to
+    stop. Its own way-back write is captured for the same reason. */
+ const removeOnLog=logPage.slice(logPage.indexOf(" const removeBatch="),logPage.indexOf(" const restoreBatch="));
+ assert.match(removeOnLog,/heatCleanupLeftBehind\(cut\.why,cut\.removed,scanBatchWords\(batch\)\.noun,wayBack\.ok\)/,"the Defect Log's door says it too");
+ assert.match(removeOnLog,/const wayBack=writeSetting\(localStorage,SCAN_BATCH_UNDO_KEY,/,"and does not throw its way-back write away either");
+ assert.doesNotMatch(stripCodeComments(removeOnLog),/still in it|read as checked|try that part once more/,"neither door owns the wording");
  assert.doesNotMatch(executor,/scan sweep record|from that sweep|"[^"]*That scan sweep/,"the executor names the scan it removed, not always a sweep");
  assert.match(panel,/scanBatchWords\(batch\)/);
  assert.doesNotMatch(code(panel),/SCAN SWEEP FILED|this sweep/,"the panel lists two kinds of scan now and must not call both a sweep");
@@ -5393,7 +5428,16 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  assert.match(board,/const undo=\(\)=>guardedPress\(onUndo\);/);
  assert.match(board,/const tap=\(row:HeatRosterRow,result:HeatResult\)=>guardedPress\(\(\)=>onCheck\(row,result\)\);/);
  assert.doesNotMatch(boardCode,/role="tablist"|role="tab"/,"buttons that filter a list are not tabs without panels");
- const listsCode=code(lists);
+ /* STRING-AWARE, because `code()` above is the naive non-greedy regex and both
+    locks below read this string: a line holding "https://wiki/*" opens a
+    pseudo-comment that swallows real code after it, which hid a planted
+    `localStorage["setItem"](FLEET_STORAGE_KEY,…)` from the ban list AND from
+    the count; and a `//` comment naming the key was never stripped at all, so
+    an accurate note about this rule failed the build. Two bugs in opposite
+    directions, one cause — the pair `tests/settings.test.mjs` records paying
+    for once already. `stripCodeComments` keeps strings and drops both comment
+    forms, and is already imported at the top of this file. */
+ const listsCode=stripCodeComments(lists);
  assert.doesNotMatch(listsCode,/writeFleetStorage|serializeFleetPayload|setItem\(\s*FLEET_STORAGE_KEY|pace-board-v1/,"Fleet Campaigns never writes the board itself — by the constant, or by the key spelled out");
  /* The line above bans the write spellings somebody would reach for, and a ban
     list is not a proof: `localStorage["setItem"](FLEET_STORAGE_KEY,…)` and a key
