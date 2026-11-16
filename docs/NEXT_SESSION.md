@@ -171,8 +171,8 @@ locked box and its label dim to .55 so they do not look live (the heat
 scanner's box shares the class and now shows its lock too). **That is a flow
 change and it is Curtis's to keep or reverse:** on a hand-off the read starts
 by itself, and until `8e5e364` a note could be typed while it ran and was used
-on the next read after CHANGE PHOTOS. It was put to him the same night and is
-not answered. The open question was the keyboard: the bot would not take
+on the next read after CHANGE PHOTOS. It was put to him, and **on 2026-11-16 he
+said *"Keep it locked"*. Settled; do not re-ask.** The open question was the keyboard: the bot would not take
 synthetic key events, so Tab and Shift+Tab were driven with trusted presses
 through the browser's input layer (17, every one `isTrusted`), including after
 a button is disabled and after the buttons are replaced, and focus stayed in
@@ -305,10 +305,9 @@ Curtis's integration to look at.
 ### Still Curtis's call, not yours
 
 - **Merging #47 and #39.** Never merge on your own.
-- **Two things on #47.** Whether the notes box stays locked while a scanner
-  reads (`8e5e364`; put to him, not answered), and pressing Tab and Shift+Tab
-  on a physical keyboard in the SCAN SHEET box, or waiving it — CodeRabbit
-  holds one thread open for that.
+- **One thing on #47.** Pressing Tab and Shift+Tab on a physical keyboard in
+  the SCAN SHEET box, or waiving it — CodeRabbit holds one thread open for
+  that. The notes lock (`8e5e364`) is settled: he said keep it, 2026-11-16.
 - **Pointing Codex at `docs/PUBLISH_NEXT.md`.** That is how 194 goes live.
 - **An actual iPhone.** `overflow:clip` and the row swipe were measured in
   Chromium with real CDP touch events. Real iOS Safari was never touched.
