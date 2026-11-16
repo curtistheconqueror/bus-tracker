@@ -16,6 +16,7 @@ import {shareOrDownloadFile} from "../shared/share-file.ts";
    this hint is the long version behind them. It lives beside the backup itself
    so the two can never be described inconsistently. */
 import {SHEET_LEDGER_KEY} from "../down-sheet/sheet-ledger.ts";
+import {HEAT_CHECKS_KEY} from "../defects/heat-check-log.ts";
 
 export const REPORT_EXPORT_HINT="Report only — a snapshot to read or send to somebody. This file cannot be imported back into the app. To move this section to another device use the transfer above it; to back the whole app up use MASTER EXPORT in Settings.";
 
@@ -56,7 +57,7 @@ function readSavedValue(storage:Pick<Storage,"getItem">,key:string){
    is — the Shop Cloud cannot take it without a `shop_memory` schema migration,
    which is Curtis's call and not done. */
 export async function exportFleetBoardBackup(storage:Storage,buses:unknown[]){
- const exportedAt=new Date(),filename="fleet-board-"+exportedAt.toISOString().slice(0,10)+".json",payload={kind:"pace-south-fleet-board-backup",version:6,exportedAt:exportedAt.toISOString(),buses,settings:readSavedValue(storage,BOARD_SETTINGS_STORAGE_KEY),downSheet:readSavedValue(storage,DOWN_SHEET_STORAGE_KEY),downSheetSettings:readSavedValue(storage,DOWN_SHEET_SETTINGS_STORAGE_KEY),defectLogSettings:readSavedValue(storage,DEFECT_LOG_SETTINGS_STORAGE_KEY),partsMemory:readSavedValue(storage,PARTS_MEMORY_STORAGE_KEY),busLists:readSavedValue(storage,BUS_LISTS_STORAGE_KEY),busListTemplates:readSavedValue(storage,BUS_LIST_TEMPLATES_STORAGE_KEY),findingsMemory:readSavedValue(storage,FINDINGS_MEMORY_STORAGE_KEY),pathToRepairs:readSavedValue(storage,PATH_TO_REPAIR_KEY),repairHours:readSavedValue(storage,REPAIR_HOURS_KEY),sheetLedger:readSavedValue(storage,SHEET_LEDGER_KEY)},contents=JSON.stringify(payload,null,2),blob=new Blob([contents],{type:"application/json"});
+ const exportedAt=new Date(),filename="fleet-board-"+exportedAt.toISOString().slice(0,10)+".json",payload={kind:"pace-south-fleet-board-backup",version:6,exportedAt:exportedAt.toISOString(),buses,settings:readSavedValue(storage,BOARD_SETTINGS_STORAGE_KEY),downSheet:readSavedValue(storage,DOWN_SHEET_STORAGE_KEY),downSheetSettings:readSavedValue(storage,DOWN_SHEET_SETTINGS_STORAGE_KEY),defectLogSettings:readSavedValue(storage,DEFECT_LOG_SETTINGS_STORAGE_KEY),partsMemory:readSavedValue(storage,PARTS_MEMORY_STORAGE_KEY),busLists:readSavedValue(storage,BUS_LISTS_STORAGE_KEY),busListTemplates:readSavedValue(storage,BUS_LIST_TEMPLATES_STORAGE_KEY),findingsMemory:readSavedValue(storage,FINDINGS_MEMORY_STORAGE_KEY),pathToRepairs:readSavedValue(storage,PATH_TO_REPAIR_KEY),repairHours:readSavedValue(storage,REPAIR_HOURS_KEY),sheetLedger:readSavedValue(storage,SHEET_LEDGER_KEY),heatChecks:readSavedValue(storage,HEAT_CHECKS_KEY)},contents=JSON.stringify(payload,null,2),blob=new Blob([contents],{type:"application/json"});
  const outcome=await shareOrDownloadFile(blob,filename,"Fleet Board Backup");
  if(outcome==="cancelled")return false;
  markFleetBackupExported(storage,buses,exportedAt.toISOString());

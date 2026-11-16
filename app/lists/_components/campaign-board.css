@@ -1,0 +1,111 @@
+/* THE CAMPAIGNS BOARD, above the working lists.
+
+   Every block here is a div with a class, never a bare <header> or <aside>:
+   globals.css styles those element selectors for the Facility Map — a navy
+   banner, a panel pinned top-right — and they reach this page too. lists.css spends its first rules undoing exactly
+   that for the elements it inherited; nothing here needs undoing because
+   nothing here asks for it.
+
+   Every button, link and input is at least 44px tall at every width, not only
+   on a phone:
+   the shop computer is the exception here and the iPad at 820 is the rule,
+   and it is worked with the same thumb.
+
+   The one text input is 16px at every width. Below that iOS zooms the page on
+   focus, and a mechanic typing initials with a glove on does not need the list
+   jumping out from under the button he is about to press. */
+.campaigns{display:grid;gap:10px;margin:12px 14px 0}
+.campaigns-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.campaigns-head b{font-size:10px;letter-spacing:.8px;color:#163c70}
+.campaigns-head small{font-size:9px;color:#56677f}
+.campaign-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
+.campaign-card{display:grid;gap:9px;align-content:start;min-width:0;padding:12px;border:1px solid #aebdd1;border-top-width:4px;border-radius:9px;background:#fff;box-shadow:0 6px 22px #17355718}
+/* Warm for heat and blue for A/C, so a campaign is told apart before it is
+   read. The heat card's orange is the one on the Defect Log's SCAN HEAT SHEET
+   button, which is where this card's own scan link leads. */
+.campaign-card.heat{border-top-color:#b3530a}
+.campaign-card.ac{border-top-color:#0b64bd}
+.campaign-title{display:flex;align-items:baseline;gap:8px}
+.campaign-title b{font-size:15px;color:#163c70}
+.campaign-title small{font-size:8px;font-weight:900;letter-spacing:.8px;color:#56677f}
+.campaign-tallies{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.campaign-tallies span{display:grid;gap:2px;justify-items:center;min-width:0;padding:7px 4px;border:1px solid #d7e0ec;border-radius:7px;background:#f7fafd}
+.campaign-tallies strong{font-size:19px;line-height:1;color:#163c70}
+.campaign-tallies small{font-size:7px;font-weight:900;letter-spacing:.3px;color:#56677f;text-align:center}
+.campaign-card.heat .campaign-tallies .hot{border-color:#e3b58d;background:#fff4ea}
+.campaign-card.heat .campaign-tallies .hot strong{color:#8a3a05}
+.campaign-card.ac .campaign-tallies .hot{border-color:#b9d4f1;background:#eef6ff}
+.campaign-card.ac .campaign-tallies .hot strong{color:#0b4f96}
+.campaign-idle{margin:0;font-size:10px;line-height:1.4;color:#44566f}
+.campaign-actions{display:flex;gap:7px;flex-wrap:wrap}
+.campaign-actions a,.campaign-actions button{flex:1 1 130px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #163c70;border-radius:6px;background:#fff;color:#163c70;padding:0 10px;font-size:9px;font-weight:900;text-align:center;text-decoration:none;cursor:pointer}
+.campaign-actions .campaign-scan{border-color:#b3530a;background:#b3530a;color:#fff}
+
+.heat-list{display:grid;gap:9px;padding:12px;border:1px solid #aebdd1;border-radius:9px;background:#fff;box-shadow:0 6px 22px #17355718}
+.heat-list-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.heat-initials{display:grid;gap:3px;font-size:7px;font-weight:900;letter-spacing:.5px;color:#56677f}
+.heat-initials input{width:150px;min-height:44px;border:1px solid #b7c4d7;border-radius:6px;padding:0 9px;font-size:16px}
+.heat-share{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.heat-share button{min-height:44px;border:1px solid #163c70;border-radius:6px;background:#fff;color:#163c70;padding:0 12px;font-size:9px;font-weight:900;cursor:pointer}
+.heat-share i{font-size:9px;font-style:normal;font-weight:900;color:#08733f}
+.heat-list-note{margin:0;font-size:9px;line-height:1.45;color:#44566f}
+.heat-lanes{display:flex;gap:6px;flex-wrap:wrap}
+.heat-lanes button{min-height:44px;border:1px solid #b7c4d7;border-radius:999px;background:#f7fafd;color:#163c70;padding:0 12px;font-size:9px;font-weight:900;cursor:pointer}
+.heat-lanes button.active{border-color:#163c70;background:#163c70;color:#fff}
+.heat-lanes strong{margin-left:3px}
+.heat-roster{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.heat-roster li{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid #cbd6e6;border-left-width:5px;border-radius:7px;background:#fff}
+.heat-roster li.standing-no-heat{border-left-color:#b3530a}
+.heat-roster li.standing-verify{border-left-color:#c98a00}
+.heat-roster li.standing-unchecked{border-left-color:#8496ad}
+.heat-roster li.standing-ok{border-left-color:#08733f}
+.heat-bus{display:grid;gap:1px}
+.heat-bus b{font-size:17px;color:#073d7c}
+.heat-bus em{font-size:7px;font-style:normal;font-weight:900;letter-spacing:.4px;color:#56677f}
+.standing-no-heat .heat-bus em{color:#8a3a05}
+.standing-verify .heat-bus em{color:#6f4d00}
+.standing-ok .heat-bus em{color:#08733f}
+.heat-detail{display:grid;gap:3px;min-width:0;font-size:10px;line-height:1.35;color:#2d3d56;overflow-wrap:anywhere}
+/* A link somebody is meant to press, so it is a button's height. It was 8px
+   of text with no height of its own under a comment claiming every control
+   here was 44. */
+.heat-detail a{justify-self:start;min-height:44px;display:inline-flex;align-items:center;font-size:9px;font-weight:900;color:#0b4f96}
+.heat-taps{display:flex;gap:6px}
+.heat-taps button{min-width:86px;min-height:44px;border:0;border-radius:6px;color:#fff;font-size:10px;font-weight:900;cursor:pointer}
+/* Dead for a moment after any tap. Dimmed, not hidden: a button that vanished
+   would move the next one under the thumb, which is the thing being stopped. */
+.heat-taps button:disabled{opacity:.45;cursor:default}
+/* Sticky, not fixed: it keeps its place after the last row, so at the end of
+   the list it covers nothing, and it cannot sit over another page's content. */
+.heat-undo{position:sticky;bottom:8px;z-index:2;box-shadow:0 4px 14px rgb(0 0 0 / .18);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid #c9b46a;border-radius:7px;background:#fffbea;color:#4d3d00;font-size:10px;line-height:1.4}
+.heat-undo span{flex:1 1 220px;min-width:0}
+.heat-undo button{flex:none;min-height:44px;border:1px solid #5d4a00;border-radius:6px;background:#fff;color:#4d3d00;padding:0 14px;font-size:9px;font-weight:900;cursor:pointer}
+.tap-ok{background:#08733f}
+.tap-cold{background:#b3530a}
+.heat-list-empty{margin:0;color:#56677f;font-size:10px}
+
+@media(max-width:620px){
+ .campaigns{margin:10px 10px 0}
+ .campaign-cards{grid-template-columns:minmax(0,1fr)}
+ .campaigns-head small,.heat-list-note,.campaign-idle{font-size:11px}
+ .campaign-tallies strong{font-size:21px}
+ .campaign-tallies small{font-size:8px}
+ .campaign-actions a,.campaign-actions button{min-height:48px;font-size:11px}
+ .heat-list-head{align-items:stretch;flex-direction:column}
+ .heat-initials{font-size:9px}
+ .heat-initials input{width:100%;min-height:46px}
+ .heat-share button{flex:1;min-height:46px;font-size:11px}
+ .heat-lanes button{min-height:44px;font-size:11px}
+ /* One column, taps full width underneath: two fat buttons a thumb can hit
+    beat three columns squeezed onto 360px. */
+ .heat-roster li{grid-template-columns:minmax(0,1fr);gap:7px}
+ .heat-bus{display:flex;align-items:baseline;gap:8px}
+ .heat-bus b{font-size:20px}
+ .heat-bus em{font-size:9px}
+ .heat-detail{font-size:12px}
+ .heat-detail a{font-size:11px}
+ .heat-undo{font-size:12px}
+ .heat-undo button{flex:1 1 100%;min-height:48px;font-size:11px}
+ .heat-taps{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .heat-taps button{min-height:52px;font-size:13px}
+}
