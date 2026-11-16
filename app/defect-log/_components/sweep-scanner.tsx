@@ -72,7 +72,19 @@ export default function SweepScanner({fleet,onClose,onFile,handed}:Props){
     mattered less while a read only ever began with a press; a hand-off starts
     one by itself, so the window is open the moment the scanner is. The file
     inputs are locked with the buttons: they are invisible, and a keyboard
-    could otherwise still reach one and open a dialog under a read. */
+    could otherwise still reach one and open a dialog under a read.
+
+    THE NOTES ARE FROZEN WITH THEM. A read sends the notes it was started
+    with, and saves "keep these" as it was ticked then. Left live, a
+    correction typed while the read ran was in neither the read nor the kept
+    copy, and the review that followed hid the box it was sitting in: the
+    person had told the app something and nothing said it was not used. They
+    are live again when the read ends: CHANGE PHOTOS goes back to the first
+    screen, and the next READ press sends whatever is in the box then.
+
+    The cost, on a hand-off only: the read starts by itself, so a note can no
+    longer be typed WHILE it runs and kept for the next one. It has to wait
+    for the read to end. */
  const addPhotos=(files:FileList|null)=>{
   if(!files||busy)return;
   const incoming=Array.from(files).filter(file=>["image/jpeg","image/png","image/webp"].includes(file.type));
@@ -149,8 +161,8 @@ export default function SweepScanner({fleet,onClose,onFile,handed}:Props){
       <input ref={uploadRef} className="sweep-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple tabIndex={-1} disabled={busy} onChange={event=>addPhotos(event.target.files)}/>
      </div>
      <div className="sweep-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" disabled={busy} onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
-     <label className="sweep-notes"><span><b>NOTES FOR THIS SCAN</b><small>{notes.length}/{SCAN_NOTES_LIMIT}</small></span><textarea value={notes} maxLength={SCAN_NOTES_LIMIT} rows={3} onChange={event=>setNotes(event.target.value.slice(0,SCAN_NOTES_LIMIT))} placeholder="Anything the camera might get wrong. Cw is Carlos W. The note at the bottom is bus 15506. A note can correct how a row is read, never add a bus that is not on the sheet."/></label>
-     <label className="sweep-notes-keep"><input type="checkbox" checked={keepNotes} onChange={event=>setKeepNotes(event.target.checked)}/><span>Keep these notes on this device for the next scan</span></label>
+     <label className="sweep-notes"><span><b>NOTES FOR THIS SCAN</b><small>{notes.length}/{SCAN_NOTES_LIMIT}</small></span><textarea value={notes} disabled={busy} maxLength={SCAN_NOTES_LIMIT} rows={3} onChange={event=>setNotes(event.target.value.slice(0,SCAN_NOTES_LIMIT))} placeholder="Anything the camera might get wrong. Cw is Carlos W. The note at the bottom is bus 15506. A note can correct how a row is read, never add a bus that is not on the sheet."/></label>
+     <label className="sweep-notes-keep"><input type="checkbox" checked={keepNotes} disabled={busy} onChange={event=>setKeepNotes(event.target.checked)}/><span>Keep these notes on this device for the next scan</span></label>
      <button className="sweep-read" type="button" onClick={readSheets} disabled={!photos.length||busy}>{busy?progress||"READING…":"READ SHEETS"}</button>
     </>}
     {read&&<>

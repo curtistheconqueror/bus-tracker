@@ -646,6 +646,13 @@ test("each scanner takes a hand-off for its own sheet, and reads it once", async
       /* THE KEPT NOTES ARE IN THE BOX BEFORE THE READ STARTS. A read started a
          render earlier sends none — and then writes "none kept" over them. */
       assert.match(body, /setKeepNotes\(true\)\}setNotesLoaded\(true\)\},\[\]\);/, kind);
+      /* THE NOTES ARE FROZEN WITH THE PHOTOS. A read sends the notes it was
+         started with and saves "keep these" as it was ticked then, so a
+         correction typed while it ran was in neither, and the review then hid
+         the box. Found by a review bot on the second pass. */
+      assert.match(body, /<textarea value=\{notes\} disabled=\{busy\} maxLength=\{SCAN_NOTES_LIMIT\}/, kind + ": no note typed into a running read");
+      assert.match(body, /<input type="checkbox" checked=\{keepNotes\} disabled=\{busy\} onChange=/, kind + ": nor kept");
+      assert.equal(count(body, /checked=\{keepNotes\}/g), 1, kind);
       assert.match(body, new RegExp("useEffect\\(\\(\\)=>\\{if\\(!notesLoaded\\|\\|!wantsRead\\.current\\)return;wantsRead\\.current=false;void " + reader + "\\(\\)\\},\\[notesLoaded\\]\\);"), kind);
     }
   }

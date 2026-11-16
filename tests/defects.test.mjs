@@ -6219,7 +6219,7 @@ test("a scan can carry the shop's own notes about what the camera will get wrong
  assert.match(sweepRoute,/text:INSTRUCTIONS\+scanNotesPrompt\(notes\)/);
  // Both scanners: a 500-character box before READ, sent with every page, remembered only when ticked.
  for(const [name,scanner,cls] of [["down-sheet",downScanner,"scan-notes"],["sweep",sweepScanner,"sweep-notes"]]){
-  assert.match(scanner,new RegExp('<label className="'+cls+'"><span><b>NOTES FOR THIS SCAN</b><small>\\{notes\\.length\\}/\\{SCAN_NOTES_LIMIT\\}</small></span><textarea value=\\{notes\\} maxLength=\\{SCAN_NOTES_LIMIT\\}'),name+" has the box");
+  assert.match(scanner,new RegExp('<label className="'+cls+'"><span><b>NOTES FOR THIS SCAN</b><small>\\{notes\\.length\\}/\\{SCAN_NOTES_LIMIT\\}</small></span><textarea value=\\{notes\\} disabled=\\{busy\\} maxLength=\\{SCAN_NOTES_LIMIT\\}'),name+" has the box, locked while a read runs");
   assert.match(scanner,/if\(notes\.trim\(\)\)form\.append\("notes",notes\.trim\(\)\)/,name+" sends the notes with each page");
   assert.match(scanner,new RegExp('rememberScanNotes\\(localStorage\\.getItem\\(SCAN_NOTES_KEY\\),"'+name+'",notes,keepNotes\\)'),name+" remembers only when asked");
   assert.match(scanner,new RegExp('readScanNotes\\(localStorage\\.getItem\\(SCAN_NOTES_KEY\\),"'+name+'"\\)'),name+" starts with what was kept");
@@ -6227,6 +6227,15 @@ test("a scan can carry the shop's own notes about what the camera will get wrong
  }
  assert.match(downCss,/\.scan-notes textarea\{/);
  assert.match(logCss,/\.sweep-notes textarea\{/);
+ /* A LOCKED NOTES BOX LOOKS LOCKED. The box sets its own background and ink,
+    which is what a browser would otherwise grey out, so disabled alone drew
+    exactly like live. `.sweep-notes` is the heat scanner's box too, which was
+    already locked during a read and now shows it. */
+ for(const [css,cls] of [[downCss,"scan"],[logCss,"sweep"]]){
+  assert.ok(css.includes("."+cls+"-notes textarea:disabled{opacity:.55;cursor:not-allowed}"),cls+": the box");
+  assert.ok(css.includes("."+cls+"-notes-keep input:disabled{cursor:not-allowed}"),cls+": the tick");
+  assert.ok(css.includes("."+cls+"-notes-keep:has(input:disabled){opacity:.55;cursor:not-allowed}"),cls+": and its label");
+ }
 });
 
 test("Farebox, Ventra and the CUBIC screens are counted apart, off one table",async()=>{
