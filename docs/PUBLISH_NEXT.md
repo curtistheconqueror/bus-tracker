@@ -57,10 +57,19 @@ SHARED** — COPY LIST, SHARE TEXT and SHARE PAGE used to appear only once a
 quick filter was picked, so the one thing that could not be sent was the sheet;
 the bar is permanent now and its heading says whether what it sends is the
 whole sheet or part of it. And the box of checks on the LOG DEFECT form reads
-**PRELIMS** where it read WORK DONE SO FAR. Queued by Claude Code; not
-published, not tagged, not deployed. PR39 MCP remains separately held and
-unmerged, and so are PR45 (a test that could not run on Windows) and PR46 (the
-heat check log) — **neither is in this release.**
+**PRELIMS** where it read WORK DONE SO FAR. And, merged on 2026-11-16 after
+Curtis said to: **A HEAT CHECK LOG** — SCAN HEAT SHEET on the Defect Log reads
+a photo of the garage's handwritten heat sheet, shows every row for review and
+files a No Heat defect on each N/R bus not already tagged; Fleet Campaigns gets
+a CAMPAIGNS board whose NO HEAT card opens a walking list with HEAT OK and
+NO HEAT at each bus; and **A/C Buses now means cooling only**, on the Defect
+Log, the campaigns card and the Facility Map. One new key,
+`pace-heat-checks-v1`. **The heat sheet's photo read has never seen a real
+photograph**, so its first real sheet is the test of it. Also merged that day,
+and test-only: the unknown-name gate now runs on Windows. Queued by Claude
+Code; not published, not tagged, not deployed. PR39 MCP remains separately held
+and unmerged, and so is PR47 (the Down Sheet's SCAN SHEET working out which
+sheet was photographed) — **neither is in this release.**
 
 Application release 193 is live as Sites version 189 from
 `a009c08fad02aa6859ec6445784f744c6e269c8d`, deployed 2026-10-25 at
@@ -123,6 +132,25 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+be95118 Merge pull request #46 from curtistheconqueror/claude/heat-check-domain
+3ceaa0a Merge pull request #45 from curtistheconqueror/claude/typecheck-gate-windows
+293e1be The entry point: #47 at 8e5e364 passed CI, and one thread waits on a physical keyboard
+129cd71 The entry point: CodeRabbit's second pass on #47 is answered, at 8e5e364
+8ed8813 The entry point: CodeRabbit's nine findings on #46 and #47 are answered, at f9c9e10 and 9ebf489
+f9c9e10 Five review findings on the heat check log, and the seven a cold read found in their answers
+e0e99bf The entry point: #47 is now the Down Sheet's own SCAN SHEET button, at 70cd3f8
+7f0e715 The entry point: what Curtis decided on the 15th, #46 at d1d1b05, and why the iPad scan came up short
+d1d1b05 CLAUDE.md still said the A/C filter was waiting on Curtis, and said nothing about the held walk
+af4925f Hold the walk still, and A/C Buses is cooling: the two calls Curtis made on the heat check
+0770ca5 Answer the cold read: the retry I added was a circle for one failure and a promise for a write that had been refused
+db185e6 BT46-F3 and CodeRabbit's refused cleanup: a ban list is not a proof, and a failure nobody could retry
+7d2fb27 The entry point: #47 is SCAN PAPER, stacked on #46, and how to drive the built app
+d76e962 The entry point: #46's fourteen findings are answered, #45's one, and nobody has re-reviewed either
+a7b7152 BT45-F1: the canary proved TS2304 only, so 18004 could fall out of the list unseen
+cd21990 Cold read of the review fixes: UNDO sat over live buttons outside the guard
+f0a98f8 BT46-F1, F2 and CodeRabbit's twelve: the first tap moved the list, and thirteen more
+43e9594 Merge main into the heat check log: PR42, PR43 and PR44 landed
+413225e Queue PR42, PR43 and PR44 in 194, and re-run every number the handoff quotes
 14c47ae BT44-F8: the three-across rule was the 101px and nothing was holding it
 a302396 PR44-F7: the comment said COPIED! was not there, directly above the line putting it there
 f891dd9 PR44-F5/F6 and CR: the F1 gates had the same fault F1 did
@@ -152,7 +180,9 @@ fa896c9 The focus share follows the window, and a swipe drops one defect from it
 742c042 A repair can carry more than one part: the two forms
 c22f00c Answer the cold read: the badge rule was guarded by a name, and the map was scrubbing settings
 a490743 The entry point names #45 and #46, so a fresh session does not rebuild either
+79c4e58 A heat check log: scan the sheet, walk the list, and the Defect Log follows
 b8c1ef9 #39 has two open threads, not one — the second is a Minor on PUBLISH_NEXT.md
+256c744 The undefined-name gate did not run on Windows, and one stray syntax error switched it off everywhere
 cc3c8f7 #39 conflicts in two files and is nine commits ahead, not one and fourteen
 142807f #39 is conflicted, and this container's shallow clone will lie about why
 fb98346 The entry point said nothing about four open PRs, so a fresh session would miss them
@@ -228,7 +258,10 @@ b387c33 Queue application release 193 from the reviewed PR41 merge
 $ git diff --name-only a009c08..HEAD -- app src
 app/_components/down-sheet-badge-menu.tsx
 app/api/down-sheet-scan/route.ts
+app/api/heat-sheet-scan/route.ts
 app/defect-log/_components/form-coach-bar.tsx
+app/defect-log/_components/heat-scanner.tsx
+app/defect-log/_components/scan-batches-panel.tsx
 app/defect-log/_components/swipe-away-row.tsx
 app/defect-log/defect-log.css
 app/defect-log/page.tsx
@@ -240,7 +273,10 @@ app/fixed-repairs/page.tsx
 app/globals.css
 app/incidents/incidents.css
 app/layout.tsx
+app/lists/_components/campaign-board.css
+app/lists/_components/campaign-board.tsx
 app/lists/lists.css
+app/lists/page.tsx
 app/page.tsx
 app/settings/_components/defect-log-settings-modal.tsx
 app/settings/_components/map-settings-panel.tsx
@@ -266,11 +302,15 @@ src/lib/defects/feed-window.ts
 src/lib/defects/fixed-share.ts
 src/lib/defects/focus-share-scope.ts
 src/lib/defects/form-coach.ts
+src/lib/defects/heat-check-apply.ts
+src/lib/defects/heat-check-import.ts
+src/lib/defects/heat-check-log.ts
 src/lib/defects/quick-filter-share.ts
 src/lib/defects/quick-filters.ts
 src/lib/defects/repair-catalog.ts
 src/lib/defects/report-returns.ts
 src/lib/defects/save-refusal.ts
+src/lib/defects/scan-batches.ts
 src/lib/down-sheet/down-sheet-badge-view.ts
 src/lib/down-sheet/down-sheet-counter.ts
 src/lib/down-sheet/down-sheet-scan-import.ts
@@ -292,11 +332,13 @@ src/lib/settings/header-theme.ts
 src/lib/settings/map-settings.ts
 src/lib/settings/page-header-themes.ts
 src/lib/settings/site-identity.ts
+src/lib/storage/fleet-backup.ts
+src/lib/storage/fleet-restore.ts
 ```
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 87 files changed, 16142 insertions(+), 723 deletions(-)
+ 99 files changed, 21075 insertions(+), 798 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -354,6 +396,21 @@ it and draws exactly what it drew before.
 `pace-defect-log-settings-v1` and `pace-board-settings-v1` are now READ by
 `src/lib/settings/page-header-themes.ts`, which writes neither. Those pages
 keep owning them.
+
+**A SECOND NEW LOCALSTORAGE KEY, from PR46: `pace-heat-checks-v1`**, the heat
+check log — one record per person per bus per day. Added, never renamed, and
+in `CLAUDE.md`'s list. A device that has never scanned a heat sheet or tapped a
+heat check holds nothing under it. **MASTER EXPORT carries it and a restore
+MERGES it**, as it does the swap ledger, because it is events. **It does not
+sync**: that needs a new table in the live database, which is Curtis's call and
+is not part of this release. The No Heat DEFECTS a scan or a tap files are
+ordinary defects in `pace-board-v1` and travel like any other defect; one
+optional field, `scanRestoredAt`, is written on a defect that PUT BACK returns.
+
+**ONE NEW ROUTE: `POST /api/heat-sheet-scan`.** It reads `OPENROUTER_API_KEY`,
+the variable `/api/down-sheet-scan` already reads, and answers 503 *"Photo
+processing is not configured yet."* without it. No new runtime configuration,
+no dependency, no schema.
 
 ### What was wrong
 
@@ -1386,7 +1443,8 @@ both quoted a test count that the next commit moved. A number copied forward is
 the thing `.claude/skills/fresh-context-review` was written about, and naming a
 hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **417 pass, 0 fail**
+- `npm test` — **446 pass, 0 fail**, on Windows, where it had never passed in
+  full before PR45
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 
@@ -1838,6 +1896,23 @@ that refusal has not been measured on an Android device.
    FOUND under ADVANCED DETAILS, save, then clear it and save again. Open that
    bus's Down Sheet row, change the mechanic, save. The cause should stay
    cleared — it used to come back.
+19. **FLEET CAMPAIGNS.** There should be a CAMPAIGNS board at the top, with a
+   NO HEAT card and an A/C card. Open the NO HEAT card: a walking list, with
+   HEAT OK and NO HEAT at each bus. With your initials set, tap HEAT OK on one
+   bus — the row should stay where it is and only change how it is marked, and
+   UNDO THIS TAP should take it back. NO HEAT asks first, because it opens a
+   No Heat defect on that bus in the Defect Log.
+20. **DEFECT LOG, SCAN HEAT SHEET**, beside SCAN SWEEP. Photograph the heat
+   check sheet. **This is the first real photograph it will ever have read**,
+   so check the review against the paper BEFORE importing: each N/R bus should
+   be offered to file, the OK buses drawn as their own group, and a
+   struck-through row filed as nothing. If it has misread the sheet, do not
+   import — say what it got wrong, and the prompt gets fixed.
+21. **If a heat scan went in wrong**, SCAN BATCHES on the Defect Log should
+   name it as a heat sheet, and removing it should take its defects and its
+   checks back out together.
+22. **A/C BUSES** on the Defect Log, and the Facility Map's A/C highlight,
+   should no longer count a bus whose only HVAC fault is its heat.
 
 ### The screen stops zooming on a phone
 
@@ -3179,6 +3254,111 @@ under it. No storage key. No migration. Landed as PR43.
 **To check once it is live:** open + LOG DEFECT on a phone. The box of six
 checks is headed PRELIMS — OPTIONAL, on one line.
 
+### A heat check log
+
+**Merged on 2026-11-16 as PR46.** Curtis photographed the garage's handwritten
+heat check sheet and asked for *"a heat/no heat log. That can digest this page
+similarly to how the downsheet is cataloged"* — with one difference he spelled
+out: the heat sheet *"needs to be shared and verify with multiple mechanics
+because a mechanic could be put on heat sheet duty"*, where the Down Sheet
+*"is just a snapshot"*. So this is a LOG OF CHECKS that accumulates, and a scan
+never replaces anything.
+
+**What changes on screen**, all of it described to him before it was built:
+
+- **Fleet Campaigns** gets a CAMPAIGNS board above what the page already
+  showed: a NO HEAT card (no heat / verify / not checked / heat OK) and an A/C
+  card. The heat card opens a walking list with HEAT OK and NO HEAT at each
+  bus, UNDO THIS TAP, and two plain-text lists to hand out. **The list holds
+  its order once a check is recorded** and only re-sorts when it is left and
+  opened again — his call, after a NO HEAT tap was measured moving 5 of 8 rows
+  under the thumb that made it.
+- **The Defect Log** gets SCAN HEAT SHEET, beside SCAN SWEEP. It reads the
+  photo, shows every row for review, files a No Heat defect on each N/R bus
+  that is not already tagged, and logs the checks. A filed defect is an
+  ordinary defect — *"editable of course and be no different than logging one
+  manually."*
+- **SCAN BATCHES** names which kind of scan a batch was, and removing a heat
+  scan takes its checks out with its defects.
+- **A/C Buses is cooling, not the whole category.** The filter matched the
+  category "A/C and HVAC", so one cooling fault and two no-heat buses read as
+  three A/C buses. It moves three surfaces: the Defect Log's A/C Buses list,
+  the campaigns card that links to it, and the Facility Map's A/C highlight
+  and quick-filter count.
+
+**What a mark means is decided in `src/lib/defects/heat-check-import.ts`, not
+by the model.** N/R is needs repair — asked, and Curtis: *"Yes N/R needs
+repair"*. OK is heat works. Blank is nobody looked. A struck-through row files
+nothing, closes nothing and is not logged: *"struck means fixed but I'll double
+check"*, and until he has, a pen line is nobody's finding.
+
+**Which buses are cold is still the Defect Log's answer**, never this log's. A
+no-heat bus is a defect on a bus that still runs, so it is never put on the
+Down Sheet, and an open heat repair is not cleared by somebody saying the bus
+felt warm.
+
+**Four limits, known and left**, each written out in `CLAUDE.md`: two devices
+that each scan the same sheet before either syncs each file their own defect;
+a scan that files no defect leaves no batch to take back; an undated line off
+the paper never outranks a dated check; and UNDO THIS TAP takes back the check,
+never the defect a NO HEAT tap opened.
+
+**NOT VERIFIED, and not to be reported as verified:**
+
+- **`/api/heat-sheet-scan` has never read a real photograph.** The development
+  machine has no OpenRouter key. Everything after the route was driven in a
+  browser with the route's answer stubbed.
+- **No physical phone.** The pull request records browser runs at 360, 375,
+  390, 430, 820 and 1180; none of that was re-run for this merge.
+- The fixes from its third cold read were driven by tests only, and the AI
+  Operator's scan removal was tested in code, not clicked through.
+
+**How it was reviewed.** It failed its SDET gate at `79c4e58` with 14 findings,
+one Major (UNDO THIS TAP mounting above the list and pushing every row down);
+all 14 were answered and it passed the re-gate at `cd21990`. CodeRabbit left
+five more on 2026-11-15, one Major, all answered in `f9c9e10`. At `f9c9e10`
+GitHub's *Lint, build and test* and CodeRabbit's check both passed; CodeRabbit
+posted no review of that last commit.
+
+### The unknown-name gate runs on Windows now
+
+**Merged on 2026-11-16 as PR45. Test-only: one file,
+`tests/app-shell.test.mjs`.** Nothing under `app/`, `src/`, `supabase/`,
+`public/` or `worker/`, so nothing a phone runs is different.
+
+The test *nothing in app/ or src/ names an identifier that does not exist* is
+the gate written after + LOG DEFECT stopped opening. It spawned `npx tsc`, which
+cannot be spawned that way on Windows, so on Curtis's own machine it failed
+every run and proved nothing; and on every platform one stray syntax error
+anywhere switched the checker off and let it pass. It now asks the TypeScript
+program for its diagnostics in-process, knows thirteen error codes where it
+knew one, and plants one undefined name in a file that exists only in memory
+and demands exactly that report back — so a checker that did not run fails
+instead of going green.
+
+### How PR45 and PR46 reached `main`, and what was run on the result
+
+Curtis, 2026-11-16: *"Yes, merge both"*. Both were merged on GitHub with a
+merge commit — `3ceaa0a` for PR45, then `be95118` for PR46 — the way #40 and
+#41 were. PR46's branch already held a merge of `main` (`43e9594`), because it
+was published and a published branch is not rebased, so the commit list in
+**Source** is no longer a straight line.
+
+Before either was merged, both were merged in that order onto `main` at
+`293e1be` in a scratch branch and the gates run there. `main` ended on the same
+tree — `git rev-parse 'be95118^{tree}'` and the scratch branch both give
+`2b16bb8ce5cc7dc8487e4f07c7b315f21d920e52`. The two pull requests share no
+file.
+
+On that tree, on a Windows machine: **`npm test` 446 of 446** — the first full
+pass there, because PR45 is what lets the unknown-name test run on Windows.
+ESLint reports no error in the repository. The build inside `npm test`
+succeeds. **No cold read was run on the combination**: each had its own, and no
+file was touched by both.
+
+PR47 was stacked on PR46's branch. Its base was moved to `main` the same day;
+it stays open and is not in this release.
+
 ### How PR42, PR43 and PR44 reached `main`, and what was run on the result
 
 PR42 and PR43 were rebase-merged on GitHub, in that order; PR44 was replayed as
@@ -3214,3 +3394,14 @@ in the include list and a line in the two renderers, plus putting `ibs` back
 into the flag fallback so a flagged bus is not counted twice. Nothing has been
 added, because the report is what his superintendent sends upward and that is
 not a section to invent for him.
+
+**Three on the heat check log, none built.** Whether each OK bus in the scan
+review needs its own way to be turned down — today they can only be accepted
+as a group. Whether a struck-through row really means fixed. And whether the
+walking list's lane tab should count what the held list shows: it counts the
+whole roster, so TO DO can read 6 above eight rows.
+
+**Should the heat checks sync?** The No Heat defects already do. Who looked,
+the OK results and who is still unchecked stay on the device that recorded
+them, which is the gap for a log whose whole reason is changing hands. It
+needs a new table in the live database.
