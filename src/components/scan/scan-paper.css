@@ -17,6 +17,7 @@
 .paper-pickers{display:flex;justify-content:center;gap:12px;padding:8px}
 .paper-pickers button,.paper-read{min-height:44px;border:0;border-radius:7px;padding:0 22px;background:#173d74;color:#fff;font-family:inherit;font-size:10px;font-weight:900;cursor:pointer;touch-action:manipulation}
 .paper-pickers button:disabled{opacity:.45;cursor:not-allowed}
+.paper-modal:focus{outline:none}
 .paper-file-input{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0}
 .paper-previews{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px}
 .paper-previews:empty{display:none}

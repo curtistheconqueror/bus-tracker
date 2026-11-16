@@ -84,8 +84,17 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
     beside it was written for. */
  const unread=useMemo(()=>unreadBusNumbers(rows),[rows]);
 
+ /* THE PHOTOS ARE FROZEN WHILE A READ IS RUNNING, the rule the heat scanner
+    learned first. A read is about the photos it was started with. With these
+    live, a page added mid-read never reached the review, the review then hid
+    the photo strip, and what was approved was a sheet with a page missing —
+    here that is buses coming off a sheet the import REPLACES. It mattered
+    less while a read only ever began with a press; a hand-off starts one by
+    itself, so the window is open the moment the scanner is. The file inputs
+    are locked with the buttons: they are invisible, and a keyboard could
+    otherwise still reach one and open a dialog under a read. */
  const addPhotos=(files:FileList|null)=>{
-  if(!files)return;
+  if(!files||busy)return;
   const incoming=Array.from(files).filter(file=>["image/jpeg","image/png","image/webp"].includes(file.type));
   setPhotos(current=>{
    const available=Math.max(0,MAX_FILES-current.length),next=incoming.slice(0,available).map((file,index)=>({file,url:URL.createObjectURL(file),key:`${file.name}-${file.lastModified}-${index}-${Math.random()}`}));
@@ -96,10 +105,10 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
   if(cameraRef.current)cameraRef.current.value="";
   if(uploadRef.current)uploadRef.current.value="";
  };
- const removePhoto=(key:string)=>{setFromPaper(false);setPhotos(current=>{const removed=current.find(photo=>photo.key===key);if(removed)URL.revokeObjectURL(removed.url);return current.filter(photo=>photo.key!==key)})};
+ const removePhoto=(key:string)=>{if(busy)return;setFromPaper(false);setPhotos(current=>{const removed=current.find(photo=>photo.key===key);if(removed)URL.revokeObjectURL(removed.url);return current.filter(photo=>photo.key!==key)})};
  const updateRow=(key:string,patch:Partial<ReviewedScanRow>)=>setRows(current=>current.map(row=>row.key===key?{...row,...patch}:row));
  const readSheet=async()=>{
-  if(!photos.length)return;
+  if(!photos.length||busy)return;
   setBusy(true);setError("");
   writeSetting(localStorage,SCAN_NOTES_KEY,rememberScanNotes(localStorage.getItem(SCAN_NOTES_KEY),"down-sheet",notes,keepNotes));
   try{
@@ -157,12 +166,12 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
     {!rows.length&&<>
      <div className="scan-intro"><b>ADD UP TO 6 PAGES</b><span>Photos are sent for processing only after you press Read Sheet.</span></div>
      <div className="scan-pickers">
-      <button type="button" onClick={()=>cameraRef.current?.click()}>📷 TAKE PHOTO</button>
-      <button type="button" onClick={()=>uploadRef.current?.click()}>⇧ UPLOAD FILE</button>
-      <input ref={cameraRef} className="scan-file-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event=>addPhotos(event.target.files)}/>
-      <input ref={uploadRef} className="scan-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event=>addPhotos(event.target.files)}/>
+      <button type="button" disabled={busy} onClick={()=>cameraRef.current?.click()}>📷 TAKE PHOTO</button>
+      <button type="button" disabled={busy} onClick={()=>uploadRef.current?.click()}>⇧ UPLOAD FILE</button>
+      <input ref={cameraRef} className="scan-file-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" tabIndex={-1} disabled={busy} onChange={event=>addPhotos(event.target.files)}/>
+      <input ref={uploadRef} className="scan-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple tabIndex={-1} disabled={busy} onChange={event=>addPhotos(event.target.files)}/>
      </div>
-     <div className="scan-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
+     <div className="scan-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" disabled={busy} onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
      <label className="scan-notes"><span><b>NOTES FOR THIS SCAN</b><small>{notes.length}/{SCAN_NOTES_LIMIT}</small></span><textarea value={notes} maxLength={SCAN_NOTES_LIMIT} rows={3} onChange={event=>setNotes(event.target.value.slice(0,SCAN_NOTES_LIMIT))} placeholder="Anything the camera might get wrong. Line 23 is 17565. The margin name is Carlos. TIROS means tires. A note can correct how a row is read, never add a bus that is not on the sheet."/></label>
      <label className="scan-notes-keep"><input type="checkbox" checked={keepNotes} onChange={event=>setKeepNotes(event.target.checked)}/><span>Keep these notes on this device for the next scan</span></label>
      <button className="scan-read" type="button" onClick={readSheet} disabled={!photos.length||busy}>{busy?progress||"READING…":"READ SHEET"}</button>

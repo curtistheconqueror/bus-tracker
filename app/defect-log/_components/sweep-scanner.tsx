@@ -64,8 +64,17 @@ export default function SweepScanner({fleet,onClose,onFile,handed}:Props){
  const flagged=findings.filter(finding=>finding.fleetMatch!=="matched").length;
  const busesRead=useMemo(()=>new Set(rows.map(row=>row.busNumber).filter(Boolean)).size,[rows]);
 
+ /* THE PHOTOS ARE FROZEN WHILE A READ IS RUNNING, the rule the heat scanner
+    learned first. A read is about the photos it was started with. With these
+    live, a page added mid-read never reached the review and a page removed
+    mid-read was still in it — and the review then hides the photo strip, so
+    what was approved came from photos nobody could check it against. It
+    mattered less while a read only ever began with a press; a hand-off starts
+    one by itself, so the window is open the moment the scanner is. The file
+    inputs are locked with the buttons: they are invisible, and a keyboard
+    could otherwise still reach one and open a dialog under a read. */
  const addPhotos=(files:FileList|null)=>{
-  if(!files)return;
+  if(!files||busy)return;
   const incoming=Array.from(files).filter(file=>["image/jpeg","image/png","image/webp"].includes(file.type));
   setPhotos(current=>{
    const available=Math.max(0,MAX_FILES-current.length),next=incoming.slice(0,available).map((file,index)=>({file,url:URL.createObjectURL(file),key:`${file.name}-${file.lastModified}-${index}-${Math.random()}`}));
@@ -76,11 +85,11 @@ export default function SweepScanner({fleet,onClose,onFile,handed}:Props){
   if(cameraRef.current)cameraRef.current.value="";
   if(uploadRef.current)uploadRef.current.value="";
  };
- const removePhoto=(key:string)=>{setFromPaper(false);setPhotos(current=>{const removed=current.find(photo=>photo.key===key);if(removed)URL.revokeObjectURL(removed.url);return current.filter(photo=>photo.key!==key)})};
+ const removePhoto=(key:string)=>{if(busy)return;setFromPaper(false);setPhotos(current=>{const removed=current.find(photo=>photo.key===key);if(removed)URL.revokeObjectURL(removed.url);return current.filter(photo=>photo.key!==key)})};
  const updateFinding=(key:string,patch:Partial<SweepFinding>)=>setFindings(current=>current.map(finding=>finding.key===key?{...finding,...patch}:finding));
 
  const readSheets=async()=>{
-  if(!photos.length)return;
+  if(!photos.length||busy)return;
   setBusy(true);setError("");
   writeSetting(localStorage,SCAN_NOTES_KEY,rememberScanNotes(localStorage.getItem(SCAN_NOTES_KEY),"sweep",notes,keepNotes));
   try{
@@ -134,12 +143,12 @@ export default function SweepScanner({fleet,onClose,onFile,handed}:Props){
     {!read&&<>
      <div className="sweep-intro"><b>ADD UP TO 6 PAGES — BOTH SHEET TYPES ARE FINE TOGETHER</b><span>The Ventra sheet and the farebox check-off sheet. A tick or dash is working, ER or X is a fault, blank means nobody looked. Photos are sent for processing only after you press Read Sheets, and nothing is filed until you approve it.</span></div>
      <div className="sweep-pickers">
-      <button type="button" onClick={()=>cameraRef.current?.click()}>📷 TAKE PHOTO</button>
-      <button type="button" onClick={()=>uploadRef.current?.click()}>⇧ UPLOAD FILE</button>
-      <input ref={cameraRef} className="sweep-file-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event=>addPhotos(event.target.files)}/>
-      <input ref={uploadRef} className="sweep-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event=>addPhotos(event.target.files)}/>
+      <button type="button" disabled={busy} onClick={()=>cameraRef.current?.click()}>📷 TAKE PHOTO</button>
+      <button type="button" disabled={busy} onClick={()=>uploadRef.current?.click()}>⇧ UPLOAD FILE</button>
+      <input ref={cameraRef} className="sweep-file-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" tabIndex={-1} disabled={busy} onChange={event=>addPhotos(event.target.files)}/>
+      <input ref={uploadRef} className="sweep-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple tabIndex={-1} disabled={busy} onChange={event=>addPhotos(event.target.files)}/>
      </div>
-     <div className="sweep-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
+     <div className="sweep-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" disabled={busy} onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
      <label className="sweep-notes"><span><b>NOTES FOR THIS SCAN</b><small>{notes.length}/{SCAN_NOTES_LIMIT}</small></span><textarea value={notes} maxLength={SCAN_NOTES_LIMIT} rows={3} onChange={event=>setNotes(event.target.value.slice(0,SCAN_NOTES_LIMIT))} placeholder="Anything the camera might get wrong. Cw is Carlos W. The note at the bottom is bus 15506. A note can correct how a row is read, never add a bus that is not on the sheet."/></label>
      <label className="sweep-notes-keep"><input type="checkbox" checked={keepNotes} onChange={event=>setKeepNotes(event.target.checked)}/><span>Keep these notes on this device for the next scan</span></label>
      <button className="sweep-read" type="button" onClick={readSheets} disabled={!photos.length||busy}>{busy?progress||"READING…":"READ SHEETS"}</button>

@@ -428,7 +428,40 @@ test("SCAN SHEET on the screen: it identifies, hands on, and files nothing", asy
   ]);
   const body = code(paper);
   /* It asks its one question of SMALL copies, at the one route. */
-  assert.match(body, /form\.append\("photos",await scanGlancePhoto\(batch\[index\]\.file,index\+1\)\)/);
+  assert.match(body, /form\.append\("photos",await Promise\.race\(\[scanGlancePhoto\(batch\[index\]\.file,index\+1\),stopped\]\)\)/);
+  /* THE TIME LIMIT COVERS MAKING THE SMALL COPIES. Shrinking a photo takes no
+     signal, so a copy that hung sat on WORKING past the limit, which only
+     stopped the request. Each copy is raced against the same abort, asked
+     before each one starts, and the race's own rejection is never left
+     unhandled. Found by a review bot. */
+  assert.match(body, /const stopped=new Promise<never>\(\(_,reject\)=>asking\.signal\.addEventListener\("abort",\(\)=>reject\(new DOMException\("stopped","AbortError"\)\),\{once:true\}\)\);\s*stopped\.catch\(\(\)=>\{\}\);/);
+  assert.match(body, /for\(let index=0;index<batch\.length;index\+\+\)\{\s*if\(asking\.signal\.aborted\)throw new DOMException\("stopped","AbortError"\);/);
+  assert.equal(count(body, /scanGlancePhoto\(/g), 1, "and there is no second, unraced, copy");
+
+  /* THE KEYBOARD STAYS IN THE BOX. `aria-modal` says the page behind is out
+     of reach and does nothing to make it so. Found by a review bot; a cold
+     read of the first answer then measured three ways out of it, each pinned
+     here:
+     - Tab is caught ON THE DOCUMENT. Every step forward removes or disables
+       the button just pressed, focus drops to the body, and a listener on the
+       box never heard the next Tab;
+     - with no live button — the page is being left — Tab stays on the box;
+     - focus goes back only on a plain close. After a hand-off it went to SCAN
+       SHEET under the scanner, where Space re-opened this box over a running
+       read; and it never goes back to a text field. */
+  assert.match(body, /document\.addEventListener\("keydown",keepInside,true\);\s*return\(\)=>\{\s*document\.removeEventListener\("keydown",keepInside,true\);/);
+  assert.doesNotMatch(body, /onKeyDown=/, "not on the box");
+  assert.match(body, /modal\.current\?\.focus\(\{preventScroll:true\}\);/);
+  assert.match(body, /if\(!stops\.length\)\{event\.preventDefault\(\);box\.focus\(\{preventScroll:true\}\);return\}/);
+  assert.match(body, /const first=stops\[0\],last=stops\[stops\.length-1\],outside=!box\.contains\(at\)\|\|at===box;\s*if\(event\.shiftKey\?\(at===first\|\|outside\):\(at===last\|\|outside\)\)\{event\.preventDefault\(\);\(event\.shiftKey\?last:first\)\.focus\(\)\}/);
+  assert.match(body, /querySelectorAll<HTMLElement>\("button:not\(:disabled\)"\)/);
+  assert.match(body, /if\(!handedOn\.current&&before\?\.isConnected&&!before\.matches\("input,textarea,select,\[contenteditable\]"\)\)before\.focus\(\{preventScroll:true\}\);/);
+  assert.match(body, /if\(!files\.length\)\{setError\("There is no page to send to that scanner\."\);return\}\s*handedOn\.current=true;\s*if\(paperKind\(choice\.kind\)\.route===here\)/, "set for both ways of handing on, and not when nothing was sent");
+  assert.match(body, /<section className="paper-modal" ref=\{modal\} tabIndex=\{-1\}>/);
+  /* Out of time while the answer was still arriving is still "took too long". */
+  assert.match(body, /catch\{\}\s*if\(asking\.signal\.aborted\)throw new DOMException\("stopped","AbortError"\);\s*if\(!response\.ok\)/);
+  assert.equal(count(body, /className="paper-file-input"[^>]*tabIndex=\{-1\}/g), 2, "both file inputs");
+  assert.equal(count(body, /className="paper-file-input"/g), 2);
   assert.match(body, /fetch\("\/api\/scan-identify",\{method:"POST",body:form,signal:asking\.signal\}\)/);
   assert.doesNotMatch(body, /scanReadyPhoto|\/api\/(down-sheet-scan|sweep-scan|heat-sheet-scan)/, "it never does a scanner's read");
   /* IT TOUCHES NO RECORD. Nothing here can file, import or store. */
@@ -594,7 +627,21 @@ test("each scanner takes a hand-off for its own sheet, and reads it once", async
     assert.match(body, new RegExp('\\{fromPaper&&start\\.warning&&<p className="' + noteClass + ' held-back" role="alert">\\{start\\.warning\\}</p>\\}'), kind);
     assert.equal(count(body, /setFromPaper\(false\)/g), 2, kind + ": adding a photo and removing one both retire the lines");
     assert.match(body, /return \[\.\.\.current,\.\.\.next\];\s*\}\);\s*setFromPaper\(false\);/, kind);
-    assert.match(body, /const removePhoto=\(key:string\)=>\{(if\(busy\)return;)?setFromPaper\(false\);setPhotos\(/, kind);
+    assert.match(body, /const removePhoto=\(key:string\)=>\{if\(busy\)return;setFromPaper\(false\);setPhotos\(/, kind);
+    /* EVERY SCANNER FREEZES ITS PHOTOS WHILE IT READS. Only the heat scanner
+       did. A hand-off starts the read by itself, so the photo controls were
+       live under a read from the moment the scanner opened: a page added then
+       never reached the review, and on the Down Sheet the import that
+       followed replaced the sheet without it. Found by a review bot. */
+    assert.match(body, /const addPhotos=\(files:FileList\|null\)=>\{\s*if\(!files\|\|busy\)return;/, kind + " takes no photo mid-read");
+    assert.match(body, /<button type="button" disabled=\{busy\} onClick=\{\(\)=>cameraRef\.current\?\.click\(\)\}>📷 TAKE PHOTO<\/button>/, kind);
+    assert.match(body, /<button type="button" disabled=\{busy\} onClick=\{\(\)=>uploadRef\.current\?\.click\(\)\}>⇧ UPLOAD FILE<\/button>/, kind);
+    assert.match(body, /<button type="button" disabled=\{busy\} onClick=\{\(\)=>removePhoto\(photo\.key\)\}>REMOVE<\/button>/, kind);
+    /* A read cannot be started twice, and the invisible file inputs are
+       locked with the buttons that open them. The heat scanner's inputs are
+       not: that file is #46's and is left as it was reviewed. */
+    assert.match(body, /const (readSheet|readSheets)=async\(\)=>\{\s*if\(!photos\.length\|\|busy\)return;/, kind);
+    if (kind !== "heat") assert.equal(count(body, /type="file"[^>]*tabIndex=\{-1\} disabled=\{busy\}/g), 2, kind + ": both file inputs");
     if (keepsNotes) {
       /* THE KEPT NOTES ARE IN THE BOX BEFORE THE READ STARTS. A read started a
          render earlier sends none — and then writes "none kept" over them. */

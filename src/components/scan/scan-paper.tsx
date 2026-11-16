@@ -75,6 +75,42 @@ export default function ScanPaper({here,onClose,onHere}:Props){
  useEffect(()=>{open.current=true;return()=>{open.current=false;request.current?.abort();photosRef.current.forEach(photo=>URL.revokeObjectURL(photo.url))}},[]);
  useEffect(()=>lockPageScroll("scan-paper-open"),[]);
 
+ /* THE KEYBOARD STAYS IN THE BOX. `aria-modal` says the page behind is out of
+    reach and does nothing to make it so: focus stayed on the button that
+    opened this, under the shade, and Tab walked the page nobody could see.
+
+    Focus comes in when it opens. Tab is caught ON THE DOCUMENT, not on the
+    box: every step forward here removes or disables the button just pressed,
+    which drops focus to the page body, and a listener on the box never hears
+    the next Tab from there. From anywhere outside the box, or from its
+    first or last live button, Tab goes to the box's own buttons; with none
+    live — the page is being left — it stays on the box. The two file inputs
+    are out of the tab order: the buttons that open them are the controls.
+
+    FOCUS GOES BACK ONLY WHEN THE BOX IS SIMPLY CLOSED. Not when it has handed
+    the photos on: the scanner is opening over the page, and putting focus on
+    the SCAN SHEET button underneath it left Space and Enter pressing that
+    button under a running read. And never onto a text field, which on a
+    phone raises the keyboard over whatever opened next. */
+ const modal=useRef<HTMLElement>(null),handedOn=useRef(false);
+ useEffect(()=>{
+  const before=document.activeElement instanceof HTMLElement?document.activeElement:null;
+  modal.current?.focus({preventScroll:true});
+  const keepInside=(event:globalThis.KeyboardEvent)=>{
+   const box=modal.current;
+   if(event.key!=="Tab"||!box)return;
+   const stops=Array.from(box.querySelectorAll<HTMLElement>("button:not(:disabled)")),at=document.activeElement;
+   if(!stops.length){event.preventDefault();box.focus({preventScroll:true});return}
+   const first=stops[0],last=stops[stops.length-1],outside=!box.contains(at)||at===box;
+   if(event.shiftKey?(at===first||outside):(at===last||outside)){event.preventDefault();(event.shiftKey?last:first).focus()}
+  };
+  document.addEventListener("keydown",keepInside,true);
+  return()=>{
+   document.removeEventListener("keydown",keepInside,true);
+   if(!handedOn.current&&before?.isConnected&&!before.matches("input,textarea,select,[contenteditable]"))before.focus({preventScroll:true});
+  };
+ },[]);
+
  /* THE PHOTOS ARE FROZEN WHILE THE LOOK IS RUNNING, the rule the heat scanner
     learned: what comes back is about the photos the look was started with. */
  const addPhotos=(files:FileList|null)=>{
@@ -104,6 +140,7 @@ export default function ScanPaper({here,onClose,onHere}:Props){
   if(!open.current||leaving)return;
   const files=choice.send.map(page=>batch[page-1]?.file).filter((file):file is File=>Boolean(file));
   if(!files.length){setError("There is no page to send to that scanner.");return}
+  handedOn.current=true;
   if(paperKind(choice.kind).route===here){onHere({kind:choice.kind,files,expected:files.length,leftOut:choice.leftOut.length});return}
   const href=paperScanHref(choice.kind,files.length);
   setLeaving(paperPageLabel(choice.kind));
@@ -122,10 +159,24 @@ export default function ScanPaper({here,onClose,onHere}:Props){
   const giveUp=window.setTimeout(()=>{slow=true;asking.abort()},PAPER_LOOK_MS);
   try{
    const form=new FormData();
-   for(let index=0;index<batch.length;index++)form.append("photos",await scanGlancePhoto(batch[index].file,index+1));
+   /* THE LIMIT COVERS MAKING THE SMALL COPIES TOO. Shrinking a photo takes no
+      signal, so a copy whose promise never settles would have sat on WORKING
+      past the limit, which only stopped the request. Each copy is raced
+      against the same abort. What this cannot bound is a decode that blocks
+      the page outright: that holds the timer up with everything else. */
+   const stopped=new Promise<never>((_,reject)=>asking.signal.addEventListener("abort",()=>reject(new DOMException("stopped","AbortError")),{once:true}));
+   stopped.catch(()=>{});
+   for(let index=0;index<batch.length;index++){
+    if(asking.signal.aborted)throw new DOMException("stopped","AbortError");
+    form.append("photos",await Promise.race([scanGlancePhoto(batch[index].file,index+1),stopped]));
+   }
    const response=await fetch("/api/scan-identify",{method:"POST",body:form,signal:asking.signal});
    let payload:{pages?:unknown[];error?:string}={};
    try{payload=(await response.json() as typeof payload)||{}}catch{}
+   /* Out of time while the answer was still arriving: the read above
+      swallows that like any unreadable body, and the person was then asked
+      with no reason given. */
+   if(asking.signal.aborted)throw new DOMException("stopped","AbortError");
    if(!response.ok)throw new Error(payload.error||"the reader did not answer");
    pages=normalizePaperPages(payload,batch.length);
    verdict=paperVerdict(pages);
@@ -163,7 +214,7 @@ export default function ScanPaper({here,onClose,onHere}:Props){
  const pagesNote=(choice:PaperChoice)=>total>1?paperPagesWords(choice.send)+" · ":"";
 
  return <div className="paper-shade" role="dialog" aria-modal="true" aria-labelledby="scan-paper-title">
-  <section className="paper-modal">
+  <section className="paper-modal" ref={modal} tabIndex={-1}>
    <div className="paper-head"><div><span>PHOTO IMPORT</span><h2 id="scan-paper-title">{PAPER_DOOR}</h2></div><button type="button" onClick={onClose} disabled={Boolean(leaving)} aria-label="Close">×</button></div>
    <div className="paper-body">
     {!looked&&<>
@@ -171,8 +222,8 @@ export default function ScanPaper({here,onClose,onHere}:Props){
      <div className="paper-pickers">
       <button type="button" disabled={busy} onClick={()=>cameraRef.current?.click()}>📷 TAKE PHOTO</button>
       <button type="button" disabled={busy} onClick={()=>uploadRef.current?.click()}>⇧ UPLOAD FILE</button>
-      <input ref={cameraRef} className="paper-file-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event=>addPhotos(event.target.files)}/>
-      <input ref={uploadRef} className="paper-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event=>addPhotos(event.target.files)}/>
+      <input ref={cameraRef} className="paper-file-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" tabIndex={-1} onChange={event=>addPhotos(event.target.files)}/>
+      <input ref={uploadRef} className="paper-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple tabIndex={-1} onChange={event=>addPhotos(event.target.files)}/>
      </div>
      <div className="paper-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" disabled={busy} onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
      <button className="paper-read" type="button" onClick={look} disabled={!photos.length||busy}>{busy?"WORKING OUT WHICH SHEET THIS IS…":"READ SHEET"}</button>
