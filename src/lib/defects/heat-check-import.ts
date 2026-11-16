@@ -404,6 +404,22 @@ function onePerBus(rows:ScannedHeatRow[],unsurePages:ReadonlySet<number>=new Set
  }
  return slots.map(({rows:all})=>{
   const written=all.filter(row=>outcome(row)!=="blank");
+  /* ASKED BEFORE THE BLANK COPIES ARE SET ASIDE. A page lists each bus once,
+     so one number twice on ONE photo is a misread number whatever the two
+     lines say — and "N/R" beside "blank" is the dangerous pair: with the
+     blank dropped first, one written row was left, nothing called it a
+     conflict, and it arrived ticked. If the N/R line is the misread one, that
+     files No Heat on a bus nobody checked. `sameLine` already refuses two
+     WRITTEN rows on one photo; this is the same rule reached before the
+     filter that hid the second row from it.
+
+     ONLY WHEN A WRITTEN ROW SHARES ITS PHOTO WITH A COPY. Asked of the whole
+     group — "is any photo in here twice" — it also refused a clean N/R on
+     photo 1 because photo 2, taken earlier in the walk, had the number on two
+     blank lines. That misread is photo 2's, on lines nobody wrote on, and
+     nothing can be filed from them; the N/R shares its photo with nothing. */
+  const crowded=written.find(row=>all.some(other=>other!==row&&other.pageNumber===row.pageNumber));
+  if(crowded)return {row:crowded,conflict:true,repeated:all.length};
   const group=written.length?written:all.filter(touched).slice(0,1);
   if(!group.length)return {row:all[0],conflict:false,repeated:all.length};
   if(group.length===1)return {row:group[0],conflict:false,repeated:all.length};

@@ -351,9 +351,10 @@ export function heatRosterLane(rows:HeatRosterRow[],lane:HeatLane){
    stays where it is and only changes how it is marked, and the list re-sorts
    when somebody leaves and comes back.
 
-   `held` is the WALK'S OWN ORDER — bus numbers, pinned at the first tap, which
-   is the moment the ranking stops helping and starts moving things. null means
-   no walk is under way, and the ranked order is what to draw.
+   `held` is the WALK'S OWN ORDER — bus numbers, pinned at the first RECORDED
+   check, which is the moment the ranking stops helping and starts moving
+   things, and added to by every one after it (`heatWalkPin`). null means no
+   walk is under way, and the ranked order is what to draw.
 
    A held row is KEPT even when its new standing would have taken it out of the
    lane, because that is the whole point of holding it. A bus the held order has
@@ -367,6 +368,25 @@ export function heatWalkRoster(rows:HeatRosterRow[],lane:HeatLane,held:string[]|
  const kept=held.map(number=>byNumber.get(number)).filter((row):row is HeatRosterRow=>!!row);
  const seen=new Set(held);
  return [...kept,...fresh.filter(row=>!seen.has(row.busNumber))];
+}
+
+/* WHAT A RECORDED CHECK PINS: the held order, plus every bus on the screen
+   that is not in it yet.
+
+   Pinning only the FIRST time left a bus that arrived mid-walk held by
+   nothing. It was drawn on the end, and then HEAT OK on it took its row out
+   from under the next newcomer and NO HEAT re-ranked the newcomers among
+   themselves — the two things holding the walk exists to stop.
+
+   ADDED TO, never replaced by what is on the screen: a held bus that is off
+   the roster for a moment — a pull that renumbers it and puts it back — keeps
+   its place in the order, where taking the screen's rows as the new order
+   would have forgotten it and returned it on the end. */
+export function heatWalkPin(held:string[]|null,shown:HeatRosterRow[]):string[]{
+ const order=shown.map(row=>row.busNumber);
+ if(!held)return order;
+ const seen=new Set(held);
+ return [...held,...order.filter(number=>!seen.has(number))];
 }
 
 /* How long the tap buttons stay dead after a tap, in milliseconds. Long enough
@@ -486,6 +506,11 @@ export function dropScanChecks(storage:LogStorage,batch:{kind:string;key:string}
    an event — and without this the only way to correct a stray HEAT OK was to
    tap NO HEAT, which opens a defect on a bus nobody found cold. */
 export function undoHeatCheck(storage:LogStorage,id:string):{ok:boolean;why?:HeatLogProblem;removed:boolean}{
+ /* The question `dropScanChecks` asks first, for the same reason: a log that
+    cannot be read comes back as an empty list, the id is "not in it", and
+    this answered that the undo had worked. The page then dropped its UNDO bar
+    with the check still on disk. */
+ if(!storedHeatChecks(storage).readable)return {ok:false,why:"unreadable",removed:false};
  const all=readHeatChecks(storage),kept=all.filter(check=>check.id!==id);
  if(kept.length===all.length)return {ok:true,removed:false};
  return {...writeHeatChecks(storage,kept),removed:true};

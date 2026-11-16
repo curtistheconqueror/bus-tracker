@@ -3,7 +3,7 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {quickFilterHref} from "@/src/lib/defects/quick-filters";
 import type {HeatFleetBus} from "@/src/lib/defects/heat-check-import";
-import {HEAT_STANDING_LABEL,HEAT_TAP_GUARD_MS,heatRoster,heatRosterCounts,heatRowDetail,heatScanHref,heatShareText,heatWalkRoster,type HeatCheck,type HeatLane,type HeatResult,type HeatRosterRow} from "@/src/lib/defects/heat-check-log";
+import {HEAT_STANDING_LABEL,HEAT_TAP_GUARD_MS,heatRoster,heatRosterCounts,heatRowDetail,heatScanHref,heatShareText,heatWalkPin,heatWalkRoster,type HeatCheck,type HeatLane,type HeatResult,type HeatRosterRow} from "@/src/lib/defects/heat-check-log";
 import {copyText} from "@/src/lib/shared/share-file";
 
 /* THE CAMPAIGNS BOARD: the seasonal walks, above the working lists.
@@ -46,11 +46,12 @@ const LANES:HeatLane[]=["todo","no-heat","verify","unchecked","ok"];
 export default function CampaignBoard({fleet,checks,initials,onInitials,onCheck,lastTap,onUndo}:Props){
  const [open,setOpen]=useState(false);
  const [lane,setLane]=useState<HeatLane>("todo");
- /* THE WALK'S OWN ORDER, pinned at the first tap and dropped when somebody
-    leaves the walk — which is changing lane, or closing the card. Pinned at
-    the TAP rather than on mount so the list is still ranked worst-first when
-    it opens, which is what it is for before anybody has started walking.
-    `heatWalkRoster` holds the rule; this only remembers the order. */
+ /* THE WALK'S OWN ORDER, pinned at the first recorded check, added to by
+    every one after it, and dropped when somebody leaves the walk — which is
+    changing lane, or closing the card. Pinned at the CHECK rather than on
+    mount so the list is still ranked worst-first when it opens, which is what
+    it is for before anybody has started walking. `heatWalkRoster` and
+    `heatWalkPin` hold the rules; this only remembers the order. */
  const [held,setHeld]=useState<string[]|null>(null);
  const [copied,setCopied]=useState("");
  /* THE SECOND TAP IS NOT FOR THE NEXT BUS. In TO DO a bus tapped HEAT OK leaves
@@ -87,10 +88,14 @@ export default function CampaignBoard({fleet,checks,initials,onInitials,onCheck,
     a tap refused for missing initials or a cancelled question changed nothing
     — and pinning on it froze the list for the rest of the lane view on a
     gesture that wrote nothing at all. The no-initials path is the live one:
-    the default is empty. */
+    the default is empty.
+
+    AND EVERY RECORDED CHECK PINS AGAIN, not only the first, so a bus that
+    arrived mid-walk is held from the next one. What that adds to the order
+    is `heatWalkPin`'s to say. */
  const tap=(row:HeatRosterRow,result:HeatResult)=>guardedPress(()=>{
-  const order=shown.map(item=>item.busNumber);
-  if(onCheck(row,result)&&held===null)setHeld(order);
+  const order=heatWalkPin(held,shown);
+  if(onCheck(row,result))setHeld(order);
  });
  /* UNDO IS GUARDED BOTH WAYS, because the bar now floats over live tap
     buttons. Dead while a tap's guard runs: the bar mounts under the thumb

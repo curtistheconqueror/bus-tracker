@@ -33,6 +33,7 @@
 
 import {defectSummary,isUnresolved,normalizeDefects,repairIdentityKey,type StructuredDefect} from "./repair-catalog.ts";
 import {statusAfterDefectChange,type DefectLogFleetBus} from "./defect-log-sync.ts";
+import {quickFilterDefects} from "./quick-filters.ts";
 
 export type ScanBatchBus={id:string;n:string;defects?:unknown;pendingRepair?:string};
 
@@ -244,6 +245,19 @@ export function scanBatchUndoSnapshot(removed:RemovedScanRecord[],label:string,n
  return {version:1,removedAt:now,label,records:removed};
 }
 
+/* WHICH WAY BACK "PUT BACK" MEANS, when the page holds one and the device
+   holds one. They are the same thing unless the write of the stored copy was
+   refused — and then the device has either nothing or the removal BEFORE this
+   one, while the button on the screen is for the one just made. Reading the
+   device alone, PUT BACK said there was nothing to put back with the records
+   sitting in the page's own memory, or put an older scan back instead.
+
+   The later removal wins, so a newer one made in another tab still does. */
+export function latestScanBatchUndo(stored:ScanBatchUndo|null,held:ScanBatchUndo|null):ScanBatchUndo|null{
+ if(!stored||!held)return stored||held;
+ return held.removedAt>stored.removedAt?held:stored;
+}
+
 export function readScanBatchUndo(raw:string|null):ScanBatchUndo|null{
  if(!raw)return null;
  try{
@@ -271,12 +285,27 @@ export function readScanBatchUndo(raw:string|null):ScanBatchUndo|null{
    alone, gave each bus the same open repair twice. Matched on the repair, the
    way PATH TO REPAIR names one, and only against what the bus holds now: two
    records returning together are both the scan's and both go back. `duplicate`
-   counts what was left off, so the screen can say so. */
-export function restoreScanBatch<T extends ScanBatchBus>(fleet:T[],snapshot:ScanBatchUndo,now=new Date().toISOString()):{fleet:T[];restored:number;missing:number;duplicate:number;restoredIds:string[]}{
+   counts what was left off, so the screen can say so.
+
+   AND A HEAT RECORD DOES NOT GO BACK ONTO A BUS THAT IS ALREADY ON NO HEAT
+   BUSES. Filing refuses that pair — `applyHeatFiling` asks No Heat Buses, the
+   one rule, because "Heater boost pump" is not the same repair as "No heat"
+   and the same-repair check above cannot see it. PUT BACK did not ask, so a
+   bus that picked up a heat repair after the removal came back with two open
+   heat repairs, which the scan itself would never have filed. Asked of the
+   board as it stands, like the check above; `tagged` counts those. */
+export function restoreScanBatch<T extends ScanBatchBus>(fleet:T[],snapshot:ScanBatchUndo,now=new Date().toISOString()):{fleet:T[];restored:number;missing:number;duplicate:number;tagged:number;restoredIds:string[]}{
  const byBus=new Map<string,RemovedScanRecord[]>();
  for(const record of snapshot.records)byBus.set(record.busId,[...(byBus.get(record.busId)||[]),record]);
  const restoredIds:string[]=[];
- let duplicate=0;
+ let duplicate=0,tagged=0;
+ /* The BUS is what is asked, the way `applyHeatFiling` asks it — not the list
+    of its records. A bus with an empty defect list and a heat line typed into
+    its old free-text field is on No Heat Buses, and asking the list alone
+    missed it. */
+ type Asked=Parameters<typeof quickFilterDefects>[0];
+ const isHeatRecord=(defect:StructuredDefect)=>quickFilterDefects({id:"",defects:[defect]},"no-cabin-heat",now).length>0;
+ const onNoHeat=(bus:ScanBatchBus)=>quickFilterDefects(bus as Asked,"no-cabin-heat",now).length>0;
  const next=fleet.map(bus=>{
   const returning=byBus.get(bus.id);
   if(!returning)return bus;
@@ -288,6 +317,7 @@ export function restoreScanBatch<T extends ScanBatchBus>(fleet:T[],snapshot:Scan
   for(const record of returning){
    if(have.has(record.defect.id))continue;
    if(open.has(repairIdentityKey(record.defect.category,record.defect.issue))){duplicate++;continue}
+   if(isHeatRecord(record.defect)&&onNoHeat(bus)){tagged++;continue}
    added.push({...record.defect,updatedAt:now,scanRestoredAt:now});
   }
   if(!added.length)return bus;
@@ -295,11 +325,25 @@ export function restoreScanBatch<T extends ScanBatchBus>(fleet:T[],snapshot:Scan
   return settle(bus,current,[...current,...added],now);
  });
  const missing=[...byBus.values()].reduce((count,records)=>count+records.length,0);
- return {fleet:next,restored:restoredIds.length,missing,duplicate,restoredIds};
+ return {fleet:next,restored:restoredIds.length,missing,duplicate,tagged,restoredIds};
 }
 
 /* What PUT BACK says about the records it did not return, for both screens
    that can put a scan back. */
-export function scanRestoreLeftOff(result:{duplicate:number}){
- return result.duplicate?"; "+result.duplicate+" "+(result.duplicate===1?"was":"were")+" left off because the bus already has that repair open":"";
+/* What PUT BACK says when NOTHING went back, for the door that says it in a
+   sentence of its own. It was written out in the AI Operator and knew two
+   reasons; with a third added to the restore it answered "every record from
+   that scan is already back on its bus" about a record that was not on its
+   bus at all. Said from the same counts as the line below, so a fourth reason
+   cannot be forgotten here either. */
+export function scanRestoreNothingWords(result:{missing:number;duplicate:number;tagged?:number}):string{
+ if(result.missing)return "Those records' buses are no longer on this device, so nothing could be put back.";
+ const left=scanRestoreLeftOff(result);
+ return left?"Nothing was put back"+left+".":"Every record from that scan is already back on its bus.";
+}
+
+export function scanRestoreLeftOff(result:{duplicate:number;tagged?:number}){
+ const tagged=result.tagged||0;
+ return (result.duplicate?"; "+result.duplicate+" "+(result.duplicate===1?"was":"were")+" left off because the bus already has that repair open":"")
+  +(tagged?"; "+tagged+" No Heat record"+(tagged===1?" was":"s were")+" left off because the bus already has a heat repair open":"");
 }
