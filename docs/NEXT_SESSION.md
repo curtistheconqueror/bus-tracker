@@ -96,7 +96,7 @@ ever will, and it is the only one of the three with no downside at all.
 
 ---
 
-## Two pull requests are open; #42 to #46 are on `main`
+## One pull request is open; #42 to #47 are on `main`
 
 **Read this before you plan anything.** Measured 2026-11-13.
 
@@ -122,14 +122,23 @@ tree. **They are not live either**: both are written into
 `docs/PUBLISH_NEXT.md` as part of 194. **The heat section of `CLAUDE.md` is on
 `main` now**, and it is the place to read before touching the heat check log.
 
+**#47 landed on `main` later on 2026-11-16**, after Curtis said *"Waive the
+keyboard check and merge #47"*. A merge commit on GitHub, `3cdb5da`. It was
+first merged onto `main` in a scratch branch and the gates run there — 457 of
+457 on Windows — and `main` ended on the same tree. **Not live either**: it has
+its own section in `docs/PUBLISH_NEXT.md` as part of 194. **The SCAN SHEET
+section of `CLAUDE.md` is on `main` now**, and it is the place to read before
+touching any of the three scanners.
+
 | PR | Branch | Head | Ahead | CI | Threads | What it is |
 | --- | --- | --- | --- | --- | --- | --- |
-| **#47** | `claude/scan-paper` | `8e5e364` | 6 | passed at `8e5e364` | **4, then 2 more, from CodeRabbit, all answered** | **SCAN SHEET IS THE DOOR.** The Down Sheet's own SCAN SHEET button takes the photo, works out which of the three sheets it is and opens that sheet's own scanner with the photos loaded. The separate SCAN PAPER button it was first built as is gone. **Was stacked on #46; its base has been `main` since 2026-11-16, and GitHub reports it mergeable** |
 | **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
-#47's row is as pushed and as read from GitHub on 2026-11-16. #39's was read on
-2026-11-13 and not since; it sits behind `main` by everything merged after that
-and will need rebasing before it can land.
+#39's row was read on 2026-11-13 and not since; it sits behind `main` by
+everything merged after that and will need rebasing before it can land.
+
+**What follows about #47 is its history**, kept because the next change to the
+scanners will want it. Its head when it was merged was `8e5e364`.
 
 **#47 was built on 2026-11-13 as SCAN PAPER, a fourth button on two pages, and
 REBUILT on 2026-11-15 as the Down Sheet's own SCAN SHEET button** (`70cd3f8`).
@@ -141,8 +150,8 @@ button anywhere we want for ease of access"* — the component takes its route
 as a prop for that, and WHERE it goes is his call before it moves.
 
 **It WAS stacked on #46** because the heat scanner only existed there. #46 is
-on `main` now and #47's base was moved to `main` on 2026-11-16. **It is still
-not to be merged until Curtis says.** Two cold reads by a subagent: 14 findings on the first build, 9 on
+on `main` now, #47's base was moved to `main` on 2026-11-16, and it was merged
+the same day. Two cold reads by a subagent: 14 findings on the first build, 9 on
 the rebuild, each with one Major, all answered and listed in the PR body. The
 rebuild's Major is worth knowing: with no direct button left, the door could
 strand a Down Sheet the look had split or cut short, so every question screen
@@ -151,9 +160,9 @@ seconds. **The 81 planted bugs from the first build were not re-run on the
 rebuild.**
 
 **CODERABBIT DID NOT REVIEW #47 BY ITSELF while it was aimed at #46's branch.**
-It skips a pull request that is not aimed at `main`. The base is `main` since
-2026-11-16, so a new push may now get a review unasked; nothing has been pushed
-since to find out. Curtis asked for its
+It skips a pull request that is not aimed at `main`. The base became `main` on
+2026-11-16 and nothing was pushed between then and the merge, so whether it
+would have reviewed unasked was never found out. Curtis asked for its
 review on 2026-11-15; a comment reading `@coderabbitai review` on the pull
 request is what starts one, and it only reads commits it has not read. It left
 four findings on `70cd3f8`, one Major — the sweep and Down Sheet scanners let
@@ -186,7 +195,9 @@ passed; twenty minutes on it had left no new finding, only a reply on the
 keyboard thread: it accepts that the trusted presses exercise the browser's
 tab order, and **holds that thread open until somebody presses Tab and
 Shift+Tab on a physical keyboard** after a control is disabled or replaced.
-That is Curtis's to do or to waive; nothing here can.
+**Curtis waived it on 2026-11-16** — *"Waive the keyboard check and merge
+#47"* — and the waiver is written on that thread. Nobody has pressed Tab on a
+physical keyboard in that box: waived, not passed. Do not re-ask.
 
 **A SCANNER'S OWN READ HAS NO TIME LIMIT, and that is recorded, not built.**
 The first look gives up after 20 seconds; the read after it never does. On
@@ -205,8 +216,8 @@ Three more things worth knowing before touching it:
   pages' stylesheets loaded afterwards. Measured on the built worker: the
   Defect Log reached that way is 78 of 80 elements identical to a fresh load,
   the Down Sheet 138 of 148 (five board toggles 44px for 38px). One board
-  state, one width. `CLAUDE.md` on that branch records it as a risk introduced
-  and not removed.
+  state, one width. `CLAUDE.md` records it as a risk introduced and not
+  removed.
 - **`/api/scan-identify` has never seen a real photograph.** Every browser
   check stubbed the route's answer.
 - **How to drive the BUILT app locally**, which nothing here had written down:
@@ -225,11 +236,11 @@ longer one commit.
 
 **WHAT CURTIS DECIDED ON 2026-11-15, so nobody re-asks:** land #45 and #46;
 **hold #47** — said of SCAN PAPER as a fourth button; later the same day he
-asked for SCAN SHEET to do that job instead, which is what #47 now is. It
-stays open, is kept current with #46, and is still not to be merged until he
-says; leave #39 (the MCP route) until later, with
-READ solved before any write. **On 2026-11-16, asked whether to merge #45 and
-#46 now, he said *"Yes, merge both"*, and they were.**
+asked for SCAN SHEET to do that job instead, which is what #47 became; leave
+#39 (the MCP route) until later, with READ solved before any write. **On
+2026-11-16, asked whether to merge #45 and #46 now, he said *"Yes, merge
+both"*, and they were. The same day he said *"Keep it locked"* of #47's notes
+lock, and then *"Waive the keyboard check and merge #47"*, and it was.**
 
 **#46 moved four commits on 2026-11-15, to `d1d1b05`.** `db185e6` and `0770ca5`
 answer BT46-F3 and a cold read of that answer. `af4925f` builds two calls he
@@ -274,7 +285,7 @@ iPad.** Whether a sheet should be allowed to introduce a bus is his design
 call and nothing is built. One more scanner fault is recorded and not built:
 LINES NOT READ cannot see a read that gives up partway down the page. (The
 other one listed here — the sweep and Down Sheet scanners not freezing their
-photos mid-read — is fixed on #47 in `9ebf489`, and only there.)
+photos mid-read — was fixed in `9ebf489`, on `main` since #47 was merged.)
 
 **Found while answering #46 and NOT fixed, because it is older than that
 branch:** `put()` in `src/lib/storage/fleet-restore.ts` ignores
@@ -304,10 +315,10 @@ Curtis's integration to look at.
 
 ### Still Curtis's call, not yours
 
-- **Merging #47 and #39.** Never merge on your own.
-- **One thing on #47.** Pressing Tab and Shift+Tab on a physical keyboard in
-  the SCAN SHEET box, or waiving it — CodeRabbit holds one thread open for
-  that. The notes lock (`8e5e364`) is settled: he said keep it, 2026-11-16.
+- **Merging #39.** Never merge on your own.
+- **Where else SCAN SHEET goes.** He said the button can be placed anywhere
+  for ease of access, and the component is built for that. Where is a UI
+  change, and he decides it before it moves.
 - **Pointing Codex at `docs/PUBLISH_NEXT.md`.** That is how 194 goes live.
 - **An actual iPhone.** `overflow:clip` and the row swipe were measured in
   Chromium with real CDP touch events. Real iOS Safari was never touched.
@@ -343,7 +354,7 @@ session that did the merging — if you are the session that owns it, stop it.
 
 | | |
 | --- | --- |
-| Branch | `main`, fast-forward pushes only, no force-pushes ever. **Two PRs are open, #47 and #39. See the section above before planning anything.** |
+| Branch | `main`, fast-forward pushes only, no force-pushes ever. **One PR is open, #39. See the section above before planning anything.** |
 | Live | See the STATUS line of `docs/PUBLISH_NEXT.md`, and `docs/RELEASES.md` for the version table |
 | Pending publication | The same STATUS line — it names what is queued and what it publishes from |
 | Working tree at handoff | Read it with `git status` and `git log -1`; a commit named here is stale by the next push. |
@@ -563,6 +574,12 @@ project has twice re-offered finished work from a queue title alone.
 - **The unknown-name test runs on Windows** (#45, on `main` since 2026-11-16)
   — so `npm test` passes in full on Curtis's machine, and a failure of that
   test there is now a real one.
+- **SCAN SHEET works out which sheet it is** (#47, on `main` since 2026-11-16)
+  — the Down Sheet's own button takes the photos, takes one look and opens the
+  right scanner. `src/lib/scan/paper-kinds.ts` is the table of sheets and
+  `src/components/scan/scan-paper.tsx` the box; no storage key. Its rules are
+  in `CLAUDE.md`. **Its first look has never seen a real photograph**, and a
+  scanner's own read still has no time limit.
 
 ---
 

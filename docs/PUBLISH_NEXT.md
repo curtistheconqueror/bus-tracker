@@ -66,10 +66,16 @@ NO HEAT at each bus; and **A/C Buses now means cooling only**, on the Defect
 Log, the campaigns card and the Facility Map. One new key,
 `pace-heat-checks-v1`. **The heat sheet's photo read has never seen a real
 photograph**, so its first real sheet is the test of it. Also merged that day,
-and test-only: the unknown-name gate now runs on Windows. Queued by Claude
-Code; not published, not tagged, not deployed. PR39 MCP remains separately held
-and unmerged, and so is PR47 (the Down Sheet's SCAN SHEET working out which
-sheet was photographed) — **neither is in this release.**
+and test-only: the unknown-name gate now runs on Windows. And, merged later
+that day after Curtis said to: **THE DOWN SHEET'S SCAN SHEET BUTTON WORKS OUT
+WHICH SHEET WAS PHOTOGRAPHED** — it takes the photos, takes one quick look at
+small copies of them, and opens that sheet's own scanner with them loaded: a
+Down Sheet is read where it is, a heat check sheet or a farebox / Ventra sweep
+is sent to the Defect Log. Every Down Sheet scan now pays that first look, and
+**the look has never seen a real photograph either**. No new key; one new
+route, `/api/scan-identify`. Queued by Claude Code; not published, not tagged,
+not deployed. PR39 MCP remains separately held and unmerged, and **is not in
+this release.**
 
 Application release 193 is live as Sites version 189 from
 `a009c08fad02aa6859ec6445784f744c6e269c8d`, deployed 2026-10-25 at
@@ -132,19 +138,28 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+3cdb5da Merge pull request #47 from curtistheconqueror/claude/scan-paper
+50d54e2 The entry point: Curtis keeps the notes lock on #47
+98f0edd Queue the heat check log and the Windows gate in 194, now that #45 and #46 are on main
 be95118 Merge pull request #46 from curtistheconqueror/claude/heat-check-domain
 3ceaa0a Merge pull request #45 from curtistheconqueror/claude/typecheck-gate-windows
 293e1be The entry point: #47 at 8e5e364 passed CI, and one thread waits on a physical keyboard
 129cd71 The entry point: CodeRabbit's second pass on #47 is answered, at 8e5e364
+8e5e364 The notes are frozen with the photos while a scanner reads
 8ed8813 The entry point: CodeRabbit's nine findings on #46 and #47 are answered, at f9c9e10 and 9ebf489
+9ebf489 Four review findings on SCAN SHEET, and the eight a cold read found in their answers
+1b74113 Merge remote-tracking branch 'origin/claude/heat-check-domain' into claude/scan-paper
 f9c9e10 Five review findings on the heat check log, and the seven a cold read found in their answers
 e0e99bf The entry point: #47 is now the Down Sheet's own SCAN SHEET button, at 70cd3f8
+70cd3f8 SCAN SHEET is the door: the Down Sheet's own button works out which sheet it is, and the fourth button is gone
 7f0e715 The entry point: what Curtis decided on the 15th, #46 at d1d1b05, and why the iPad scan came up short
+63d10bf Merge #46 (d1d1b05) into SCAN PAPER: the held walk, A/C is cooling, and three review fixes
 d1d1b05 CLAUDE.md still said the A/C filter was waiting on Curtis, and said nothing about the held walk
 af4925f Hold the walk still, and A/C Buses is cooling: the two calls Curtis made on the heat check
 0770ca5 Answer the cold read: the retry I added was a circle for one failure and a promise for a write that had been refused
 db185e6 BT46-F3 and CodeRabbit's refused cleanup: a ban list is not a proof, and a failure nobody could retry
 7d2fb27 The entry point: #47 is SCAN PAPER, stacked on #46, and how to drive the built app
+3b5eb67 SCAN PAPER: one door in front of the three scanners
 d76e962 The entry point: #46's fourteen findings are answered, #45's one, and nobody has re-reviewed either
 a7b7152 BT45-F1: the canary proved TS2304 only, so 18004 could fall out of the list unseen
 cd21990 Cold read of the review fixes: UNDO sat over live buttons outside the guard
@@ -259,9 +274,11 @@ $ git diff --name-only a009c08..HEAD -- app src
 app/_components/down-sheet-badge-menu.tsx
 app/api/down-sheet-scan/route.ts
 app/api/heat-sheet-scan/route.ts
+app/api/scan-identify/route.ts
 app/defect-log/_components/form-coach-bar.tsx
 app/defect-log/_components/heat-scanner.tsx
 app/defect-log/_components/scan-batches-panel.tsx
+app/defect-log/_components/sweep-scanner.tsx
 app/defect-log/_components/swipe-away-row.tsx
 app/defect-log/defect-log.css
 app/defect-log/page.tsx
@@ -286,6 +303,8 @@ app/shop-talk/shop-talk.css
 src/components/defects/parts-used-list.tsx
 src/components/defects/path-to-repair-panel.css
 src/components/defects/path-to-repair-panel.tsx
+src/components/scan/scan-paper.css
+src/components/scan/scan-paper.tsx
 src/components/settings/fixed-repairs-settings.tsx
 src/components/settings/section-transfer-controls.tsx
 src/components/shared/bus-selector.css
@@ -311,6 +330,7 @@ src/lib/defects/repair-catalog.ts
 src/lib/defects/report-returns.ts
 src/lib/defects/save-refusal.ts
 src/lib/defects/scan-batches.ts
+src/lib/defects/scan-photo.ts
 src/lib/down-sheet/down-sheet-badge-view.ts
 src/lib/down-sheet/down-sheet-counter.ts
 src/lib/down-sheet/down-sheet-scan-import.ts
@@ -326,6 +346,9 @@ src/lib/fleet/service-intervals.ts
 src/lib/operator/operator-engine.ts
 src/lib/reports/fleet-status-report-print.ts
 src/lib/reports/fleet-status-report.ts
+src/lib/scan/paper-handoff.ts
+src/lib/scan/paper-identify.ts
+src/lib/scan/paper-kinds.ts
 src/lib/settings/coach-settings.ts
 src/lib/settings/feedback-settings.ts
 src/lib/settings/header-theme.ts
@@ -338,7 +361,7 @@ src/lib/storage/fleet-restore.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 99 files changed, 21075 insertions(+), 798 deletions(-)
+ 109 files changed, 23326 insertions(+), 842 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -411,6 +434,14 @@ optional field, `scanRestoredAt`, is written on a defect that PUT BACK returns.
 the variable `/api/down-sheet-scan` already reads, and answers 503 *"Photo
 processing is not configured yet."* without it. No new runtime configuration,
 no dependency, no schema.
+
+**A SECOND NEW ROUTE, from PR47: `POST /api/scan-identify`**, the first look
+SCAN SHEET takes. It reads the same `OPENROUTER_API_KEY`, answers the same 503
+without it, and returns one word per page — it reads no rows and files
+nothing. It uses `SCAN_IDENTIFY_MODEL` if that is ever set and otherwise the
+model `/api/down-sheet-scan` uses, so **nothing has to be configured for it**.
+PR47 adds **no storage key**: the photos cross from the Down Sheet to the
+Defect Log in memory and are written nowhere.
 
 ### What was wrong
 
@@ -1443,7 +1474,7 @@ both quoted a test count that the next commit moved. A number copied forward is
 the thing `.claude/skills/fresh-context-review` was written about, and naming a
 hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **446 pass, 0 fail**, on Windows, where it had never passed in
+- `npm test` — **457 pass, 0 fail**, on Windows, where it had never passed in
   full before PR45
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
@@ -1913,6 +1944,23 @@ that refusal has not been measured on an Android device.
    checks back out together.
 22. **A/C BUSES** on the Defect Log, and the Facility Map's A/C highlight,
    should no longer count a bus whose only HVAC fault is its heat.
+23. **DOWN SHEET, ADVANCED ACTIONS, TOOLS, SCAN SHEET.** It opens a box headed
+   SCAN SHEET where it used to open the scanner. Photograph the Down Sheet and
+   press READ SHEET. After a few seconds it should go on into the Down Sheet
+   scanner and start reading by itself, with a green line saying what it was
+   opened as. **This is the first real photograph the first look will ever
+   have seen.** Check the review against the paper before importing, as
+   always — the import replaces the live sheet.
+24. **The same button, with the heat check sheet.** It should say it is a heat
+   check sheet and offer to open it on the Defect Log; the heat scanner should
+   open there with the photo already in it and read. If it names the wrong
+   sheet, the button under the answer — NOT A …? PICK THE SHEET YOURSELF — is
+   the way past it. **If it calls a heat sheet a Down Sheet it goes straight
+   into the Down Sheet scanner: do not import, and say so.** That is the one
+   wrong answer with no way round on the same screen.
+25. **While any of the three scanners is reading**, the notes box and its
+   "keep" tick should be greyed and locked, which is what you chose. CANCEL
+   still works.
 
 ### The screen stops zooming on a phone
 
@@ -3336,6 +3384,106 @@ knew one, and plants one undefined name in a file that exists only in memory
 and demands exactly that report back — so a checker that did not run fails
 instead of going green.
 
+### SCAN SHEET works out which sheet it is
+
+**Merged on 2026-11-16 as PR47.** Three sheets get photographed — the Vehicle
+Down Sheet, the farebox / Ventra sweep and the heat check sheet — and the
+person holding the paper had to know which button on which page reads which.
+It was first built as a fourth button, SCAN PAPER, on two pages. Curtis, before
+it was published: *"I'd rather the current scan button just do the job"*, and
+*"we will put the other button on the back burner."* So the Down Sheet's own
+SCAN SHEET button is the door, and there is no fourth.
+
+**What changes on screen**, described to him before it was built:
+
+- **Down Sheet, ADVANCED ACTIONS, TOOLS.** SCAN SHEET opens a box that takes
+  the photos and works out which sheet they are. A Down Sheet goes on into the
+  Down Sheet scanner and is read without a second press. A heat check sheet or
+  a sweep is offered to the Defect Log, which opens that sheet's scanner with
+  the photos in it.
+- **Defect Log.** No new button. SCAN SWEEP and SCAN HEAT SHEET open their
+  scanner directly, as before.
+- **Two ways past a wrong answer**, because no button on the Down Sheet opens
+  its scanner except through the box: NOT A …? PICK THE SHEET YOURSELF under a
+  sure answer, and NOT RIGHT? SHOW EVERY SHEET, WITH EVERY PAGE under a
+  question that offers less than everything. If the look fails, or has no
+  answer in 20 seconds, every sheet is offered with every page.
+- **A scanner opened this way** says so in one green line, and in an amber one
+  if a page was held back.
+- **While a scanner reads, its photos, its notes box and the "keep" tick are
+  locked** — in the sweep and Down Sheet scanners as well as the heat one. A
+  read sends the notes it started with. The lock on the notes was put to
+  Curtis as a flow change, and on 2026-11-16 he said: *"Keep it locked"*.
+
+**What it costs, and he has been told:** every Down Sheet scan pays the first
+look, a few seconds and one small read, where it used to open the scanner at
+once; and a note for one scan cannot be typed before the first read — kept
+notes go with it, a one-off note means CHANGE PHOTOS and a second read.
+
+**The app decides by itself only when every page agrees**
+(`src/lib/scan/paper-identify.ts`), and trusts nothing the look returns.
+Otherwise the person is asked, and told why each page was not placed. The
+table of sheets is `src/lib/scan/paper-kinds.ts`; a new sheet is one row there,
+its scanner, and the line on its page that opens it.
+
+**The photos cross pages in memory and nowhere else**
+(`src/lib/scan/paper-handoff.ts`) — no storage key, nothing in the address,
+nothing uploaded to be fetched back. That makes this **the one place the app
+changes page with the router instead of a full load**, which leaves both
+pages' stylesheets loaded afterwards. Measured on the built worker against a
+fresh load: the Defect Log reached from the Down Sheet had 78 of 80 elements
+identical, the two that differ being `<html>` and `<body>`, covered by the
+page's own root. One board state, one width; it clears on the next full load.
+`CLAUDE.md` records it as a risk introduced and not removed.
+
+**NOT VERIFIED, and not to be reported as verified:**
+
+- **`/api/scan-identify` has never seen a real photograph.** The development
+  machine has no OpenRouter key; every browser run stubbed the route. How
+  often the look is wrong is not known.
+- **For a Down Sheet, the look is the only check before a person's eyes.** The
+  sweep and heat scanners refuse a page that is not theirs; the Down Sheet
+  scanner never has, and its import replaces the live sheet. A heat sheet the
+  look calls a Down Sheet goes straight in. That is the exposure SCAN SHEET
+  already had for the same photo, and the review and the import's confirm
+  still stand.
+- **Nobody has pressed Tab on a physical keyboard in the box.** CodeRabbit
+  held a thread open for it. Focus was driven with 17 trusted key presses
+  through the browser's input layer and stayed inside the box after each one.
+  Curtis, 2026-11-16: *"Waive the keyboard check and merge #47"*. Waived, not
+  passed.
+- **No physical phone.** Browser runs at 360, 390 and 1024 are in the pull
+  request; none was re-run for this merge. Whether a phone can scroll a locked
+  notes box during a read was not measured.
+- **A scanner's own read has no time limit.** The first look gives up after 20
+  seconds; the read after it never does, so on wifi that is joined but dead
+  the scanner sits on READING with its controls locked until CANCEL.
+- The 81 planted bugs run against the first build were not re-run on the
+  rebuild.
+
+**How it was reviewed.** Two cold reads by a subagent — 14 findings on the
+first build and 9 on the rebuild, one Major each — then CodeRabbit twice: four
+findings on `70cd3f8`, one Major, answered in `9ebf489`; two Minor and the
+keyboard question on `9ebf489`, answered in `8e5e364`. A cold read of each set
+of answers followed. At `8e5e364` GitHub's *Lint, build and test* and
+CodeRabbit's check both passed.
+
+### How PR47 reached `main`, and what was run on the result
+
+Curtis, 2026-11-16: *"Waive the keyboard check and merge #47"*. It was merged
+on GitHub with a merge commit, `3cdb5da`, the way PR45 and PR46 were. Its
+branch holds two merges of PR46's branch, from when it was stacked on it.
+
+Before it was merged, it was merged onto `main` at `50d54e2` in a scratch
+branch and the gates run there. `main` ended on the same tree —
+`git rev-parse '3cdb5da^{tree}'` and the scratch branch both give
+`679f50b949a8a9ed48d4f4777c1fffa5eee49c5b`.
+
+On that tree, on a Windows machine: **`npm test` 457 of 457.** ESLint reports
+no error in the repository. The build inside `npm test` succeeds. **No new cold
+read was run for the merge**: it merged without a conflict, and no file the
+branch changed had been changed on `main` since the commit it was built on.
+
 ### How PR45 and PR46 reached `main`, and what was run on the result
 
 Curtis, 2026-11-16: *"Yes, merge both"*. Both were merged on GitHub with a
@@ -3356,8 +3504,8 @@ ESLint reports no error in the repository. The build inside `npm test`
 succeeds. **No cold read was run on the combination**: each had its own, and no
 file was touched by both.
 
-PR47 was stacked on PR46's branch. Its base was moved to `main` the same day;
-it stays open and is not in this release.
+PR47 was stacked on PR46's branch. Its base was moved to `main` the same day,
+and it was merged later that day — see the section above.
 
 ### How PR42, PR43 and PR44 reached `main`, and what was run on the result
 
@@ -3400,6 +3548,16 @@ review needs its own way to be turned down — today they can only be accepted
 as a group. Whether a struck-through row really means fixed. And whether the
 walking list's lane tab should count what the held list shows: it counts the
 whole roster, so TO DO can read 6 above eight rows.
+
+**Four on SCAN SHEET, none built.** Where else the button should go — he said
+*"we can just place this button anywhere we want for ease of access"*, the
+component is built to be drawn on any page, and where is his call before it
+moves. Whether a Down Sheet photographed on the Down Sheet should wait for its
+own READ press, where today it is read the moment the look is sure. Whether
+the Down Sheet's own scan route should check that the page IS a Down Sheet,
+the way the other two check theirs — that changes a working prompt and needs a
+key to prove. And how long a scanner's read may run before it gives up, which
+needs a real read of a real sheet to put a number on.
 
 **Should the heat checks sync?** The No Heat defects already do. Who looked,
 the OK results and who is still unchecked stay on the device that recorded

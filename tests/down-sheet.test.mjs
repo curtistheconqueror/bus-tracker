@@ -746,7 +746,10 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
   const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
   const scanner = await readFile(new URL("../app/down-sheet/_components/down-sheet-scanner.tsx", import.meta.url), "utf8");
   const route = await readFile(new URL("../app/api/down-sheet-scan/route.ts", import.meta.url), "utf8");
-  assert.ok(page.includes("SCAN SHEET"));
+  /* The button, not the words: "SCAN SHEET" is in this page's comments too,
+     so `includes` went on passing with the button deleted. Its label is the
+     scan door's one constant. */
+  assert.match(page, /<button className="scan-sheet-button" type="button"[\s\S]{0,200}>▣ \{PAPER_DOOR\}<\/button>/);
   assert.ok(page.includes("UNDO IMPORT"));
   assert.ok(scanner.includes("TAKE PHOTO"));
   assert.ok(scanner.includes("UPLOAD FILE"));

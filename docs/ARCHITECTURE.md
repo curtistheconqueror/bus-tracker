@@ -37,6 +37,12 @@ and stay where they are.
    leading underscore is load-bearing — Next does not route a directory whose
    name starts with one, so a component can sit beside its page without
    becoming a URL.
+   **One exception, on purpose: `src/components/scan/scan-paper.tsx`.** Only
+   the Down Sheet draws it today, behind SCAN SHEET. It stays shared because
+   it is written to be put on any page — it takes the route it is on as a
+   prop and names no page — and where that button goes next is Curtis's to
+   say. Moving it into one route's folder would be undone by the first page
+   that gains the button.
 
 A file that answers 2 and 3 at once — a component *and* a rule — is two files.
 Put the rule in `src/lib` where a test can import it directly, and let the
@@ -45,7 +51,7 @@ so a rule buried in a component is a rule nothing can test.
 
 ## The areas
 
-The same nine names are used for `src/lib` and, where they apply, for
+The same names are used for `src/lib` and, where they apply, for
 `src/components`:
 
 | area | what it owns |
@@ -55,7 +61,10 @@ The same nine names are used for `src/lib` and, where they apply, for
 | `fleet` | buses and this building: the grid, the areas, location labels, status, holds, mileage, service intervals, road calls, campaign lists |
 | `defects` | the repair catalog and its rename maps, the Defect Log, duplicates, deferrals, recommendations, quick filters, the parts and findings memories |
 | `down-sheet` | the sheet itself: availability, filters, grouping, repair items, the replacing scan, membership, the swap ledger |
+| `scan` | SCAN SHEET, the one door in front of the scanners: the table of sheets this shop photographs, telling one from another, and handing the photos to the scanner that reads them. Each sheet's own reading rules stay in `defects` or `down-sheet`, with the records they change |
 | `operator` | the AI operator: what a typed command plans and what a batch applies |
+| `incidents` | what happened to a person, and where: the incident record |
+| `shop-talk` | hazards, heads ups and suggestions: the board and what counts as open |
 | `reports` | the Fleet Status Report and its print view, the Fleet Forecast, work time |
 | `settings` | per-device settings: app mode, lite mode, map settings, roles, the shift clock, the page list |
 | `shared` | small helpers with no area of their own: elapsed labels, hours typing, operational time, scroll lock, file sharing, time windows |

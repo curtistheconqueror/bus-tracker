@@ -5514,7 +5514,7 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  assert.match(scanner,/const back=files\?"[^"]*SCAN BATCHES takes the defects and the checks back out together\.":"[^"]*UNDO LAST takes these checks back out, for as long as you stay on the Defect Log and change nothing else; after that a wrong check is corrected by the next check on that bus\.";/);
  /* The photos and the notes cannot change under a read that is running. */
  assert.match(scanner,/if\(!files\|\|busy\)return;/,"no photo is added mid-read");
- assert.match(scanner,/const removePhoto=\(key:string\)=>busy\?undefined:setPhotos\(/,"none is removed mid-read");
+ assert.match(scanner,/const removePhoto=\(key:string\)=>\{if\(busy\)return;setFromPaper\(false\);setPhotos\(/,"none is removed mid-read");
  assert.equal((scanner.match(/disabled=\{busy\}/g)||[]).length,4,"TAKE PHOTO, UPLOAD FILE, REMOVE and the notes box");
  /* Why an OK is not logged is the log's sentence, drawn here. */
  assert.match(scanner,/heatOkHeldWhy\(finding\)\|\|"its page is not trusted"/);
@@ -5534,9 +5534,12 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  assert.match(fileHeat,/addHeatChecks\(localStorage,heatChecksFromFindings\(loggable,now\)\)/);
  assert.match(fileHeat,/setUndoSnapshot\(\{fleet,downEntries,label:[^}]*heatScan:now\}\)/,"the undo keeps the board as it WAS, and the stamp of the scan it undoes");
  assert.doesNotMatch(code(logPage),/writeHeatChecks|mergeHeatChecks|withoutScanChecks/,"the page reads, merges and writes the log through one function per job");
- assert.match(logPage,/\{heatOpen&&<HeatScanner fleet=\{fleet\} onClose=\{\(\)=>setHeatOpen\(false\)\} onFile=\{fileHeat\}\/>\}/);
+ assert.match(logPage,/\{heatOpen&&<HeatScanner fleet=\{fleet\} handed=\{handed\} onClose=\{\(\)=>setHeatOpen\(false\)\} onFile=\{fileHeat\}\/>\}/);
  assert.match(logPage,/<button className="heat-scan-button"[^>]*onClick=\{\(\)=>setHeatOpen\(true\)\}[^>]*>📷 SCAN HEAT SHEET</);
- assert.match(logPage,/searchParams.get\(HEAT_SCAN_PARAM\)!==HEAT_SCAN_VALUE\)return;\s*setHeatOpen\(true\);\s*url.searchParams.delete\(HEAT_SCAN_PARAM\);\s*window.history.replaceState\(/,"the campaign's link opens the scanner once, and the address is cleaned so a reload does not open it again");
+ /* The address is read through the one function SCAN SHEET's hand-off uses,
+    so the campaign's link and a photo arriving from the Down Sheet cannot be
+    understood two different ways. tests/scan.test.mjs holds what it returns. */
+ assert.match(logPage,/arrived=paperHandIn\(url\.search,PAPER_HERE\);\s*if\(!arrived\)return;\s*setHanded\(arrived\);openScanner\(arrived\.kind\);\s*url\.searchParams\.delete\(PAPER_SCAN_PARAM\);url\.searchParams\.delete\(PAPER_PHOTOS_PARAM\);\s*window\.history\.replaceState\(/,"the campaign's link opens the scanner once, and the address is cleaned so a reload does not open it again");
  /* TAKING A HEAT SCAN BACK OUT TAKES ITS CHECKS — from every door. The Defect
     Log's panel, UNDO LAST, and the AI Operator on the map all end in the one
     function. The operator did not, and left every check behind. */
@@ -5793,7 +5796,7 @@ test("the sweep scanner is its own door on the Defect Log and never touches the 
  ]);
  /* A separate button next to LOG DEFECT, not the Down Sheet's scan button. */
  assert.match(logPage,/className="sweep-scan-button"[^>]*onClick=\{\(\)=>setSweepOpen\(true\)\}[^>]*>📷 SCAN SWEEP</);
- assert.match(logPage,/<SweepScanner fleet=\{fleet\} onClose=\{\(\)=>setSweepOpen\(false\)\} onFile=\{fileSweep\}\/>/);
+ assert.match(logPage,/<SweepScanner fleet=\{fleet\} handed=\{handed\} onClose=\{\(\)=>setSweepOpen\(false\)\} onFile=\{fileSweep\}\/>/);
  /* Filing goes through the same single-record save as LOG DEFECT, and UNDO LAST covers it. */
  assert.match(logPage,/saveDefectLogRecord\(nextFleet,nextDown,finding\.busId,sweepDefect\(finding,now\),false,now\)/);
  assert.match(logPage,/setUndoSnapshot\(\{fleet,downEntries,label:"Filed "\+filed\+" sweep finding"/);
@@ -6216,7 +6219,7 @@ test("a scan can carry the shop's own notes about what the camera will get wrong
  assert.match(sweepRoute,/text:INSTRUCTIONS\+scanNotesPrompt\(notes\)/);
  // Both scanners: a 500-character box before READ, sent with every page, remembered only when ticked.
  for(const [name,scanner,cls] of [["down-sheet",downScanner,"scan-notes"],["sweep",sweepScanner,"sweep-notes"]]){
-  assert.match(scanner,new RegExp('<label className="'+cls+'"><span><b>NOTES FOR THIS SCAN</b><small>\\{notes\\.length\\}/\\{SCAN_NOTES_LIMIT\\}</small></span><textarea value=\\{notes\\} maxLength=\\{SCAN_NOTES_LIMIT\\}'),name+" has the box");
+  assert.match(scanner,new RegExp('<label className="'+cls+'"><span><b>NOTES FOR THIS SCAN</b><small>\\{notes\\.length\\}/\\{SCAN_NOTES_LIMIT\\}</small></span><textarea value=\\{notes\\} disabled=\\{busy\\} maxLength=\\{SCAN_NOTES_LIMIT\\}'),name+" has the box, locked while a read runs");
   assert.match(scanner,/if\(notes\.trim\(\)\)form\.append\("notes",notes\.trim\(\)\)/,name+" sends the notes with each page");
   assert.match(scanner,new RegExp('rememberScanNotes\\(localStorage\\.getItem\\(SCAN_NOTES_KEY\\),"'+name+'",notes,keepNotes\\)'),name+" remembers only when asked");
   assert.match(scanner,new RegExp('readScanNotes\\(localStorage\\.getItem\\(SCAN_NOTES_KEY\\),"'+name+'"\\)'),name+" starts with what was kept");
@@ -6224,6 +6227,15 @@ test("a scan can carry the shop's own notes about what the camera will get wrong
  }
  assert.match(downCss,/\.scan-notes textarea\{/);
  assert.match(logCss,/\.sweep-notes textarea\{/);
+ /* A LOCKED NOTES BOX LOOKS LOCKED. The box sets its own background and ink,
+    which is what a browser would otherwise grey out, so disabled alone drew
+    exactly like live. `.sweep-notes` is the heat scanner's box too, which was
+    already locked during a read and now shows it. */
+ for(const [css,cls] of [[downCss,"scan"],[logCss,"sweep"]]){
+  assert.ok(css.includes("."+cls+"-notes textarea:disabled{opacity:.55;cursor:not-allowed}"),cls+": the box");
+  assert.ok(css.includes("."+cls+"-notes-keep input:disabled{cursor:not-allowed}"),cls+": the tick");
+  assert.ok(css.includes("."+cls+"-notes-keep:has(input:disabled){opacity:.55;cursor:not-allowed}"),cls+": and its label");
+ }
 });
 
 test("Farebox, Ventra and the CUBIC screens are counted apart, off one table",async()=>{

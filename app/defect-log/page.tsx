@@ -25,9 +25,11 @@ import {headerTextFor} from "@/src/lib/settings/header-theme";
 import {pageThemeHeaderPair} from "@/src/lib/settings/page-header-themes";
 import SweepScanner from "./_components/sweep-scanner";
 import HeatScanner from "./_components/heat-scanner";
+import {PAPER_PHOTOS_PARAM,PAPER_SCAN_PARAM} from "@/src/lib/scan/paper-kinds";
+import {paperHandIn,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
 import {heatFiling,type HeatFinding} from "@/src/lib/defects/heat-check-import";
 import {applyHeatFiling} from "@/src/lib/defects/heat-check-apply";
-import {HEAT_SCAN_PARAM,HEAT_SCAN_VALUE,addHeatChecks,dropScanChecks,heatChecksFromFindings,heatCleanupLeftBehind,heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
+import {addHeatChecks,dropScanChecks,heatChecksFromFindings,heatCleanupLeftBehind,heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
 import {sweepDefect,type SweepFinding} from "@/src/lib/defects/sweep-scan-import";
 import ScanBatchesPanel from "./_components/scan-batches-panel";
 import {findScanBatch,latestScanBatchUndo,readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,scanBatchWords,scanRestoreLeftOff,type ScanBatch,type ScanBatchUndo} from "@/src/lib/defects/scan-batches";
@@ -90,6 +92,8 @@ type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownShee
    That path lives in restoreBatch and UNDO LAST hands over to it. */
 type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string;scanBatch?:true;heatScan?:string;heatChecks?:string};
 
+/* The route this page is, as the hand-off from SCAN SHEET names it. */
+const PAPER_HERE="/defect-log";
 const BOARD_SETTINGS_KEY="pace-board-settings-v1";
 /* Absent means closed. A new key rather than a settings field, so a device
    that has never opened the stats does not have to write anything to say so. */
@@ -993,15 +997,39 @@ export default function DefectLog(){
  const [extendUntil,setExtendUntil]=useState("");
  const [sweepOpen,setSweepOpen]=useState(false);
  const [heatOpen,setHeatOpen]=useState(false);
- /* Fleet Campaigns sends people here to scan the heat sheet. The parameter is
-    taken off the address once it has been acted on, the way a quick filter's
-    is, so a reload does not throw the scanner up a second time. */
+ /* The photos SCAN SHEET on the Down Sheet hands to whichever of this page's
+    scanners reads them. Both take a hand-off; each uses only one addressed to
+    its own sheet, so a sweep's photos can never open in the heat scanner.
+    THIS PAGE HAS NO DOOR OF ITS OWN: it had a SCAN PAPER button for one
+    unpublished build, and Curtis chose the one button over a fourth. SCAN
+    SWEEP and SCAN HEAT SHEET open their scanner directly, as they always
+    did. */
+ const [handed,setHanded]=useState<HandedPhotos|null>(null);
+ /* A hand-off is for ONE opening. Left in place, the next press of SCAN SWEEP
+    would open on yesterday's photos and start reading them. Dropped when a
+    scanner SHUTS, however it came to be shut — on the change from open to
+    shut, not whenever both are shut. "Whenever both are shut" is also true
+    the moment the page opens, in the same pass as the effect below that takes
+    a hand-off off the address, and which of the two won would then have
+    depended on the order they happen to be written in. */
+ const scannerWasOpen=useRef(false);
+ useEffect(()=>{const open=sweepOpen||heatOpen;if(scannerWasOpen.current&&!open)setHanded(null);scannerWasOpen.current=open},[sweepOpen,heatOpen]);
+ /* Each of this page's sheets is NAMED. An `else` here would open the sweep
+    scanner, empty, for any sheet added to the table later and read on this
+    page — the wrong scanner being the one thing SCAN SHEET is for stopping. */
+ const openScanner=(kind:HandedPhotos["kind"])=>{if(kind==="heat")setHeatOpen(true);else if(kind==="sweep")setSweepOpen(true)};
+ /* Another page sends people here to scan: Fleet Campaigns for the heat
+    sheet, and SCAN SHEET on the Down Sheet for either of this page's two. The
+    parameters are taken off the address once acted on, the way a quick
+    filter's is, so a reload does not throw the scanner up a second time. The
+    history entry keeps the state it had, because SCAN SHEET arrives through
+    the router and the router keeps its own notes there. */
  useEffect(()=>{
-  const url=new URL(window.location.href);
-  if(url.searchParams.get(HEAT_SCAN_PARAM)!==HEAT_SCAN_VALUE)return;
-  setHeatOpen(true);
-  url.searchParams.delete(HEAT_SCAN_PARAM);
-  window.history.replaceState(null,"",url.pathname+url.search+url.hash);
+  const url=new URL(window.location.href),arrived=paperHandIn(url.search,PAPER_HERE);
+  if(!arrived)return;
+  setHanded(arrived);openScanner(arrived.kind);
+  url.searchParams.delete(PAPER_SCAN_PARAM);url.searchParams.delete(PAPER_PHOTOS_PARAM);
+  window.history.replaceState(window.history.state,"",url.pathname+url.search+url.hash);
  },[]);
  const [batchesOpen,setBatchesOpen]=useState(false);
  /* The last removed scan sweep, read from the device rather than held only in
@@ -2391,7 +2419,7 @@ export default function DefectLog(){
   {editing&&<DefectEditor key={editing.busId+":"+editing.defect.id} draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} coachOn={coachOn} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} shopHours={repairHours} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside}/>}
   {/* Rendered here rather than inside ADVANCED ACTIONS: closing that section
       must not tear down a scanner somebody is part-way through. */}
-  {sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{heatOpen&&<HeatScanner fleet={fleet} onClose={()=>setHeatOpen(false)} onFile={fileHeat}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}
+  {sweepOpen&&<SweepScanner fleet={fleet} handed={handed} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{heatOpen&&<HeatScanner fleet={fleet} handed={handed} onClose={()=>setHeatOpen(false)} onFile={fileHeat}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}
   {holdBoardOpen&&<HoldBoard fleet={fleet} close={()=>setHoldBoardOpen(false)} onRelease={busId=>setHold(busId,false)}/>}
   {movingMysteryBus&&<MysteryMoveModal bus={movingMysteryBus} fleet={fleet} move={moveMysteryBus} close={()=>setMovingMysteryBusId("")}/>}
   
