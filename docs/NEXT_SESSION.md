@@ -96,7 +96,7 @@ ever will, and it is the only one of the three with no downside at all.
 
 ---
 
-## Four pull requests are open; #42, #43 and #44 are on `main`
+## Two pull requests are open; #42 to #46 are on `main`
 
 **Read this before you plan anything.** Measured 2026-11-13.
 
@@ -113,17 +113,23 @@ before any was merged, and `main` ended byte-identical to that stack.
 ADVANCED DETAILS bar is still what the shop's phones draw — do not tell him to
 check a fix on his phone that has not been published.
 
+**#45 and #46 landed on `main` on 2026-11-16**, after Curtis said *"Yes, merge
+both"*. Merge commits on GitHub, `3ceaa0a` then `be95118`, the way #40 and #41
+went in. Both were first merged onto `main` in a scratch branch and the gates
+run there — 446 of 446 on Windows, the first full pass on that machine, because
+#45 is what lets the unknown-name test run there — and `main` ended on the same
+tree. **They are not live either**: both are written into
+`docs/PUBLISH_NEXT.md` as part of 194. **The heat section of `CLAUDE.md` is on
+`main` now**, and it is the place to read before touching the heat check log.
+
 | PR | Branch | Head | Ahead | CI | Threads | What it is |
 | --- | --- | --- | --- | --- | --- | --- |
-| **#45** | `claude/typecheck-gate-windows` | `a7b7152` | 2 | not re-read | **1, answered** — the reviewer's to close | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
-| **#46** | `claude/heat-check-domain` | `f9c9e10` | see below | passed at `d1d1b05`; not read at `f9c9e10` | **14, then 5 more on 2026-11-15, all answered** — the reviewers' to close | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules and limits are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`** |
-| **#47** | `claude/scan-paper` | `8e5e364` | 6, **on #46** | passed at `8e5e364` | **4, then 2 more, from CodeRabbit, all answered** | **SCAN SHEET IS THE DOOR.** The Down Sheet's own SCAN SHEET button takes the photo, works out which of the three sheets it is and opens that sheet's own scanner with the photos loaded. The separate SCAN PAPER button it was first built as is gone. **Stacked on #46 — its base is `claude/heat-check-domain`, not `main`** |
+| **#47** | `claude/scan-paper` | `8e5e364` | 6 | passed at `8e5e364` | **4, then 2 more, from CodeRabbit, all answered** | **SCAN SHEET IS THE DOOR.** The Down Sheet's own SCAN SHEET button takes the photo, works out which of the three sheets it is and opens that sheet's own scanner with the photos loaded. The separate SCAN PAPER button it was first built as is gone. **Was stacked on #46; its base has been `main` since 2026-11-16, and GitHub reports it mergeable** |
 | **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
-Heads, commits ahead, CI and thread counts were read from GitHub on 2026-11-13
-before the merges, except #47's, which is as pushed. **"Ahead" is against the `main` each was cut from**; all
-three now sit behind `main` by the 27 merged commits and will need rebasing
-before they can land.
+#47's row is as pushed and as read from GitHub on 2026-11-16. #39's was read on
+2026-11-13 and not since; it sits behind `main` by everything merged after that
+and will need rebasing before it can land.
 
 **#47 was built on 2026-11-13 as SCAN PAPER, a fourth button on two pages, and
 REBUILT on 2026-11-15 as the Down Sheet's own SCAN SHEET button** (`70cd3f8`).
@@ -134,8 +140,9 @@ photos handed over from the Down Sheet. He also said *"we can just place this
 button anywhere we want for ease of access"* — the component takes its route
 as a prop for that, and WHERE it goes is his call before it moves.
 
-**It is STACKED ON #46** because the heat scanner only exists there, and merges
-after it. Two cold reads by a subagent: 14 findings on the first build, 9 on
+**It WAS stacked on #46** because the heat scanner only existed there. #46 is
+on `main` now and #47's base was moved to `main` on 2026-11-16. **It is still
+not to be merged until Curtis says.** Two cold reads by a subagent: 14 findings on the first build, 9 on
 the rebuild, each with one Major, all answered and listed in the PR body. The
 rebuild's Major is worth knowing: with no direct button left, the door could
 strand a Down Sheet the look had split or cut short, so every question screen
@@ -143,8 +150,10 @@ now has a way to send every page to any sheet, and the look gives up after 20
 seconds. **The 81 planted bugs from the first build were not re-run on the
 rebuild.**
 
-**CODERABBIT DOES NOT REVIEW #47 BY ITSELF.** It skips a pull request that is
-not aimed at `main`, and #47 is aimed at #46's branch. Curtis asked for its
+**CODERABBIT DID NOT REVIEW #47 BY ITSELF while it was aimed at #46's branch.**
+It skips a pull request that is not aimed at `main`. The base is `main` since
+2026-11-16, so a new push may now get a review unasked; nothing has been pushed
+since to find out. Curtis asked for its
 review on 2026-11-15; a comment reading `@coderabbitai review` on the pull
 request is what starts one, and it only reads commits it has not read. It left
 four findings on `70cd3f8`, one Major — the sweep and Down Sheet scanners let
@@ -209,8 +218,8 @@ Three more things worth knowing before touching it:
 2026-11-13** in `f0a98f8` and `cd21990`, each on its own thread, with a ledger
 in a PR comment. The Major — UNDO THIS TAP mounting above the heat list and
 pushing every row down — is fixed and re-measured: no row moves at 390 or 1180.
-**Nobody has re-reviewed it since, and CI on the new head was not read.** Do
-that before calling it ready. The branch now CONTAINS `main` (`43e9594` merges
+It was reviewed again after that — CodeRabbit, below — and is merged. The
+branch CONTAINS `main` (`43e9594` merges
 it in, because the branch is published and is not rebased), so "ahead" is no
 longer one commit.
 
@@ -219,7 +228,8 @@ longer one commit.
 asked for SCAN SHEET to do that job instead, which is what #47 now is. It
 stays open, is kept current with #46, and is still not to be merged until he
 says; leave #39 (the MCP route) until later, with
-READ solved before any write.
+READ solved before any write. **On 2026-11-16, asked whether to merge #45 and
+#46 now, he said *"Yes, merge both"*, and they were.**
 
 **#46 moved four commits on 2026-11-15, to `d1d1b05`.** `db185e6` and `0770ca5`
 answer BT46-F3 and a cold read of that answer. `af4925f` builds two calls he
@@ -242,10 +252,11 @@ check (`heatWalkPin`); and PUT BACK leaves a No Heat record off a bus already
 on No Heat Buses. A cold read of those answers found seven more things, six
 fixed and one declined — with the stored write refused AND a second tab, a
 removal held only in memory is dropped when the other tab puts an older one
-back. **Nobody has reviewed `f9c9e10`; CodeRabbit should pick it up by itself
-because #46 is aimed at `main`. Read what it says and its CI before merging.**
+back. **`f9c9e10` is the head that was merged on 2026-11-16.** GitHub's CI and
+CodeRabbit's check both passed on it; CodeRabbit posted no review of that
+commit and no new comment.
 
-**Still with Curtis on #46, not built:** whether each OK row in the scan review
+**Still with Curtis on the heat check log, not built:** whether each OK row in the scan review
 needs its own way to be turned down; whether a struck-through row means fixed;
 and, new, whether the lane tab's count should follow the held walk — it counts
 the whole roster, so TO DO can read 6 above eight rows. **What it has never
@@ -293,7 +304,11 @@ Curtis's integration to look at.
 
 ### Still Curtis's call, not yours
 
-- **Merging #45, #46 and #39.** Never merge on your own.
+- **Merging #47 and #39.** Never merge on your own.
+- **Two things on #47.** Whether the notes box stays locked while a scanner
+  reads (`8e5e364`; put to him, not answered), and pressing Tab and Shift+Tab
+  on a physical keyboard in the SCAN SHEET box, or waiving it — CodeRabbit
+  holds one thread open for that.
 - **Pointing Codex at `docs/PUBLISH_NEXT.md`.** That is how 194 goes live.
 - **An actual iPhone.** `overflow:clip` and the row swipe were measured in
   Chromium with real CDP touch events. Real iOS Safari was never touched.
@@ -329,7 +344,7 @@ session that did the merging — if you are the session that owns it, stop it.
 
 | | |
 | --- | --- |
-| Branch | `main`, linear history, no force-pushes ever. **Four PRs are open — three off it and one stacked on #46. See the section above before planning anything.** |
+| Branch | `main`, fast-forward pushes only, no force-pushes ever. **Two PRs are open, #47 and #39. See the section above before planning anything.** |
 | Live | See the STATUS line of `docs/PUBLISH_NEXT.md`, and `docs/RELEASES.md` for the version table |
 | Pending publication | The same STATUS line — it names what is queued and what it publishes from |
 | Working tree at handoff | Read it with `git status` and `git log -1`; a commit named here is stale by the next push. |
@@ -510,7 +525,7 @@ strike the item the day it lands.
   rust on Incidents, green on Shop Talk, bright blue on the Down Sheet. 194
   shared the header BAR only. Whether the whole block should match is open.
 
-### 4. Built, and on `main` since 2026-11-13 — do not rebuild
+### 4. Built, and on `main` — do not rebuild
 
 Every one of these is written, reviewed and **on `main`, waiting on Codex to
 publish** — not live. Check before offering any of them to Curtis as work; this
@@ -541,6 +556,14 @@ project has twice re-offered finished work from a queue title alone.
   unconditionally**, which is why WHOLE SHEET had to be computed from what was
   drawn against what the sheet holds rather than from a list of filters — a
   list goes stale the moment the next row filter lands.
+- **A heat check log** (#46, on `main` since 2026-11-16) — SCAN HEAT SHEET on
+  the Defect Log, a CAMPAIGNS board with a NO HEAT walking list on Fleet
+  Campaigns, `pace-heat-checks-v1`, and A/C Buses narrowed to cooling. Its
+  rules and its four known limits are in `CLAUDE.md`. **Its photo read has
+  never seen a real photograph.**
+- **The unknown-name test runs on Windows** (#45, on `main` since 2026-11-16)
+  — so `npm test` passes in full on Curtis's machine, and a failure of that
+  test there is now a real one.
 
 ---
 

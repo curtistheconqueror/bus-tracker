@@ -123,6 +123,35 @@ function repairStatus(bus:DefectLogFleetBus,defects:StructuredDefect[],state:Def
  return bus.s==="service"||bus.s==="defect"?roadServiceStatus(repairAware):bus.s;
 }
 
+/* THE STATUS A BUS IS LEFT WITH WHEN RECORDS A SCAN FILED COME OFF IT, OR GO
+   BACK ON.
+
+   Filing a scan goes through `saveDefectLogRecord`, which moves the bus's
+   status: a bus in service with its first open defect becomes DEFECT. Taking
+   the scan back out rebuilt the defects and left that status standing — a cold
+   read measured a bus on the road reading DEFECT with nothing on it, and a heat
+   sheet does that to sixty buses in one press.
+
+   So the status is worked out again, by the one rule a save uses, and ONLY
+   WHILE THE STATUS IS STILL THE ONE THAT RULE GIVES for what the bus carries
+   now. Anything else is a call somebody made since — in progress in the shop,
+   held out by a foreman — and `takeDefectOffBus` above says why that is left
+   alone: a record leaving is not new information about whether a bus can run.
+
+   The clock is stamped only when the status actually moves, the way a save
+   stamps it.
+
+   It cannot give back a status the filing itself flattened. A bus marked OUT
+   with nothing downing it became DEFECT when the scan filed on it, exactly as
+   it would for a defect logged by hand, and nothing recorded what it had
+   been. */
+export function statusAfterDefectChange<T extends DefectLogFleetBus>(bus:T,before:StructuredDefect[],after:StructuredDefect[],now=new Date().toISOString()):T{
+ const next={...bus,defects:after,pendingRepair:defectSummary(after)} as T;
+ if(repairStatus(bus,before,"open")!==bus.s)return next;
+ const s=repairStatus(bus,after,"open");
+ return s===bus.s?next:stampOperationalChange(bus,{...next,s},now) as T;
+}
+
 export function activeDefectLogCount(fleet:DefectLogFleetBus[]){
  return fleet.reduce((count,bus)=>count+normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.source==="defect-log"&&isUnresolved(defect)&&!defect.defectLogHiddenAt).length,0);
 }
