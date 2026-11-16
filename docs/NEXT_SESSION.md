@@ -117,7 +117,7 @@ check a fix on his phone that has not been published.
 | --- | --- | --- | --- | --- | --- | --- |
 | **#45** | `claude/typecheck-gate-windows` | `a7b7152` | 2 | not re-read | **1, answered** — the reviewer's to close | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
 | **#46** | `claude/heat-check-domain` | `f9c9e10` | see below | passed at `d1d1b05`; not read at `f9c9e10` | **14, then 5 more on 2026-11-15, all answered** — the reviewers' to close | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules and limits are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`** |
-| **#47** | `claude/scan-paper` | `8e5e364` | 6, **on #46** | passed at `9ebf489`; not read at `8e5e364` | **4, then 2 more, from CodeRabbit, all answered** | **SCAN SHEET IS THE DOOR.** The Down Sheet's own SCAN SHEET button takes the photo, works out which of the three sheets it is and opens that sheet's own scanner with the photos loaded. The separate SCAN PAPER button it was first built as is gone. **Stacked on #46 — its base is `claude/heat-check-domain`, not `main`** |
+| **#47** | `claude/scan-paper` | `8e5e364` | 6, **on #46** | passed at `8e5e364` | **4, then 2 more, from CodeRabbit, all answered** | **SCAN SHEET IS THE DOOR.** The Down Sheet's own SCAN SHEET button takes the photo, works out which of the three sheets it is and opens that sheet's own scanner with the photos loaded. The separate SCAN PAPER button it was first built as is gone. **Stacked on #46 — its base is `claude/heat-check-domain`, not `main`** |
 | **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
 Heads, commits ahead, CI and thread counts were read from GitHub on 2026-11-13
@@ -170,8 +170,14 @@ a button is disabled and after the buttons are replaced, and focus stayed in
 the box each time. That is not a hand on a physical keyboard. A cold read of
 `8e5e364` found no defect; it declined-and-recorded two things: `disabled`
 rather than `readOnly` means a phone may not be able to scroll the notes during
-a read, and nothing measured a phone. **Nobody has reviewed `8e5e364`:
-CodeRabbit was asked again; read what it says and its CI.**
+a read, and nothing measured a phone.
+
+**Where `8e5e364` stands.** CI passed. CodeRabbit was asked again and its check
+passed; twenty minutes on it had left no new finding, only a reply on the
+keyboard thread: it accepts that the trusted presses exercise the browser's
+tab order, and **holds that thread open until somebody presses Tab and
+Shift+Tab on a physical keyboard** after a control is disabled or replaced.
+That is Curtis's to do or to waive; nothing here can.
 
 **A SCANNER'S OWN READ HAS NO TIME LIMIT, and that is recorded, not built.**
 The first look gives up after 20 seconds; the read after it never does. On
