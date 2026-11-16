@@ -7,7 +7,10 @@ import {TRACKER_PAGES} from "../settings/tracker-pages.ts";
    wrong was not a cosmetic mistake: a Vehicle Down Sheet once went through the
    farebox scanner and filed 24 records that did not exist.
 
-   SCAN PAPER is one door in front of the three. It needs to know, for every
+   SCAN SHEET, on the Down Sheet, is one door in front of the three: it takes
+   the photos, works out which sheet they are, and opens that sheet's scanner.
+   The Defect Log's SCAN SWEEP and SCAN HEAT SHEET still open their own scanner
+   directly. The door needs to know, for every
    kind of paper: what to call it, which page reads it, and how to tell it from
    the other two. That is this table and nothing else is. The cheap first read
    builds its question from `looksLike`, the screen draws `label`, and the
@@ -49,6 +52,14 @@ const SHEETS:readonly Omit<PaperKindInfo,"label">[]=[
 
 export const PAPER_KINDS:readonly PaperKindInfo[]=SHEETS.map(sheet=>({...sheet,label:sheet.name.toUpperCase()}));
 
+/* THE WORDS ON THE BUTTON, once. The door was built as a fourth button called
+   SCAN PAPER beside the three scanners' own. Curtis: *"I'd rather the current
+   scan button just do the job."* So the Down Sheet's SCAN SHEET is the door,
+   and the button and the box it opens both say this. The code still says
+   "paper" for the thing
+   being photographed, because a Down Sheet is one of three kinds of it. */
+export const PAPER_DOOR="SCAN SHEET";
+
 /* No more photos than any one scanner will take, so a hand-off can never be
    cut short on arrival. Every scanner's own limit is this number. */
 export const PAPER_MAX_PHOTOS=6;
@@ -71,7 +82,7 @@ function article(name:string){return /^[aeiou]/i.test(name)?"an ":"a "}
 export function paperNamed(kind:PaperKind):string{const {label}=paperKind(kind);return article(label).toUpperCase()+label}
 export function paperNamedInSentence(kind:PaperKind):string{const {name}=paperKind(kind);return article(name)+name}
 
-/* Every sheet SCAN PAPER takes, as the start of a sentence: "A Vehicle Down
+/* Every sheet SCAN SHEET takes, as the start of a sentence: "A Vehicle Down
    Sheet, a farebox / Ventra sweep, or a heat check sheet". The screen's own
    introduction is this, so a sheet added to the table is in it. */
 export function paperListWords():string{

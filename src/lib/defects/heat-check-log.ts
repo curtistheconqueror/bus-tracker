@@ -435,7 +435,7 @@ export function heatShareText(rows:HeatRosterRow[],mode:HeatShareMode="remaining
    and this is its address — one definition, so the link and the page that
    reads it cannot drift.
 
-   SCAN PAPER uses the same address for all three sheets, so the spelling now
+   SCAN SHEET uses the same address for all three sheets, so the spelling now
    lives with the table of sheets in scan/paper-kinds.ts and these are that
    table's answers for the heat sheet rather than a second copy of them. */
 export const HEAT_SCAN_PARAM=PAPER_SCAN_PARAM;

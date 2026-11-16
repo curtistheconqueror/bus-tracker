@@ -1,4 +1,4 @@
-/* SCAN PAPER: which sheet a photo is, and getting it to the scanner that reads it. */
+/* SCAN SHEET: which sheet a photo is, and getting it to the scanner that reads it. */
 
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -49,7 +49,7 @@ test("the table of sheets: three kinds, each read on a page this app has", async
      record. */
   assert.throws(() => paperKind("bogus"), /Unknown kind of paper: bogus/);
   assert.throws(() => paperPageLabel("bogus"));
-  /* No scanner takes fewer photos than SCAN PAPER can hand it. */
+  /* No scanner takes fewer photos than SCAN SHEET can hand it. */
   for (const [, file] of SCANNERS) {
     const limit = Number((await read(file)).match(/const MAX_FILES=(\d+);/)?.[1]);
     assert.ok(limit >= PAPER_MAX_PHOTOS, file + " takes at least " + PAPER_MAX_PHOTOS + " photos");
@@ -159,6 +159,70 @@ test("the app decides by itself only when every page agrees", async () => {
   /* THE LOOK NEVER HAPPENED: asked, everything offered, everything sent. */
   assert.deepEqual(paperUnread(2), { decided: false, why: "unread", choices: [
     { kind: "down-sheet", send: [1, 2], leftOut: [] }, { kind: "sweep", send: [1, 2], leftOut: [] }, { kind: "heat", send: [1, 2], leftOut: [] }] });
+
+  /* THE PERSON SAYS THE LOOK WAS WRONG. Every OTHER sheet is offered and
+     every page goes — the look's placements are dropped whole. Applied to the
+     new pick instead, they would hold back every page the look had just
+     placed, and a Down Sheet the look called a heat sheet could never be
+     read: SCAN SHEET is the only way to the Down Sheet's scanner. */
+  const { paperOverruled } = await import("../src/lib/scan/paper-identify.ts");
+  assert.deepEqual(paperOverruled(2, "heat"), { decided: false, why: "overruled", not: "heat", choices: [
+    { kind: "down-sheet", send: [1, 2], leftOut: [] }, { kind: "sweep", send: [1, 2], leftOut: [] }] });
+  const sureHeat = [page(1, "heat"), page(2, "heat")];
+  assert.deepEqual(paperChoice(sureHeat, "down-sheet"), { kind: "down-sheet", send: [], leftOut: [{ page: 1, kind: "heat" }, { page: 2, kind: "heat" }] }, "which is what applying the look to the new pick would have sent: nothing");
+  for (const item of ["down-sheet", "sweep", "heat"]) {
+    const verdict = paperOverruled(3, item);
+    assert.equal(verdict.choices.length, 2, item);
+    assert.ok(verdict.choices.every(choice => choice.kind !== item && choice.send.length === 3 && !choice.leftOut.length), item);
+  }
+  /* WITH NO SHEET NAMED, every sheet is offered — the way past a QUESTION
+     that came up short — and the verdict carries no `not` key at all. */
+  assert.deepEqual(paperOverruled(2), { decided: false, why: "overruled", choices: [
+    { kind: "down-sheet", send: [1, 2], leftOut: [] }, { kind: "sweep", send: [1, 2], leftOut: [] }, { kind: "heat", send: [1, 2], leftOut: [] }] });
+  assert.equal("not" in paperOverruled(2), false);
+
+  /* WHEN A QUESTION IS SHORT OF EVERYTHING. The two cases that made this
+     necessary, both a real Down Sheet: every page placed as something else,
+     so the Down Sheet is not offered at all; and the last page placed as a
+     heat sheet, so the Down Sheet is offered without it. */
+  const { paperHoldsBack } = await import("../src/lib/scan/paper-identify.ts");
+  const split = paperVerdict([page(1, "sweep"), page(2, "heat")]);
+  assert.deepEqual(split.choices.map(choice => choice.kind), ["sweep", "heat"], "no Down Sheet on the screen");
+  assert.equal(paperHoldsBack(split), true);
+  const short = paperVerdict([page(1, "down-sheet"), page(2, "down-sheet"), page(3, "heat")]);
+  assert.deepEqual(short.choices[0], { kind: "down-sheet", send: [1, 2], leftOut: [{ page: 3, kind: "heat" }] });
+  assert.equal(paperHoldsBack(short), true);
+  /* Not when there is nothing more to give: a decision, a failed look, or
+     every sheet already offered every page. */
+  assert.equal(paperHoldsBack(paperVerdict([page(1, "heat")])), false);
+  assert.equal(paperHoldsBack(paperUnread(3)), false);
+  assert.equal(paperHoldsBack(paperOverruled(3)), false);
+  assert.equal(paperHoldsBack(paperVerdict([page(1, "other", 0), page(2, "other", 0)])), false, "nothing placed, so everything is already on offer");
+  assert.equal(paperHoldsBack(paperOverruled(3, "heat")), true, "a sheet turned down by mistake can be had back");
+
+  /* THE DOOR IS NEVER A DEAD END, walked rather than argued: for every way
+     one, two or three pages can come back from the look — each sheet, sure or
+     unsure, or nothing — every sheet can be reached WITH EVERY PAGE in at
+     most two presses. This fails for [sweep, heat] without `paperHoldsBack`. */
+  const answers = [["down-sheet", 0.9], ["sweep", 0.9], ["heat", 0.9], ["down-sheet", 0.3], ["other", 0.9], ["other", 0]];
+  const whole = (choices, kind, total) => choices.some(choice => choice.kind === kind && choice.send.length === total && !choice.leftOut.length);
+  let walked = 0;
+  for (let total = 1; total <= 3; total++) {
+    for (let code = 0; code < answers.length ** total; code++) {
+      const pages = Array.from({ length: total }, (_, index) => { const [kind, confidence] = answers[Math.floor(code / answers.length ** index) % answers.length]; return page(index + 1, kind, confidence); });
+      const verdict = paperVerdict(pages), label = JSON.stringify(pages.map(item => [item.kind, item.confidence]));
+      for (const kind of ["down-sheet", "sweep", "heat"]) {
+        let reached;
+        if (verdict.decided) {
+          const next = paperOverruled(total, verdict.choice.kind);
+          reached = (verdict.choice.kind === kind && verdict.choice.send.length === total) || whole(next.choices, kind, total);
+        } else reached = whole(verdict.choices, kind, total) || (paperHoldsBack(verdict) && whole(paperOverruled(total).choices, kind, total));
+        assert.ok(reached, kind + " cannot be reached whole from " + label);
+        walked++;
+      }
+    }
+  }
+  assert.equal(walked, (6 + 36 + 216) * 3, "every combination was walked");
 });
 
 test("what the person is told, in the words the screen draws", async () => {
@@ -195,6 +259,16 @@ test("what the person is told, in the words the screen draws", async () => {
   assert.equal(paperAskWords(paperUnread(1), normalizePaperPages(null, 1), "Photo processing is not configured yet."), "The photos could not be looked at first (Photo processing is not configured yet), so pick the sheet yourself.");
   assert.equal(paperAskWords(paperUnread(1), normalizePaperPages(null, 1)), "The photos could not be looked at first, so pick the sheet yourself.");
   assert.equal(ask([page(1, "heat")]), "", "a decision asks nothing");
+  /* The way out of a sure answer, and what is said once it has been taken. */
+  const { paperNotThisWords, paperOverruled } = await import("../src/lib/scan/paper-identify.ts");
+  assert.equal(paperNotThisWords("heat"), "NOT A HEAT CHECK SHEET? PICK THE SHEET YOURSELF");
+  assert.equal(paperAskWords(paperOverruled(1, "heat"), [page(1, "heat")]), "You said this is not a heat check sheet. Pick the sheet it is.");
+  assert.equal(paperAskWords(paperOverruled(2, "down-sheet"), [page(1, "down-sheet"), page(2, "down-sheet")]), "You said this is not a Vehicle Down Sheet. Pick the sheet it is. Every page goes with the one you pick.");
+  const { paperShowAllWords } = await import("../src/lib/scan/paper-identify.ts");
+  assert.equal(paperShowAllWords(1), "NOT RIGHT? SHOW EVERY SHEET");
+  assert.equal(paperShowAllWords(3), "NOT RIGHT? SHOW EVERY SHEET, WITH EVERY PAGE");
+  assert.equal(paperAskWords(paperOverruled(3), [page(1, "sweep"), page(2, "heat"), page(3, "heat")]), "Pick the sheet it is. Every page goes with the one you pick.");
+  assert.equal(paperAskWords(paperOverruled(1), [page(1, "sweep", 0.3)]), "Pick the sheet it is.");
 
   assert.equal(paperWhereWords("heat", "/defect-log"), "READ HERE");
   assert.equal(paperWhereWords("heat", "/down-sheet"), "READ ON THE DEFECT LOG PAGE");
@@ -227,7 +301,7 @@ test("the question the first look asks is built from the table of sheets", async
   assert.doesNotMatch(code(route), /paperVerdict|paperPlaced|PAPER_SURE|"heat"|"sweep"|"down-sheet"/);
 });
 
-test("the photos go from SCAN PAPER to a scanner once, in memory, whole or not at all", async () => {
+test("the photos go from SCAN SHEET to a scanner once, in memory, whole or not at all", async () => {
   const { offerPaperPhotos, takePaperPhotos, paperHandIn, handedFiles, handedStart, paperLostWords, paperHandedWords, paperHeldBackWords, PAPER_HANDOFF_MS } = await import("../src/lib/scan/paper-handoff.ts");
   const a = { name: "a.jpg" }, b = { name: "b.jpg" }, T = 1_000_000, none = { files: [], leftOut: 0 };
 
@@ -285,12 +359,12 @@ test("the photos go from SCAN PAPER to a scanner once, in memory, whole or not a
 
   /* WHAT A SCANNER STARTS WITH. Only a hand-off for its own sheet counts. */
   const handed = { kind: "heat", files: [a, b], expected: 2, leftOut: 0 };
-  const quiet = { files: [], lost: "", note: "", warning: "", read: false };
+  const quiet = { files: [], lost: "", note: "", warning: "", wrong: "", read: false };
   assert.deepEqual(handedFiles(handed, "heat"), [a, b]);
   assert.deepEqual(handedFiles(handed, "sweep"), [], "the sweep scanner on the same page does not pick up the heat sheet's photos");
   assert.deepEqual(handedFiles(null, "heat"), []);
   assert.deepEqual(handedFiles(undefined, "heat"), []);
-  assert.deepEqual(handedStart(handed, "heat"), { files: [a, b], lost: "", note: "OPENED BY SCAN PAPER AS A HEAT CHECK SHEET. The photos taken there are read straight away.", warning: "", read: true });
+  assert.deepEqual(handedStart(handed, "heat"), { files: [a, b], lost: "", note: "OPENED AS A HEAT CHECK SHEET. Your photos are read straight away.", warning: "", wrong: 'SCAN SHEET sent these here. If it was wrong, scan them there again and press "NOT A HEAT CHECK SHEET? PICK THE SHEET YOURSELF".', read: true });
   assert.deepEqual(handedStart(handed, "sweep"), quiet);
   assert.deepEqual(handedStart(null, "heat"), quiet, "the scanner's own button: empty, silent, and it waits to be told to read");
   assert.deepEqual(handedStart({ kind: "heat", files: [], expected: 0, leftOut: 0 }, "heat"), quiet, "the campaign's link: the same");
@@ -301,7 +375,20 @@ test("the photos go from SCAN PAPER to a scanner once, in memory, whole or not a
   assert.equal(paperLostWords({ kind: "down-sheet", files: [], expected: 3, leftOut: 0 }, "down-sheet"), "The 3 photos did not come across from the other page. Add them again.");
   assert.equal(paperLostWords({ kind: "down-sheet", files: [], expected: 2, leftOut: 0 }, "heat"), "", "another scanner's loss is not this one's to report");
   assert.equal(paperLostWords(handed, "heat"), "");
-  assert.equal(paperHandedWords({ kind: "sweep", files: [a], expected: 1, leftOut: 0 }, "sweep"), "OPENED BY SCAN PAPER AS A FAREBOX / VENTRA SWEEP. The photos taken there are read straight away.");
+  assert.equal(paperHandedWords({ kind: "sweep", files: [a], expected: 1, leftOut: 0 }, "sweep"), "OPENED AS A FAREBOX / VENTRA SWEEP. Your photos are read straight away.");
+
+  /* A SCANNER THAT REFUSES WHAT THE DOOR SENT SAYS HOW TO GET PAST THE DOOR.
+     Its own refusal names the button that reads the page — and for a Down
+     Sheet that is the door, which sent it. Only for photos that were handed
+     in, and only to the scanner they were handed to. */
+  const { paperSentWrongWords } = await import("../src/lib/scan/paper-handoff.ts");
+  assert.equal(paperSentWrongWords({ kind: "sweep", files: [a], expected: 1, leftOut: 0 }, "sweep"), 'SCAN SHEET sent this here. If it was wrong, scan it there again and press "NOT A FAREBOX / VENTRA SWEEP? PICK THE SHEET YOURSELF".');
+  assert.equal(paperSentWrongWords(handed, "sweep"), "");
+  assert.equal(paperSentWrongWords(null, "heat"), "");
+  assert.equal(paperSentWrongWords({ kind: "heat", files: [], expected: 2, leftOut: 0 }, "heat"), "", "lost photos were never refused");
+  for (const [file, last] of [["../app/defect-log/_components/heat-scanner.tsx", "through SCAN SWEEP."], ["../app/defect-log/_components/sweep-scanner.tsx", "on the Down Sheet page."]]) {
+    assert.ok(code(await read(file)).includes(last + '"+(fromPaper&&start.wrong?" "+start.wrong:""));'), file + " adds it to its refusal, while the photos are still the door's");
+  }
 
   /* PAGES HELD BACK ARE SAID IN THE SCANNER, where the photos can be changed.
      The first look is a guess about each page; a third page of the Down Sheet
@@ -333,7 +420,7 @@ test("the photos are never written down on the way", async () => {
   for (const file of ["../src/lib/scan/paper-handoff.ts", "../src/lib/scan/paper-kinds.ts", "../src/lib/scan/paper-identify.ts"]) assert.doesNotMatch(await read(file), /from "react"|<\/[a-z]+>/, file);
 });
 
-test("SCAN PAPER on the screen: it identifies, hands on, and files nothing", async () => {
+test("SCAN SHEET on the screen: it identifies, hands on, and files nothing", async () => {
   const [paper, css, logPage, downPage, logCss, downCss] = await Promise.all([
     read("../src/components/scan/scan-paper.tsx"), read("../src/components/scan/scan-paper.css"),
     read("../app/defect-log/page.tsx"), read("../app/down-sheet/page.tsx"),
@@ -354,10 +441,20 @@ test("SCAN PAPER on the screen: it identifies, hands on, and files nothing", asy
   assert.doesNotMatch(body, /down sheet|ventra|farebox|heat check|sweep/i);
   assert.match(body, /<span>\{paperListWords\(\)\}\. The app works out which it is/);
   /* A FAILED LOOK IS NOT A DEAD END: the person is asked instead. */
-  assert.match(body, /catch\(reason\)\{[\s\S]{0,260}verdict=paperUnread\(batch\.length\);/);
+  assert.match(body, /catch\(reason\)\{[\s\S]{0,300}verdict=paperUnread\(batch\.length\);/);
   /* A dropped connection is said as one. The browser's own words for it are
      "Failed to fetch", which tells a foreman nothing. */
-  assert.match(body, /problem=reason instanceof TypeError\?"no connection to the reader":reason instanceof Error\?reason\.message:"";/);
+  assert.match(body, /problem=slow\?PAPER_SLOW_WORDS:reason instanceof TypeError\?"no connection to the reader":reason instanceof Error\?reason\.message:"";/);
+  /* A LOOK THAT HANGS IS A LOOK THAT FAILED. Wifi that is joined but dead
+     does not fail a request, it hangs it, and this look now stands in front
+     of every scan started from the door. The limit aborts it, the timer is
+     cleared whatever happened, and the limit is the domain's. */
+  const { PAPER_LOOK_MS, PAPER_SLOW_WORDS } = await import("../src/lib/scan/paper-identify.ts");
+  assert.ok(PAPER_LOOK_MS >= 10000 && PAPER_LOOK_MS <= 30000, "long enough for a real look, short enough to wait out: " + PAPER_LOOK_MS);
+  assert.equal(PAPER_SLOW_WORDS, "the reader took too long");
+  assert.match(body, /let verdict:PaperVerdict,pages:PaperPage\[\],problem="",slow=false;\s*const giveUp=window\.setTimeout\(\(\)=>\{slow=true;asking\.abort\(\)\},PAPER_LOOK_MS\);\s*try\{/);
+  assert.match(body, /\}finally\{window\.clearTimeout\(giveUp\)\}/);
+  assert.doesNotMatch(body, /setTimeout\([^)]*\d{4}/, "no time typed into the component");
   assert.match(body, /payload=\(await response\.json\(\) as typeof payload\)\|\|\{\}/, "an empty answer is not mistaken for a dropped connection");
 
   /* CANCEL MEANS CANCEL. Closing the box aborts the look, and an answer that
@@ -366,7 +463,10 @@ test("SCAN PAPER on the screen: it identifies, hands on, and files nothing", asy
   assert.match(body, /return\(\)=>\{open\.current=false;request\.current\?\.abort\(\);/);
   assert.match(body, /const batch=photos,asking=new AbortController\(\);\s*request\.current=asking;/);
   const afterLook = body.slice(body.indexOf("verdict=paperUnread(batch.length);"));
-  assert.match(afterLook, /^verdict=paperUnread\(batch\.length\);\s*\}\s*if\(!open\.current\|\|asking\.signal\.aborted\)return;\s*setBusy\(false\);/, "nothing that came back is acted on, and no state is set, once it has closed");
+  /* …and the two aborts are told apart: closed means nothing happens, out of
+     time means the person is asked. Without `&&!slow` a look that timed out
+     would leave the box on WORKING for good. */
+  assert.match(afterLook, /^verdict=paperUnread\(batch\.length\);\s*\}finally\{window\.clearTimeout\(giveUp\)\}\s*if\(!open\.current\|\|\(asking\.signal\.aborted&&!slow\)\)return;\s*setBusy\(false\);/, "nothing that came back is acted on, and no state is set, once it has closed");
   assert.match(body, /const send=\(choice:PaperChoice,batch:SelectedPhoto\[\]\)=>\{\s*if\(!open\.current\|\|leaving\)return;/);
   /* ONCE THE PAGE IS BEING LEFT, NOTHING PRETENDS TO CALL IT BACK: both ways
      of closing go dead, because the move has started and closing would not
@@ -376,6 +476,18 @@ test("SCAN PAPER on the screen: it identifies, hands on, and files nothing", asy
 
   /* ONLY A SHEET THIS PAGE READS, WITH EVERY PAGE AGREED, GOES STRAIGHT THROUGH. */
   assert.match(body, /if\(verdict\.decided&&paperKind\(verdict\.choice\.kind\)\.route===here\)\{send\(verdict\.choice,batch\);return\}\s*setLooked\(/);
+  /* A SURE ANSWER FOR ANOTHER PAGE CAN BE TURNED DOWN, and only there: what is
+     offered instead is the domain's, built from the count and the sheet that
+     was refused, and it goes dead with everything else once the page is being
+     left. */
+  assert.match(body, /const overrule=\(\)=>\{if\(looked&&looked\.verdict\.decided&&!leaving\)setLooked\(\{\.\.\.looked,verdict:paperOverruled\(looked\.batch\.length,looked\.verdict\.choice\.kind\)\}\)\};/);
+  assert.match(body, /\{!leaving&&<button className="paper-back" type="button" onClick=\{overrule\}>\{paperNotThisWords\(looked\.verdict\.choice\.kind\)\}<\/button>\}/);
+  assert.equal(count(body, /onClick=\{overrule\}/g), 1);
+  /* AND A QUESTION THAT CAME UP SHORT HAS ITS OWN WAY PAST. Whether it is
+     short is the domain's to say, and so is what is offered instead. */
+  assert.match(body, /const showAll=\(\)=>\{if\(looked&&!looked\.verdict\.decided&&!leaving\)setLooked\(\{\.\.\.looked,verdict:paperOverruled\(looked\.batch\.length\)\}\)\};/);
+  assert.match(body, /\{!leaving&&paperHoldsBack\(looked\.verdict\)&&<button className="paper-back" type="button" onClick=\{showAll\}>\{paperShowAllWords\(total\)\}<\/button>\}/);
+  assert.equal(count(body, /onClick=\{showAll\}/g), 1);
   /* THE PAGES SENT ARE THE CHOICE'S, from the photos the look was started
      with, and the number held back goes with them. */
   assert.match(body, /const files=choice\.send\.map\(page=>batch\[page-1\]\?\.file\)/);
@@ -405,33 +517,45 @@ test("SCAN PAPER on the screen: it identifies, hands on, and files nothing", asy
   assert.doesNotMatch(body, /<header|<footer|<nav/);
   const selectors = code(css).replace(/@media[^{]*\{/g, "").split("}").map(part => part.split("{")[0].trim()).filter(Boolean).flatMap(rule => rule.split(",")).map(item => item.trim());
   assert.ok(selectors.length > 40, "the sheet was actually read: " + selectors.length + " selectors");
-  for (const selector of selectors) assert.match(selector, /^\.paper-[a-z-]+/, "'" + selector + "' is scoped to SCAN PAPER");
+  for (const selector of selectors) assert.match(selector, /^\.paper-[a-z-]+/, "'" + selector + "' is scoped to SCAN SHEET");
 
-  /* BOTH PAGES DRAW THE SAME BUTTON AND THE SAME DOOR. */
-  for (const [name, source, here] of [["Defect Log", logPage, "/defect-log"], ["Down Sheet", downPage, "/down-sheet"]]) {
-    assert.match(source, new RegExp('const PAPER_HERE="' + here + '";'), name);
-    assert.match(source, /<button className="paper-scan-button" type="button" onClick=\{\(\)=>setPaperOpen\(true\)\}[^>]*>📷 SCAN PAPER<\/button>/, name);
-    assert.match(source, /\{paperOpen&&<ScanPaper here=\{PAPER_HERE\} onClose=\{\(\)=>setPaperOpen\(false\)\} onHere=\{openPaperHere\}\/>\}/, name);
-    assert.equal(count(source, /className="paper-scan-button"/g), 1, name + " draws SCAN PAPER once");
-  }
-  /* THE THREE OLD BUTTONS ARE WHERE THEY WERE. The new one is after the last
-     of them on the Defect Log, and after SCAN SHEET on the Down Sheet. */
-  assert.match(logPage, /<div className="feed-actions"><button className="cleanup-log" onClick=\{cleanUpLog\}>CLEAN UP<\/button><button className="sweep-scan-button"/, "the row still starts where it did");
-  assert.match(logPage, /className="sweep-scan-button"[\s\S]{0,400}className="scan-batches-button"[\s\S]{0,1500}className="heat-scan-button"[\s\S]{0,300}>📷 SCAN HEAT SHEET<\/button><button className="paper-scan-button"/);
-  assert.match(logPage, /📷 SCAN PAPER<\/button><\/div>/, "and SCAN PAPER closes it");
-  assert.match(downPage, /className="scan-sheet-button" type="button" onClick=\{\(\)=>setScannerOpen\(true\)\}>▣ SCAN SHEET<\/button>\s*<button className="paper-scan-button"/);
+  /* THE DOOR IS THE BUTTON THE DOWN SHEET ALREADY HAD. It was built as a
+     fourth button called SCAN PAPER; Curtis chose the one button. So SCAN
+     SHEET opens the door, and no button on the page opens the Down Sheet
+     scanner any other way. (The address still can, empty: that is the
+     receiver for a door on another page, and no page has one today.) */
+  const { PAPER_DOOR } = await import("../src/lib/scan/paper-kinds.ts");
+  assert.equal(PAPER_DOOR, "SCAN SHEET");
+  assert.match(downPage, /<button className="scan-sheet-button" type="button" onClick=\{\(\)=>setPaperOpen\(true\)\} title="[^"]+">▣ \{PAPER_DOOR\}<\/button>/);
+  assert.equal(count(downPage, /className="scan-sheet-button"/g), 1, "one SCAN SHEET button");
+  assert.match(downPage, /\{paperOpen&&<ScanPaper here=\{PAPER_HERE\} onClose=\{\(\)=>setPaperOpen\(false\)\} onHere=\{openPaperHere\}\/>\}/);
+  assert.doesNotMatch(code(downPage), /onClick=\{\(\)=>setScannerOpen\(true\)\}/, "no button opens the scanner past the door");
+  assert.equal(count(code(downPage), /setScannerOpen\(true\)/g), 2, "the scanner opens from the door on this page and from a hand-off off the address, and nowhere else");
+  assert.equal(count(code(downPage), /setScannerOpen\(/g), 4, "and is only ever set outright: those two, CLOSE, and the end of an import — a toggle would be a fifth");
+  assert.equal(count(code(downPage), /setScannerOpen\(false\)/g), 2);
+  /* The name is drawn from the one constant by everything that says it: the
+     button, the box it opens, the Down Sheet scanner's own heading, and what
+     a scanner says when it refuses photos the door sent. Typed nowhere. */
+  assert.doesNotMatch(code(await read("../src/lib/scan/paper-handoff.ts")), /SCAN PAPER|SCAN SHEET/);
+  assert.match(body, /<h2 id="scan-paper-title">\{PAPER_DOOR\}<\/h2>/);
+  assert.doesNotMatch(body, /SCAN PAPER|SCAN SHEET/, "the component types no name for itself");
+  assert.match(await read("../app/down-sheet/_components/down-sheet-scanner.tsx"), /<h2 id="scan-title">\{PAPER_DOOR\}<\/h2>/);
 
-  /* THE BUTTON'S LOOK IS SCOPED TO ITS OWN PAGE'S ROW ON BOTH PAGES. SCAN PAPER
-     changes page without reloading, which leaves both pages' stylesheets
-     loaded; a bare `.paper-scan-button` in each would have the Down Sheet's
-     height and font landing on the Defect Log's button after a hop. */
-  for (const [name, sheet] of [["defect-log.css", logCss], ["down-sheet.css", downCss]]) {
-    const rules = code(sheet).replace(/@media[^{]*\{/g, "").split("}").map(part => part.split("{")[0]).flatMap(rule => rule.split(",")).map(item => item.trim()).filter(item => item.includes("paper-scan-button"));
-    assert.ok(rules.length >= 2, name + " styles the button");
-    for (const selector of rules) assert.match(selector, /^\.(feed-actions|down-advanced-group)>\.paper-scan-button/, name + ": '" + selector + "' would also apply on the other page");
+  /* AND THE FOURTH BUTTON IS GONE, FROM BOTH PAGES AND BOTH STYLESHEETS. */
+  for (const [name, source] of [["Defect Log", logPage], ["Down Sheet", downPage], ["defect-log.css", logCss], ["down-sheet.css", downCss]]) {
+    assert.doesNotMatch(source, /paper-scan-button/, name);
+    assert.doesNotMatch(code(source), /SCAN PAPER/, name);
   }
-  assert.match(logCss, /\.feed-actions>\.paper-scan-button\{[^}]*background:#3d1c6e/);
-  assert.match(downCss, /\.down-advanced-group>\.paper-scan-button\{[^}]*background:#3d1c6e/, "the same colour on both pages");
+  /* THE DEFECT LOG HAS NO DOOR OF ITS OWN. It still TAKES a hand-off — that is
+     how a heat sheet or a sweep photographed on the Down Sheet gets read —
+     but it draws nothing that starts one. */
+  assert.match(logPage, /const PAPER_HERE="\/defect-log";/);
+  assert.match(downPage, /const PAPER_HERE="\/down-sheet";/);
+  assert.doesNotMatch(code(logPage), /ScanPaper|paperOpen|openPaperHere/);
+  /* ITS OWN TWO SCAN BUTTONS ARE WHERE THEY WERE, and open their scanner
+     directly, as they did before any of this. */
+  assert.match(logPage, /<div className="feed-actions"><button className="cleanup-log" onClick=\{cleanUpLog\}>CLEAN UP<\/button><button className="sweep-scan-button" type="button" onClick=\{\(\)=>setSweepOpen\(true\)\}/, "the row still starts where it did");
+  assert.match(logPage, /className="sweep-scan-button"[\s\S]{0,400}className="scan-batches-button"[\s\S]{0,1500}className="heat-scan-button" type="button" onClick=\{\(\)=>setHeatOpen\(true\)\}[\s\S]{0,300}>📷 SCAN HEAT SHEET<\/button><\/div>/, "and SCAN HEAT SHEET closes it again");
 
   /* A HAND-OFF IS FOR ONE OPENING. Both pages drop it when the scanner shuts —
      ON THE CHANGE FROM OPEN TO SHUT, not "whenever shut": that is also true as
@@ -443,7 +567,6 @@ test("SCAN PAPER on the screen: it identifies, hands on, and files nothing", asy
   /* EACH OF THE DEFECT LOG'S SHEETS IS NAMED. An `else` would open the sweep
      scanner, empty, for a sheet added to the table later. */
   assert.match(logPage, /const openScanner=\(kind:HandedPhotos\["kind"\]\)=>\{if\(kind==="heat"\)setHeatOpen\(true\);else if\(kind==="sweep"\)setSweepOpen\(true\)\};/);
-  assert.match(logPage, /const openPaperHere=\(next:HandedPhotos\)=>\{setPaperOpen\(false\);setHanded\(next\);openScanner\(next\.kind\)\};/);
   assert.match(downPage, /const openPaperHere=\(next:HandedPhotos\)=>\{setPaperOpen\(false\);setHanded\(next\);setScannerOpen\(true\)\};/);
   /* Both pages read their address through the same function and clean it the
      same way, keeping the history state the router left. */
@@ -465,7 +588,7 @@ test("each scanner takes a hand-off for its own sheet, and reads it once", async
     assert.equal(count(body, new RegExp("\\b" + reader + "\\b", "g")), 3, kind + ": defined, pressed, and started once by itself");
     assert.equal(count(body, new RegExp("void " + reader + "\\(\\)", "g")), 1, kind);
     assert.equal(count(body, new RegExp("onClick=\\{" + reader + "\\}", "g")), 1, kind);
-    /* It says SCAN PAPER opened it, and warns when pages were held back —
+    /* It says SCAN SHEET opened it, and warns when pages were held back —
        for as long as the photos are still the ones that were handed over. */
     assert.match(body, new RegExp('\\{fromPaper&&start\\.note&&<p className="' + noteClass + '" role="status">\\{start\\.note\\}</p>\\}'), kind);
     assert.match(body, new RegExp('\\{fromPaper&&start\\.warning&&<p className="' + noteClass + ' held-back" role="alert">\\{start\\.warning\\}</p>\\}'), kind);

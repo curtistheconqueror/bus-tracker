@@ -1157,18 +1157,78 @@ Grouped catalog categories are held in **two** structures that must stay in
 step: `REPAIR_OPTIONS` (the stored identity, prefixed `"Group - Item"`) and
 `REPAIR_OPTION_GROUPS` (the bare names the picker draws).
 
-## SCAN PAPER: one door in front of the three scanners
+## SCAN SHEET: one door in front of the three scanners
 
 Three sheets get photographed — the Vehicle Down Sheet, the farebox / Ventra
-sweep, the heat check sheet — through three buttons on two pages, and the
-person holding the paper had to know which button reads which. SCAN PAPER takes
-the photo, asks one cheap question of a small copy of it (`/api/scan-identify`:
-which sheet is this), and opens THAT sheet's own scanner with the photos in it.
-It reads no rows and files nothing. **It adds no storage key.**
+sweep, the heat check sheet — and the person holding the paper had to know
+which button on which page reads which. The Down Sheet's **SCAN SHEET** button
+now takes the photo, asks one cheap question of a small copy of it
+(`/api/scan-identify`: which sheet is this), and opens THAT sheet's own scanner
+with the photos in it. It reads no rows and files nothing. **It adds no storage
+key.**
 
-**THE THREE OLD BUTTONS STAY.** Curtis was told nothing he uses today moves, and
-they are also the way round a wrong guess: each scanner still opens from its own
-button, empty, exactly as before.
+**THE DOOR IS THE BUTTON THE DOWN SHEET ALREADY HAD, AND THERE IS NO FOURTH.**
+It was built as a separate button called SCAN PAPER, on both pages, beside the
+three scanners' own. Curtis, before it was published: *"I'd rather the current
+scan button just do the job"*, and *"we will put the other button on the back
+burner."* So SCAN SHEET opens the door; the Defect Log has none and its SCAN
+SWEEP and SCAN HEAT SHEET open their scanner directly, as they always did. The
+name is one constant, `PAPER_DOOR`, drawn by the button, the box it opens and
+the Down Sheet scanner's own heading.
+The code says "paper" for the thing photographed because a Down Sheet is one
+of three kinds of it.
+
+**WHAT THAT COSTS, because it is not free.** Every Down Sheet scan now pays the
+first look — a few seconds and a small read — where it used to open the scanner
+at once. And **no button on the Down Sheet opens its scanner except through the
+door**, so the door must never be a dead end. Every screen the look can leave a
+person on has a way past the look:
+
+- **the look fails** — no signal, no key, a refusal, or `PAPER_LOOK_MS` (20
+  seconds) with no answer: every sheet is offered with every page. The time
+  limit is there because wifi that is joined but dead does not fail a request,
+  it hangs it, and the box would sit on WORKING with only CANCEL to press;
+- **the look is SURE AND WRONG about the whole batch** — a Down Sheet read as a
+  heat sheet — it offers to open the other page, and beside that is NOT A HEAT
+  CHECK SHEET? PICK THE SHEET YOURSELF, which offers every OTHER sheet;
+- **the look is unsure, or the pages disagree**: the person is asked, and what
+  they are offered follows the look — a sheet no page read as is not offered,
+  and a page placed as another sheet is left out of each choice. Whenever that
+  is short of everything (`paperHoldsBack`), NOT RIGHT? SHOW EVERY SHEET, WITH
+  EVERY PAGE is under the choices.
+
+Both buttons end in `paperOverruled`, which **sends every page and drops the
+look's placements whole.** Applied to the new pick they would hold back every
+page the look had just placed. The two cases that made it necessary, found by a
+cold read of the first version, which had the way out on one screen only: a
+two-page Down Sheet read as a sweep and a heat sheet was offered those two and
+no Down Sheet; a three-page one with its last page read as a heat sheet could
+only ever be sent as two, into a scanner whose import replaces the live sheet.
+While SCAN SHEET also opened the scanner directly, the way round all of this
+was the other button. A test walks every combination of placements for one,
+two and three pages and holds that each sheet can be reached with every page.
+
+**A SCANNER THAT REFUSES PHOTOS THE DOOR SENT SAYS HOW TO GET PAST THE DOOR**
+(`paperSentWrongWords`). The sweep and heat scanners turn away a page that is
+not theirs and name the button that reads it — and for a Down Sheet that
+button is the door, which is what sent the page there.
+
+The one case with no way round on the same screen: the look is sure a HEAT
+sheet is a Down Sheet. It goes straight into the Down Sheet scanner, as
+pressing SCAN SHEET on that photo always did, and the way to read it properly
+is SCAN HEAT SHEET on the Defect Log.
+
+**The scanner can still be opened empty by ADDRESS**: `/down-sheet?scan=down-sheet`
+with no `photos=` opens it with nothing in it, the way the Fleet Campaigns link
+opens the heat scanner. No button on any page makes that address today.
+
+**PUTTING THE DOOR ON ANOTHER PAGE IS ONE BUTTON.** Curtis: *"we can just place
+this button anywhere we want for ease of access."* `ScanPaper` takes the route
+it is drawn on as `here`, and both pages already TAKE a hand-off off their
+address — the Down Sheet's receiver has no sender today and is kept for this.
+A page that reads none of the three sheets needs only the button and the
+component; one that reads a sheet also needs `onHere`, the way the Down Sheet
+does it. Where it goes is a UI change and his call first.
 
 **A NEW SHEET IS ONE ROW IN `src/lib/scan/paper-kinds.ts`, ITS SCANNER, AND THE
 LINE ON ITS PAGE THAT OPENS THAT SCANNER.** The table is what the first look's
@@ -1204,9 +1264,9 @@ refuse one that is not theirs. The Down Sheet scanner does not —
 `down-sheet-scan` was never asked that — and its import REPLACES the live sheet.
 So a heat sheet the look calls a Down Sheet opens the replacing scanner, reads,
 and shows every row as FLEET MATCH, because all three sheets list real buses.
-That is no worse than pressing SCAN SHEET on the same photo, which has always
-done exactly that, and the review and the import's own confirm still stand in
-the way. It is still the weakest point here, and the fix is a document verdict
+That is no worse than SCAN SHEET was before it became the door, when it read
+whatever it was handed, and the review and the import's own confirm still
+stand in the way. It is still the weakest point here, and the fix is a document verdict
 on the Down Sheet route — which changes a production prompt and needs a key to
 prove, so it is not in this change.
 
@@ -1231,14 +1291,16 @@ and the destination did exactly that. The fallback is vinext's, not ours:
 `scan-paper.tsx` only ever sees an address the router refuses outright.
 
 **MOVING WITHOUT A RELOAD LEAVES BOTH PAGES' STYLESHEETS LOADED.** No reload ever
-produces that state, so a browser check that reloads will never see it. Any
-class this feature styles in a page stylesheet is therefore named through that
-page's own container (`.feed-actions>.paper-scan-button`,
-`.down-advanced-group>.paper-scan-button`), never bare, and a test reads both
-sheets for it.
+produces that state, so a browser check that reloads will never see it. So a
+class this feature adds to a page stylesheet must be one the OTHER page's
+sheet does not also style: today that is `.scan-handed` on the Down Sheet and
+`.sweep-handed` on the Defect Log, the line a scanner shows when it was handed
+photos. The door's own styles are all `.paper-` and live with the component.
 
 **What the other page's stylesheet does to a page it was never written for,
-measured on the built worker** by comparing every element against a fresh load
+measured on the built worker** while the door was on both pages — only the
+first of the two moves below can happen today, the second needs a door on the
+Defect Log again — by comparing every element against a fresh load
 of the same page: the Defect Log reached from the Down Sheet had 78 of 80
 elements identical, the other two being `<html>` and `<body>`, whose colour and
 background take the Down Sheet's — not visible, because the page's own root
@@ -1258,9 +1320,15 @@ until the kept notes are in the box — started a render earlier it sends none
 and then writes "none kept" over them. **The cost:** notes for this one scan
 cannot be typed before that first read. Kept notes go with it; for a one-off
 note, CHANGE PHOTOS comes back to the ordinary first screen and reads again.
+**Since SCAN SHEET became the door this is every Down Sheet scan**, not only
+one that arrived from another page: the scanner's own first screen, where a
+note is typed before reading, is reached only through CHANGE PHOTOS, and a
+one-off note therefore costs a second full read. Curtis was told; making a
+same-page hand-off wait for its own READ press is the alternative, at the price
+of pressing READ twice on every scan.
 
 **CANCEL MEANS CANCEL.** A look outlives the press that started it. Closing
-SCAN PAPER aborts the request and ignores anything already on its way back; it
+the box aborts the request and ignores anything already on its way back; it
 used to let the answer open a scanner and send the full-size photos after the
 person had backed out. Once the page is being left, both ways of closing go
 dead instead, because closing would not stop the move.

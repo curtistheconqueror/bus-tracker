@@ -20,7 +20,7 @@ type Props={
  fleet:SweepFleetBus[];
  onClose:()=>void;
  onFile:(findings:SweepFinding[])=>void;
- /* Set when SCAN PAPER was the way in: the photos it took, already identified
+ /* Set when SCAN SHEET was the way in: the photos it took, already identified
     as this scanner's sheet. Absent for the scanner's own button. */
  handed?:HandedPhotos|null;
 };
@@ -31,7 +31,7 @@ export default function SweepScanner({fleet,onClose,onFile,handed}:Props){
  /* Asked once, when the scanner opens. A hand-off is for this opening only. */
  const [start]=useState(()=>handedStart(handed,"sweep"));
  const [photos,setPhotos]=useState<SelectedPhoto[]>(()=>start.files.slice(0,MAX_FILES).map((file,index)=>({file,url:URL.createObjectURL(file),key:`handed-${index}-${file.name}-${file.lastModified}`})));
- /* The lines that say SCAN PAPER opened this stay up only while the photos
+ /* The lines that say SCAN SHEET opened this stay up only while the photos
     are the ones it handed over. Once a photo is added or taken away they
     describe a batch that is no longer the one on screen. */
  const [fromPaper,setFromPaper]=useState(true);
@@ -107,11 +107,11 @@ export default function SweepScanner({fleet,onClose,onFile,handed}:Props){
    setOkAgainstBoard(sweepOkAgainstBoard(scanned,fleet));
    setHeldPages(held);
    setRead(true);
-   if(held.length&&held.every(item=>item.verdict==="not-a-sweep-sheet")&&held.length===photos.length)setError("None of these photos is a farebox or Ventra check-off sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN SHEET on the Down Sheet page.");
+   if(held.length&&held.every(item=>item.verdict==="not-a-sweep-sheet")&&held.length===photos.length)setError("None of these photos is a farebox or Ventra check-off sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN SHEET on the Down Sheet page."+(fromPaper&&start.wrong?" "+start.wrong:""));
    else if(!scanned.length)setError("No marked bus rows were found. Try a clearer photo, with the whole sheet in frame.");
   }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false);setProgress("")}
  };
- /* PHOTOS THAT SCAN PAPER HANDED IN ARE READ WITHOUT A SECOND PRESS — once,
+ /* PHOTOS THAT SCAN SHEET HANDED IN ARE READ WITHOUT A SECOND PRESS — once,
     and only after the kept notes are in the box, so the read sends them and
     does not erase them. Notes KEPT on this device go with it; notes for this
     one scan cannot be typed first. CHANGE PHOTOS afterwards comes back to the

@@ -5,7 +5,7 @@
 
 export const MAX_SCAN_BYTES=700*1024;
 
-/* THE FIRST LOOK NEEDS FAR LESS THAN THE READ DOES. SCAN PAPER asks one
+/* THE FIRST LOOK NEEDS FAR LESS THAN THE READ DOES. SCAN SHEET asks one
    question of each photo — which sheet is this — and a title and a column
    layout survive a picture a fraction of the size a row of handwriting needs.
    Every photo in a batch goes in one request, so small matters. */

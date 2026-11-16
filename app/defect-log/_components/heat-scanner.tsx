@@ -34,7 +34,7 @@ type Props={
  /* Every finding, with the reviewer's ticks, and the subset whose page was
     trusted. The page files and logs; this only asks. */
  onFile:(findings:HeatFinding[],loggable:HeatFinding[])=>void;
- /* Set when SCAN PAPER was the way in: the photos it took, already identified
+ /* Set when SCAN SHEET was the way in: the photos it took, already identified
     as this scanner's sheet. Absent for the scanner's own button. */
  handed?:HandedPhotos|null;
 };
@@ -45,7 +45,7 @@ export default function HeatScanner({fleet,onClose,onFile,handed}:Props){
  /* Asked once, when the scanner opens. A hand-off is for this opening only. */
  const [start]=useState(()=>handedStart(handed,"heat"));
  const [photos,setPhotos]=useState<SelectedPhoto[]>(()=>start.files.slice(0,MAX_FILES).map((file,index)=>({file,url:URL.createObjectURL(file),key:`handed-${index}-${file.name}-${file.lastModified}`})));
- /* The lines that say SCAN PAPER opened this stay up only while the photos
+ /* The lines that say SCAN SHEET opened this stay up only while the photos
     are the ones it handed over. Once a photo is added or taken away they
     describe a batch that is no longer the one on screen. */
  const [fromPaper,setFromPaper]=useState(true);
@@ -105,12 +105,12 @@ export default function HeatScanner({fleet,onClose,onFile,handed}:Props){
    setFindings(review.findings);
    setHeld(review.held);
    setRead(true);
-   if(review.held.length===photos.length&&review.held.every(item=>item.verdict==="not-a-heat-sheet"))setError("None of these photos is a heat check sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN SHEET on the Down Sheet page, and a farebox or Ventra sheet through SCAN SWEEP.");
+   if(review.held.length===photos.length&&review.held.every(item=>item.verdict==="not-a-heat-sheet"))setError("None of these photos is a heat check sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN SHEET on the Down Sheet page, and a farebox or Ventra sheet through SCAN SWEEP."+(fromPaper&&start.wrong?" "+start.wrong:""));
    else if(!review.findings.length)setError("No bus lines were found. Try a clearer photo, with the whole sheet in frame.");
   }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false);setProgress("")}
  };
- /* PHOTOS THAT SCAN PAPER HANDED IN ARE READ WITHOUT A SECOND PRESS. The
-    person has already pressed READ once, on SCAN PAPER; asking again here
+ /* PHOTOS THAT SCAN SHEET HANDED IN ARE READ WITHOUT A SECOND PRESS. The
+    person has already pressed READ once, on SCAN SHEET; asking again here
     would be asking them to confirm a decision they were never shown as a
     question. It happens once. The cost is that NOTES FOR THIS SCAN cannot be
     typed before that first read: CHANGE PHOTOS afterwards comes back to the

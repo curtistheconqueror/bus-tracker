@@ -1,17 +1,18 @@
-import {paperArrival,paperNamed,type PaperKind} from "./paper-kinds.ts";
+import {PAPER_DOOR,paperArrival,paperNamed,type PaperKind} from "./paper-kinds.ts";
+import {paperNotThisWords} from "./paper-identify.ts";
 
-/* GETTING THE PHOTOS FROM SCAN PAPER TO THE SCANNER THAT READS THEM.
+/* GETTING THE PHOTOS FROM SCAN SHEET TO THE SCANNER THAT READS THEM.
 
    Two of the three scanners live on the Defect Log and one on the Down Sheet,
    because each sits on the page whose records it changes. So a photo taken
-   through SCAN PAPER on one page sometimes has to be read on the other.
+   through SCAN SHEET on one page sometimes has to be read on the other.
 
    THE PHOTOS TRAVEL IN MEMORY AND NOWHERE ELSE. They are not written to
    LocalStorage, not put in the address, and not sent anywhere to be fetched
    back: a photograph of a shop sheet carries names and initials, and the only
    copy this app has ever kept of one is the one in the camera roll. Memory
    means the hand-off only survives a change of page that does not reload the
-   app, which is why SCAN PAPER moves with the router rather than with a link.
+   app, which is why SCAN SHEET moves with the router rather than with a link.
 
    AND WHEN THEY DO NOT ARRIVE, THE PAGE CAN TELL. The address says how many
    were meant to come (`photos=`); what this module hands back says whether
@@ -32,7 +33,7 @@ export type HandedPhotos={
  /* How many the address said were coming. More than `files` holds means they
     were lost on the way. */
  expected:number;
- /* How many photos from the same batch SCAN PAPER held back because they
+ /* How many photos from the same batch SCAN SHEET held back because they
     read as a different sheet. The scanner says so: the first look can be
     wrong, and a page left out of a Down Sheet is a page of buses that would
     come off it. */
@@ -86,14 +87,14 @@ export function handedFiles(handed:HandedPhotos|null|undefined,kind:PaperKind):F
 /* EVERYTHING A SCANNER NEEDS TO KNOW ABOUT HOW IT WAS OPENED, asked once.
 
    The photos it starts with, what to say if they were lost on the way, the
-   line that says SCAN PAPER opened it, the warning when SCAN PAPER held pages
+   line that says SCAN SHEET opened it, the warning when SCAN SHEET held pages
    back, and whether to start reading by itself — which it does whenever it
    was handed photos, because they only ever arrive whole. */
-export type HandedStart={files:File[];lost:string;note:string;warning:string;read:boolean};
+export type HandedStart={files:File[];lost:string;note:string;warning:string;wrong:string;read:boolean};
 
 export function handedStart(handed:HandedPhotos|null|undefined,kind:PaperKind):HandedStart{
  const files=handedFiles(handed,kind);
- return {files,lost:paperLostWords(handed,kind),note:paperHandedWords(handed,kind),warning:paperHeldBackWords(handed,kind),read:files.length>0};
+ return {files,lost:paperLostWords(handed,kind),note:paperHandedWords(handed,kind),warning:paperHeldBackWords(handed,kind),wrong:paperSentWrongWords(handed,kind),read:files.length>0};
 }
 
 /* Said by the scanner when photos were sent and did not arrive. */
@@ -102,14 +103,28 @@ export function paperLostWords(handed:HandedPhotos|null|undefined,kind:PaperKind
  return (handed.expected===1?"The photo":"The "+handed.expected+" photos")+" did not come across from the other page. Add "+(handed.expected===1?"it":"them")+" again.";
 }
 
-/* Said above a scanner that SCAN PAPER opened, so the person can see what was
-   decided for them and by what, and that the read they are watching is not
-   waiting for a second press. */
+/* Said above a scanner that SCAN SHEET opened, so the person can see what the
+   photos were taken for and that the read they are watching is not waiting
+   for a second press. It names no button: it said "OPENED BY SCAN PAPER", and
+   once SCAN SHEET became the door the same line sat inside a box already
+   headed SCAN SHEET, telling the person the button they had just pressed had
+   opened it. "As" covers both ways of getting here — the look placed it, or
+   the person picked it. */
 export function paperHandedWords(handed:HandedPhotos|null|undefined,kind:PaperKind):string{
- return handed&&handed.kind===kind&&handed.files.length?"OPENED BY SCAN PAPER AS "+paperNamed(kind)+". The photos taken there are read straight away.":"";
+ return handed&&handed.kind===kind&&handed.files.length?"OPENED AS "+paperNamed(kind)+". Your photos are read straight away.":"";
 }
 
-/* Said when SCAN PAPER held pages of the same batch back. The first look is
+/* Said by a scanner that REFUSES photos the door sent it, after its own
+   refusal. A scanner that turns a page away tells the person which button
+   reads it — and for a Down Sheet that button is the door, which is what sent
+   the page here: the same photo gets the same answer, round and round. This
+   names the way past the look instead. */
+export function paperSentWrongWords(handed:HandedPhotos|null|undefined,kind:PaperKind):string{
+ if(!handed||handed.kind!==kind||!handed.files.length)return "";
+ return PAPER_DOOR+" sent "+(handed.files.length===1?"this":"these")+" here. If it was wrong, scan "+(handed.files.length===1?"it":"them")+" there again and press \""+paperNotThisWords(kind)+"\".";
+}
+
+/* Said when SCAN SHEET held pages of the same batch back. The first look is
    a guess about each page, and this is the only place the person reading the
    result is told the batch they photographed is not all here. */
 export function paperHeldBackWords(handed:HandedPhotos|null|undefined,kind:PaperKind):string{

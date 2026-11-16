@@ -2,7 +2,7 @@ import {PAPER_KINDS,isPaperKind,paperKind,paperNamed,paperNamedInSentence,paperP
 
 /* WHICH SHEET IS THIS, and what to do when that is not one clean answer.
 
-   SCAN PAPER takes a quick first look at every photo before any of them is
+   SCAN SHEET takes a quick first look at every photo before any of them is
    read properly, and this module turns that look into a decision. The look
    itself is a small picture and one question — "what kind of page is this" —
    so it is cheap, and it is wrong sometimes. Everything here is built around
@@ -79,10 +79,12 @@ export function paperChoice(pages:PaperPage[],kind:PaperKind):PaperChoice{
  return {kind,send,leftOut};
 }
 
-export type PaperAskWhy="mixed"|"unplaced"|"unread";
+export type PaperAskWhy="mixed"|"unplaced"|"unread"|"overruled";
 export type PaperVerdict=
  |{decided:true;choice:PaperChoice}
- |{decided:false;why:PaperAskWhy;choices:PaperChoice[]};
+ |{decided:false;why:PaperAskWhy;choices:PaperChoice[];
+   /* Only when `why` is "overruled": the sheet the person said it is not. */
+   not?:PaperKind};
 
 /* Decided only when there is at least one page, every page was placed, and
    they all agree. Otherwise the kinds worth offering, the ones the pages
@@ -102,6 +104,42 @@ export function paperUnread(count:number):PaperVerdict{
  return {decided:false,why:"unread",choices:PAPER_KINDS.map(item=>paperChoice(pages,item.kind))};
 }
 
+/* THE PERSON SAYS THE LOOK WAS WRONG.
+
+   A look can be sure and wrong, about the whole batch or about one page of
+   it. While each scanner also had a button of its own that did not matter:
+   the way round a wrong answer was the other button. SCAN SHEET on the Down
+   Sheet is now the only button that reaches that page's scanner, so every
+   screen the look can leave a person on needs a way past the look.
+
+   WITH `not` — the look agreed on one sheet and the person says it is not
+   that: every OTHER sheet is offered. WITHOUT — the person was asked, and what
+   they were offered was short of what they are holding: every sheet is
+   offered. Either way EVERY PAGE GOES and the look's placements are dropped
+   whole. Applied to the new pick they would hold back every page the look had
+   just placed: a two-page Down Sheet read as a sweep and a heat sheet was
+   offered those two and nothing else, and a three-page one with its last page
+   read as a heat sheet could only ever be sent as two. */
+export function paperOverruled(count:number,not?:PaperKind):PaperVerdict{
+ const pages=normalizePaperPages(null,count),choices=PAPER_KINDS.filter(item=>item.kind!==not).map(item=>paperChoice(pages,item.kind));
+ return not?{decided:false,why:"overruled",not,choices}:{decided:false,why:"overruled",choices};
+}
+
+/* WHETHER THE QUESTION ON THE SCREEN IS SHORT OF EVERYTHING: a sheet missing
+   from it, or a choice that leaves a page behind. That is when the person is
+   offered the way past it, and never otherwise — after a failed look, or once
+   every sheet is already offered every page, there is nothing more to give. */
+export function paperHoldsBack(verdict:PaperVerdict):boolean{
+ return !verdict.decided&&(verdict.choices.length<PAPER_KINDS.length||verdict.choices.some(choice=>choice.leftOut.length>0));
+}
+
+/* How long the first look is given. It is a small picture and one question,
+   and it now stands in front of every scan started from the door: on wifi
+   that is joined but dead a request does not fail, it hangs, and the box
+   would have sat on WORKING with nothing to press but CANCEL. After this the
+   look counts as failed and the person picks the sheet. */
+export const PAPER_LOOK_MS=20*1000;
+
 /* ---- the words, here so the screen and anything else that reports a scan say
    the same thing ---- */
 
@@ -116,9 +154,19 @@ function sheetWords(kind:PaperKind):string{return paperNamedInSentence(kind)}
 /* The heading over a sheet the first look placed. */
 export function paperReadsAsWords(kind:PaperKind):string{return "THIS READS AS "+paperNamed(kind)}
 
+/* The way out of that heading when it is wrong. */
+export function paperNotThisWords(kind:PaperKind):string{return "NOT "+paperNamed(kind)+"? PICK THE SHEET YOURSELF"}
+
+/* The way out of a question that is short of what the person is holding. */
+export function paperShowAllWords(count:number):string{return count===1?"NOT RIGHT? SHOW EVERY SHEET":"NOT RIGHT? SHOW EVERY SHEET, WITH EVERY PAGE"}
+
+/* Said in place of the browser's own words when the look ran out of time. */
+export const PAPER_SLOW_WORDS="the reader took too long";
+
 /* Why the person is being asked, as one sentence they can act on. */
 export function paperAskWords(verdict:PaperVerdict,pages:PaperPage[],problem=""):string{
  if(verdict.decided)return "";
+ if(verdict.why==="overruled")return (verdict.not?"You said this is not "+sheetWords(verdict.not)+". ":"")+"Pick the sheet it is."+(pages.length===1?"":" Every page goes with the one you pick.");
  if(verdict.why==="unread")return "The photos could not be looked at first"+(problem?" ("+problem.replace(/[.\s]+$/,"")+")":"")+", so pick the sheet yourself.";
  const unplaced=unplacedWords(pages);
  if(verdict.why==="mixed"){

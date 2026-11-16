@@ -12,6 +12,7 @@ import {scanReadyPhoto} from "@/src/lib/defects/scan-photo";
 import {readScanNotes,rememberScanNotes,SCAN_NOTES_KEY,SCAN_NOTES_LIMIT} from "@/src/lib/defects/scan-notes";
 import {writeSetting} from "@/src/lib/storage/storage";
 import {handedStart,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
+import {PAPER_DOOR} from "@/src/lib/scan/paper-kinds";
 
 type SelectedPhoto={file:File;url:string;key:string};
 
@@ -21,8 +22,9 @@ type Props={
  defaultShift:"1st"|"2nd"|"3rd";
  onClose:()=>void;
  onImport:(records:ScanImportRecord[])=>void;
- /* Set when SCAN PAPER was the way in: the photos it took, already identified
-    as this scanner's sheet. Absent for the scanner's own button. */
+ /* Set when SCAN SHEET was the way in: the photos it took, already identified
+    as this scanner's sheet. Absent only when the page was opened at an
+    address asking for this scanner with no photos. */
  handed?:HandedPhotos|null;
 };
 
@@ -35,7 +37,7 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
  /* Asked once, when the scanner opens. A hand-off is for this opening only. */
  const [start]=useState(()=>handedStart(handed,"down-sheet"));
  const [photos,setPhotos]=useState<SelectedPhoto[]>(()=>start.files.slice(0,MAX_FILES).map((file,index)=>({file,url:URL.createObjectURL(file),key:`handed-${index}-${file.name}-${file.lastModified}`})));
- /* The lines that say SCAN PAPER opened this stay up only while the photos
+ /* The lines that say SCAN SHEET opened this stay up only while the photos
     are the ones it handed over. Once a photo is added or taken away they
     describe a batch that is no longer the one on screen. */
  const [fromPaper,setFromPaper]=useState(true);
@@ -120,7 +122,7 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
    if(!reviewed.length)setError("No bus repair rows were found. Try a clearer photo.");
   }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false);setProgress("")}
  };
- /* PHOTOS THAT SCAN PAPER HANDED IN ARE READ WITHOUT A SECOND PRESS — once,
+ /* PHOTOS THAT SCAN SHEET HANDED IN ARE READ WITHOUT A SECOND PRESS — once,
     and only after the kept notes are in the box. Reading is all it does by
     itself: the rows still stop at the review, and nothing replaces the sheet
     until IMPORT APPROVED and its confirm. Notes KEPT on this device go with
@@ -148,7 +150,7 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
  useEffect(()=>lockPageScroll("scan-sheet-open"),[]);
  return <div className="down-shade scan-shade" role="dialog" aria-modal="true" aria-labelledby="scan-title">
   <section className="scan-modal">
-   <header className="repair-editor-head"><div><span>PHOTO IMPORT</span><h2 id="scan-title">SCAN SHEET</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header>
+   <header className="repair-editor-head"><div><span>PHOTO IMPORT</span><h2 id="scan-title">{PAPER_DOOR}</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header>
    <div className="scan-body">
     {fromPaper&&start.note&&<p className="scan-handed" role="status">{start.note}</p>}
     {fromPaper&&start.warning&&<p className="scan-handed held-back" role="alert">{start.warning}</p>}

@@ -3,7 +3,7 @@ import {PAPER_DOCUMENT_VALUES,paperIdentifyPrompt} from "@/src/lib/scan/paper-id
 
 export const runtime="edge";
 
-/* The first look SCAN PAPER takes: which sheet is each photo.
+/* The first look SCAN SHEET takes: which sheet is each photo.
 
    Same transport as the three scan routes beside it — the same key, the same
    model unless one is named for this, the same strict JSON answer — and a much

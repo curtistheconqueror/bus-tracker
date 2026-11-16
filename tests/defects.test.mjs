@@ -5398,7 +5398,7 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  assert.doesNotMatch(code(logPage),/writeHeatChecks|mergeHeatChecks|withoutScanChecks/,"the page reads, merges and writes the log through one function per job");
  assert.match(logPage,/\{heatOpen&&<HeatScanner fleet=\{fleet\} handed=\{handed\} onClose=\{\(\)=>setHeatOpen\(false\)\} onFile=\{fileHeat\}\/>\}/);
  assert.match(logPage,/<button className="heat-scan-button"[^>]*onClick=\{\(\)=>setHeatOpen\(true\)\}[^>]*>📷 SCAN HEAT SHEET</);
- /* The address is read through the one function SCAN PAPER's hand-off uses,
+ /* The address is read through the one function SCAN SHEET's hand-off uses,
     so the campaign's link and a photo arriving from the Down Sheet cannot be
     understood two different ways. tests/scan.test.mjs holds what it returns. */
  assert.match(logPage,/arrived=paperHandIn\(url\.search,PAPER_HERE\);\s*if\(!arrived\)return;\s*setHanded\(arrived\);openScanner\(arrived\.kind\);\s*url\.searchParams\.delete\(PAPER_SCAN_PARAM\);url\.searchParams\.delete\(PAPER_PHOTOS_PARAM\);\s*window\.history\.replaceState\(/,"the campaign's link opens the scanner once, and the address is cleaned so a reload does not open it again");

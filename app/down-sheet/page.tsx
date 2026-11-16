@@ -12,7 +12,7 @@ import "./down-sheet.css";
 import DownSheetEditor from "./_components/down-sheet-editor";
 import DownSheetScanner from "./_components/down-sheet-scanner";
 import ScanPaper from "@/src/components/scan/scan-paper";
-import {PAPER_PHOTOS_PARAM,PAPER_SCAN_PARAM} from "@/src/lib/scan/paper-kinds";
+import {PAPER_DOOR,PAPER_PHOTOS_PARAM,PAPER_SCAN_PARAM} from "@/src/lib/scan/paper-kinds";
 import {paperHandIn,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
 import {readSweep,startSweep} from "@/src/lib/fleet/facility-sweep";
 import {applyDownEntryToFleet} from "@/src/lib/down-sheet/down-sheet-sync";
@@ -43,7 +43,7 @@ import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "@/src/components/down-sheet/my
 import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "./_components/deferred-board";
 import RecommendedBoard,{RECOMMENDED_BOARD_COLLAPSED_KEY} from "./_components/recommended-board";
 import SheetSectionBoard from "./_components/sheet-section-board";
-/* The route this page is, as SCAN PAPER and the hand-off name it. */
+/* The route this page is, as SCAN SHEET and the hand-off name it. */
 const PAPER_HERE="/down-sheet";
 /* Per device and collapsed by default, the same as the three boards above
    them. Both are NEW names, so nothing already stored is renamed. */
@@ -248,9 +248,15 @@ export default function DownSheet(){
  useEffect(()=>{setAdvancedOpen(localStorage.getItem(ADVANCED_OPEN_KEY)==="1")},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,ADVANCED_OPEN_KEY,advancedOpen?"1":"0")},[advancedOpen,hydrated]);
  const [scannerOpen,setScannerOpen]=useState(false);
- /* SCAN PAPER, and the photos it hands to the scanner. A hand-off is for ONE
-    opening: left in place, the next press of SCAN SHEET would open on
-    yesterday's photos and start reading them. Dropped when the scanner SHUTS,
+ /* SCAN SHEET IS THE DOOR, NOT THE SCANNER. Pressing it opens the box that
+    takes the photos and works out which sheet they are (`paperOpen`); the
+    Down Sheet scanner (`scannerOpen`) opens only once that has handed it
+    photos, and a heat sheet or a sweep is sent to the Defect Log instead.
+    Until this the button opened the scanner directly, and a heat sheet
+    photographed here was read as a Down Sheet.
+
+    A hand-off is for ONE opening: left in place, the scanner's next opening
+    would start on yesterday's photos. Dropped when the scanner SHUTS,
     however it came to be shut — on the change from open to shut, not whenever
     it is shut, which is also true the moment the page opens and would race
     the effect below that takes a hand-off off the address. */
@@ -379,7 +385,9 @@ export default function DownSheet(){
     two places is the hazard. The rule is in `src/lib/down-sheet/sheet-mint.ts`
     now and both paths here call it. */
  useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),minted=addMintedEntries(restored,entriesFromFleet(nextFleet),MINT_RULES);setEntries(minted.entries);setMintSkipped(mintSkippedMessage(minted.skipped,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setSectionOrder(normalizeDownSheetSectionOrder(settings.sectionOrder));setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
- /* SCAN PAPER on the Defect Log sends a Vehicle Down Sheet here to be read.
+ /* A door on ANOTHER page sends a Vehicle Down Sheet here to be read. No
+    page has one today — the Defect Log's was taken off — and this is kept so
+    that putting SCAN SHEET on any other page is one button and no plumbing.
     This and the load above both run as the page opens, and what they set
     lands in one render, so the scanner mounts with the fleet and the current
     sheet already in hand. That matters because it starts reading by itself,
@@ -940,8 +948,7 @@ export default function DownSheet(){
          They were the loudest things on the page — a red CLEAR DOWNSHEET beside
          two amber buttons — sitting above the button that adds a bus. The undos
          still appear only when there is something to undo. */}
-     <button className="scan-sheet-button" type="button" onClick={()=>setScannerOpen(true)}>▣ SCAN SHEET</button>
-     <button className="paper-scan-button" type="button" onClick={()=>setPaperOpen(true)} title="Photograph any shop sheet: the app works out which one it is and opens its scanner">📷 SCAN PAPER</button>
+     <button className="scan-sheet-button" type="button" onClick={()=>setPaperOpen(true)} title="Photograph any shop sheet: the app works out which one it is and opens its scanner">▣ {PAPER_DOOR}</button>
      {undoScanAvailable&&<button className="undo-scan" type="button" onClick={undoScan}>UNDO IMPORT</button>}
      {undoClearAvailable&&<button className="undo-clear" type="button" onClick={undoClear}>UNDO CLEAR</button>}
      <button className="clear-downsheet" type="button" onClick={clearEntireDownSheet} disabled={!entries.length&&!fleet.some(bus=>bus.down)}>CLEAR DOWNSHEET</button>

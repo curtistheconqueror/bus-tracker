@@ -4,16 +4,20 @@ import {useEffect,useRef,useState} from "react";
 import {useRouter} from "next/navigation";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 import {scanGlancePhoto} from "@/src/lib/defects/scan-photo";
-import {PAPER_MAX_PHOTOS,paperKind,paperListWords,paperPageLabel,paperScanHref} from "@/src/lib/scan/paper-kinds";
-import {normalizePaperPages,paperAskWords,paperLeftOutWords,paperPagesWords,paperReadsAsWords,paperUnread,paperVerdict,paperWhereWords,type PaperChoice,type PaperPage,type PaperVerdict} from "@/src/lib/scan/paper-identify";
+import {PAPER_DOOR,PAPER_MAX_PHOTOS,paperKind,paperListWords,paperPageLabel,paperScanHref} from "@/src/lib/scan/paper-kinds";
+import {PAPER_LOOK_MS,PAPER_SLOW_WORDS,normalizePaperPages,paperAskWords,paperHoldsBack,paperLeftOutWords,paperNotThisWords,paperOverruled,paperPagesWords,paperReadsAsWords,paperShowAllWords,paperUnread,paperVerdict,paperWhereWords,type PaperChoice,type PaperPage,type PaperVerdict} from "@/src/lib/scan/paper-identify";
 import {offerPaperPhotos,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
 import "./scan-paper.css";
 
-/* SCAN PAPER: one door in front of the scanners.
+/* SCAN SHEET: one door in front of the scanners.
 
    Take the photo, and the app works out which shop sheet it is, then opens
    THAT sheet's own scanner with the photos already in it. Nobody has to
    remember which button on which page reads which piece of paper.
+
+   The name on it is `PAPER_DOOR`, never typed here: it was built as a fourth
+   button with a name of its own, and became the button the Down Sheet already
+   had.
 
    IT READS NOTHING AND FILES NOTHING. It asks one question of small copies of
    the photos and hands the originals on. What a row means, what gets ticked
@@ -30,9 +34,10 @@ import "./scan-paper.css";
    state here is the photos, what came back, and whether this page is being
    left.
 
-   Drawn by two pages, which is why it lives here and brings its own
-   stylesheet: the Defect Log's and the Down Sheet's modal styles are each
-   loaded only on their own page. */
+   IT CAN BE DRAWN BY ANY PAGE, which is why it lives here, takes the route it
+   is on as `here`, and brings its own stylesheet: each page's modal styles
+   are loaded only on that page. Today one page draws it, the Down Sheet,
+   behind the button it already had. */
 
 type SelectedPhoto={file:File;url:string;key:string};
 
@@ -111,7 +116,10 @@ export default function ScanPaper({here,onClose,onHere}:Props){
   const batch=photos,asking=new AbortController();
   request.current=asking;
   setBusy(true);setError("");
-  let verdict:PaperVerdict,pages:PaperPage[],problem="";
+  let verdict:PaperVerdict,pages:PaperPage[],problem="",slow=false;
+  /* A look that hangs is a look that failed. The same abort that CANCEL uses
+     stops it; `slow` is what tells the two apart afterwards. */
+  const giveUp=window.setTimeout(()=>{slow=true;asking.abort()},PAPER_LOOK_MS);
   try{
    const form=new FormData();
    for(let index=0;index<batch.length;index++)form.append("photos",await scanGlancePhoto(batch[index].file,index+1));
@@ -126,17 +134,27 @@ export default function ScanPaper({here,onClose,onHere}:Props){
       holding. They are asked, and the scanner they pick reports its own
       trouble if the trouble is still there. A dropped connection is said as
       one — the browser's own words for it are "Failed to fetch". */
-   problem=reason instanceof TypeError?"no connection to the reader":reason instanceof Error?reason.message:"";
+   problem=slow?PAPER_SLOW_WORDS:reason instanceof TypeError?"no connection to the reader":reason instanceof Error?reason.message:"";
    pages=normalizePaperPages(null,batch.length);
    verdict=paperUnread(batch.length);
-  }
-  /* Closed while it was working: nothing that came back is acted on. */
-  if(!open.current||asking.signal.aborted)return;
+  }finally{window.clearTimeout(giveUp)}
+  /* Closed while it was working: nothing that came back is acted on. A look
+     that ran out of time was aborted too, and is NOT that — the box is still
+     open and the person is asked. */
+  if(!open.current||(asking.signal.aborted&&!slow))return;
   setBusy(false);
   /* Every page agrees and this page reads that sheet: straight through. */
   if(verdict.decided&&paperKind(verdict.choice.kind).route===here){send(verdict.choice,batch);return}
   setLooked({verdict,pages,problem,batch});
  };
+
+ /* THE LOOK CAN BE SURE AND WRONG, and these are the ways past it. `overrule`
+    is for an answer every page agreed on: not that sheet, so the others.
+    `showAll` is for a question that came up short — a sheet missing from it,
+    or a choice that leaves a page behind. What each offers, and that the
+    look's placements are dropped with it, is paper-identify's. */
+ const overrule=()=>{if(looked&&looked.verdict.decided&&!leaving)setLooked({...looked,verdict:paperOverruled(looked.batch.length,looked.verdict.choice.kind)})};
+ const showAll=()=>{if(looked&&!looked.verdict.decided&&!leaving)setLooked({...looked,verdict:paperOverruled(looked.batch.length)})};
 
  const total=looked?.batch.length||0;
  /* Which pages a choice takes, said whenever there is more than one page —
@@ -146,7 +164,7 @@ export default function ScanPaper({here,onClose,onHere}:Props){
 
  return <div className="paper-shade" role="dialog" aria-modal="true" aria-labelledby="scan-paper-title">
   <section className="paper-modal">
-   <div className="paper-head"><div><span>PHOTO IMPORT</span><h2 id="scan-paper-title">SCAN PAPER</h2></div><button type="button" onClick={onClose} disabled={Boolean(leaving)} aria-label="Close">×</button></div>
+   <div className="paper-head"><div><span>PHOTO IMPORT</span><h2 id="scan-paper-title">{PAPER_DOOR}</h2></div><button type="button" onClick={onClose} disabled={Boolean(leaving)} aria-label="Close">×</button></div>
    <div className="paper-body">
     {!looked&&<>
      <div className="paper-intro"><b>PHOTOGRAPH ANY SHOP SHEET — UP TO {PAPER_MAX_PHOTOS} PAGES OF THE SAME ONE</b><span>{paperListWords()}. The app works out which it is and opens that sheet&apos;s own scanner with your photos in it. Photos are sent for processing only after you press Read Sheet, and nothing is filed or changed until you have reviewed and approved it there.</span></div>
@@ -163,6 +181,7 @@ export default function ScanPaper({here,onClose,onHere}:Props){
     {looked&&looked.verdict.decided&&<>
      <div className="paper-found"><b>{paperReadsAsWords(looked.verdict.choice.kind)}</b><span>It is read on the {paperPageLabel(looked.verdict.choice.kind)} page, where what it changes is saved and can be undone. Opening it leaves this page and takes your photo{total===1?"":"s"} along.</span></div>
      <button className="paper-read" type="button" disabled={Boolean(leaving)} onClick={()=>looked.verdict.decided&&send(looked.verdict.choice,looked.batch)}>{leaving?`OPENING THE ${leaving}…`:`OPEN IT ON THE ${paperPageLabel(looked.verdict.choice.kind)}`}</button>
+     {!leaving&&<button className="paper-back" type="button" onClick={overrule}>{paperNotThisWords(looked.verdict.choice.kind)}</button>}
     </>}
 
     {looked&&!looked.verdict.decided&&<>
@@ -173,6 +192,7 @@ export default function ScanPaper({here,onClose,onHere}:Props){
       {paperLeftOutWords(choice)&&<em>{paperLeftOutWords(choice)}</em>}
      </button>)}</div>
      {leaving&&<p className="paper-leaving" role="status">OPENING THE {leaving}…</p>}
+     {!leaving&&paperHoldsBack(looked.verdict)&&<button className="paper-back" type="button" onClick={showAll}>{paperShowAllWords(total)}</button>}
     </>}
 
     {looked&&!leaving&&<button className="paper-back" type="button" onClick={()=>{setLooked(null);setError("")}}>CHANGE PHOTOS</button>}

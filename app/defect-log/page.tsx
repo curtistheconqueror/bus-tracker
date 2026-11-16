@@ -25,7 +25,6 @@ import {headerTextFor} from "@/src/lib/settings/header-theme";
 import {pageThemeHeaderPair} from "@/src/lib/settings/page-header-themes";
 import SweepScanner from "./_components/sweep-scanner";
 import HeatScanner from "./_components/heat-scanner";
-import ScanPaper from "@/src/components/scan/scan-paper";
 import {PAPER_PHOTOS_PARAM,PAPER_SCAN_PARAM} from "@/src/lib/scan/paper-kinds";
 import {paperHandIn,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
 import {heatFiling,type HeatFinding} from "@/src/lib/defects/heat-check-import";
@@ -93,7 +92,7 @@ type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownShee
    That path lives in restoreBatch and UNDO LAST hands over to it. */
 type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string;scanBatch?:true;heatScan?:string;heatChecks?:string};
 
-/* The route this page is, as SCAN PAPER and the hand-off name it. */
+/* The route this page is, as the hand-off from SCAN SHEET names it. */
 const PAPER_HERE="/defect-log";
 const BOARD_SETTINGS_KEY="pace-board-settings-v1";
 /* Absent means closed. A new key rather than a settings field, so a device
@@ -998,10 +997,13 @@ export default function DefectLog(){
  const [extendUntil,setExtendUntil]=useState("");
  const [sweepOpen,setSweepOpen]=useState(false);
  const [heatOpen,setHeatOpen]=useState(false);
- /* SCAN PAPER, and the photos it hands to whichever scanner reads them. Both
-    of this page's scanners take a hand-off; each uses only one addressed to
-    its own sheet, so a sweep's photos can never open in the heat scanner. */
- const [paperOpen,setPaperOpen]=useState(false);
+ /* The photos SCAN SHEET on the Down Sheet hands to whichever of this page's
+    scanners reads them. Both take a hand-off; each uses only one addressed to
+    its own sheet, so a sweep's photos can never open in the heat scanner.
+    THIS PAGE HAS NO DOOR OF ITS OWN: it had a SCAN PAPER button for one
+    unpublished build, and Curtis chose the one button over a fourth. SCAN
+    SWEEP and SCAN HEAT SHEET open their scanner directly, as they always
+    did. */
  const [handed,setHanded]=useState<HandedPhotos|null>(null);
  /* A hand-off is for ONE opening. Left in place, the next press of SCAN SWEEP
     would open on yesterday's photos and start reading them. Dropped when a
@@ -1014,14 +1016,13 @@ export default function DefectLog(){
  useEffect(()=>{const open=sweepOpen||heatOpen;if(scannerWasOpen.current&&!open)setHanded(null);scannerWasOpen.current=open},[sweepOpen,heatOpen]);
  /* Each of this page's sheets is NAMED. An `else` here would open the sweep
     scanner, empty, for any sheet added to the table later and read on this
-    page — the wrong scanner being the one thing SCAN PAPER is for stopping. */
+    page — the wrong scanner being the one thing SCAN SHEET is for stopping. */
  const openScanner=(kind:HandedPhotos["kind"])=>{if(kind==="heat")setHeatOpen(true);else if(kind==="sweep")setSweepOpen(true)};
- const openPaperHere=(next:HandedPhotos)=>{setPaperOpen(false);setHanded(next);openScanner(next.kind)};
  /* Another page sends people here to scan: Fleet Campaigns for the heat
-    sheet, and SCAN PAPER on the Down Sheet for either of this page's two. The
+    sheet, and SCAN SHEET on the Down Sheet for either of this page's two. The
     parameters are taken off the address once acted on, the way a quick
     filter's is, so a reload does not throw the scanner up a second time. The
-    history entry keeps the state it had, because SCAN PAPER arrives through
+    history entry keeps the state it had, because SCAN SHEET arrives through
     the router and the router keeps its own notes there. */
  useEffect(()=>{
   const url=new URL(window.location.href),arrived=paperHandIn(url.search,PAPER_HERE);
@@ -2013,7 +2014,7 @@ export default function DefectLog(){
      </div>
      <div className="log-advanced-group">
       <b className="log-advanced-label">TOOLS</b>
-      <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button><button className="scan-batches-button" type="button" onClick={()=>setBatchesOpen(true)} disabled={!batches.length&&!batchUndo} title="Every photo scan filed on this device, and the way to take one back out">↶ SCAN BATCHES</button><a className="feed-operator" href="/?operator=1" title="Opens the AI Operator on the Facility Map — this leaves the Defect Log" onClick={event=>{if(!leaveForOperator())event.preventDefault()}}><span aria-hidden="true">&#10022;</span> AI OPERATOR</a><button className="heat-scan-button" type="button" onClick={()=>setHeatOpen(true)} disabled={!fleet.length} title="Photograph the heat check sheet: N/R becomes a No Heat defect, and every line is logged as a check">📷 SCAN HEAT SHEET</button><button className="paper-scan-button" type="button" onClick={()=>setPaperOpen(true)} disabled={!fleet.length} title="Photograph any shop sheet: the app works out which one it is and opens its scanner">📷 SCAN PAPER</button></div>
+      <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button><button className="scan-batches-button" type="button" onClick={()=>setBatchesOpen(true)} disabled={!batches.length&&!batchUndo} title="Every photo scan filed on this device, and the way to take one back out">↶ SCAN BATCHES</button><a className="feed-operator" href="/?operator=1" title="Opens the AI Operator on the Facility Map — this leaves the Defect Log" onClick={event=>{if(!leaveForOperator())event.preventDefault()}}><span aria-hidden="true">&#10022;</span> AI OPERATOR</a><button className="heat-scan-button" type="button" onClick={()=>setHeatOpen(true)} disabled={!fleet.length} title="Photograph the heat check sheet: N/R becomes a No Heat defect, and every line is logged as a check">📷 SCAN HEAT SHEET</button></div>
      </div>
     </div>
   </section>}
@@ -2416,7 +2417,7 @@ export default function DefectLog(){
   {editing&&<DefectEditor key={editing.busId+":"+editing.defect.id} draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} coachOn={coachOn} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} shopHours={repairHours} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside}/>}
   {/* Rendered here rather than inside ADVANCED ACTIONS: closing that section
       must not tear down a scanner somebody is part-way through. */}
-  {sweepOpen&&<SweepScanner fleet={fleet} handed={handed} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{heatOpen&&<HeatScanner fleet={fleet} handed={handed} onClose={()=>setHeatOpen(false)} onFile={fileHeat}/>}{paperOpen&&<ScanPaper here={PAPER_HERE} onClose={()=>setPaperOpen(false)} onHere={openPaperHere}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}
+  {sweepOpen&&<SweepScanner fleet={fleet} handed={handed} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{heatOpen&&<HeatScanner fleet={fleet} handed={handed} onClose={()=>setHeatOpen(false)} onFile={fileHeat}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}
   {holdBoardOpen&&<HoldBoard fleet={fleet} close={()=>setHoldBoardOpen(false)} onRelease={busId=>setHold(busId,false)}/>}
   {movingMysteryBus&&<MysteryMoveModal bus={movingMysteryBus} fleet={fleet} move={moveMysteryBus} close={()=>setMovingMysteryBusId("")}/>}
   
