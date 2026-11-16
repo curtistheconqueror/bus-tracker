@@ -116,8 +116,8 @@ check a fix on his phone that has not been published.
 | PR | Branch | Head | Ahead | CI | Threads | What it is |
 | --- | --- | --- | --- | --- | --- | --- |
 | **#45** | `claude/typecheck-gate-windows` | `a7b7152` | 2 | not re-read | **1, answered** — the reviewer's to close | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
-| **#46** | `claude/heat-check-domain` | `d1d1b05` | see below | not re-read | **14, all answered** — the reviewers' to close | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules and limits are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`** |
-| **#47** | `claude/scan-paper` | `70cd3f8` | 3, **on #46** | not read | none yet | **SCAN SHEET IS THE DOOR.** The Down Sheet's own SCAN SHEET button takes the photo, works out which of the three sheets it is and opens that sheet's own scanner with the photos loaded. The separate SCAN PAPER button it was first built as is gone. **Stacked on #46 — its base is `claude/heat-check-domain`, not `main`** |
+| **#46** | `claude/heat-check-domain` | `f9c9e10` | see below | passed at `d1d1b05`; not read at `f9c9e10` | **14, then 5 more on 2026-11-15, all answered** — the reviewers' to close | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules and limits are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`** |
+| **#47** | `claude/scan-paper` | `9ebf489` | 5, **on #46** | passed at `70cd3f8`; not read at `9ebf489` | **4 from CodeRabbit, all answered** | **SCAN SHEET IS THE DOOR.** The Down Sheet's own SCAN SHEET button takes the photo, works out which of the three sheets it is and opens that sheet's own scanner with the photos loaded. The separate SCAN PAPER button it was first built as is gone. **Stacked on #46 — its base is `claude/heat-check-domain`, not `main`** |
 | **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
 Heads, commits ahead, CI and thread counts were read from GitHub on 2026-11-13
@@ -140,8 +140,27 @@ the rebuild, each with one Major, all answered and listed in the PR body. The
 rebuild's Major is worth knowing: with no direct button left, the door could
 strand a Down Sheet the look had split or cut short, so every question screen
 now has a way to send every page to any sheet, and the look gives up after 20
-seconds. **No review bot has read it and its CI was not read. The 81 planted
-bugs from the first build were not re-run on the rebuild.**
+seconds. **The 81 planted bugs from the first build were not re-run on the
+rebuild.**
+
+**CODERABBIT DOES NOT REVIEW #47 BY ITSELF.** It skips a pull request that is
+not aimed at `main`, and #47 is aimed at #46's branch. Curtis asked for its
+review on 2026-11-15; a comment reading `@coderabbitai review` on the pull
+request is what starts one, and it only reads commits it has not read. It left
+four findings on `70cd3f8`, one Major — the sweep and Down Sheet scanners let
+the photos change while a read was running, and on the Down Sheet the import
+that followed replaced the sheet without the added page. All four are answered
+in `9ebf489`, each on its own thread, with a ledger comment; a cold read of
+those answers found eight more things, six fixed, one unchanged and one
+declined (next paragraph). **Nobody has reviewed `9ebf489`: ask CodeRabbit
+again before calling it ready, and read its CI.**
+
+**A SCANNER'S OWN READ HAS NO TIME LIMIT, and that is recorded, not built.**
+The first look gives up after 20 seconds; the read after it never does. On
+wifi that is joined but dead the scanner sits on READING for good, and since
+`9ebf489` the photo controls are locked with it — CANCEL and the X still work.
+A limit needs a number for how long a real read of a real sheet takes, and
+nothing here has ever read one.
 
 **What it costs, which Curtis has been told:** every Down Sheet scan pays the
 first look, and notes for one scan cannot be typed before the first read.
@@ -186,8 +205,21 @@ cooling, not the whole category** (the 24 A/C and HVAC repairs split 18 and 6,
 none on both — re-run by a second session, not quoted). `d1d1b05` is the
 `CLAUDE.md` correction those needed: it still said the A/C change was waiting
 on him. Gates on Windows at that head: 445 of 446, the one failure being the
-type-check test #45 fixes. **No review bot has read the four commits and CI on
-them was not read.**
+type-check test #45 fixes.
+
+**CodeRabbit read `0770ca5` and `af4925f` the same afternoon and left five
+findings, one Major**: one bus number twice on ONE photo with one line blank
+arrived ticked, because the blank copy was set aside before the same-photo
+rule was asked. All five held and are answered in `f9c9e10`, each on its own
+thread with a ledger comment: PUT BACK reads the page's copy of the way back as
+well as the device's; `undoHeatCheck` no longer calls an unreadable log
+"nothing to undo"; a bus that arrives mid-walk is held from the next recorded
+check (`heatWalkPin`); and PUT BACK leaves a No Heat record off a bus already
+on No Heat Buses. A cold read of those answers found seven more things, six
+fixed and one declined — with the stored write refused AND a second tab, a
+removal held only in memory is dropped when the other tab puts an older one
+back. **Nobody has reviewed `f9c9e10`; CodeRabbit should pick it up by itself
+because #46 is aimed at `main`. Read what it says and its CI before merging.**
 
 **Still with Curtis on #46, not built:** whether each OK row in the scan review
 needs its own way to be turned down; whether a struck-through row means fixed;
@@ -204,9 +236,10 @@ tick box disabled, and is counted in "flagged", but it cannot be imported.
 Curtis met this scanning a 30-bus sheet on an iPad whose board held 64 buses
 against the phone's 100-plus. **Until its board is full, do not scan from the
 iPad.** Whether a sheet should be allowed to introduce a bus is his design
-call and nothing is built. Two more scanner faults are recorded and not
-built: LINES NOT READ cannot see a read that gives up partway down the page,
-and the sweep and Down Sheet scanners do not freeze their photos mid-read.
+call and nothing is built. One more scanner fault is recorded and not built:
+LINES NOT READ cannot see a read that gives up partway down the page. (The
+other one listed here — the sweep and Down Sheet scanners not freezing their
+photos mid-read — is fixed on #47 in `9ebf489`, and only there.)
 
 **Found while answering #46 and NOT fixed, because it is older than that
 branch:** `put()` in `src/lib/storage/fleet-restore.ts` ignores
