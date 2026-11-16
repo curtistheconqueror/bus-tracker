@@ -117,7 +117,7 @@ check a fix on his phone that has not been published.
 | --- | --- | --- | --- | --- | --- | --- |
 | **#45** | `claude/typecheck-gate-windows` | `a7b7152` | 2 | not re-read | **1, answered** — the reviewer's to close | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
 | **#46** | `claude/heat-check-domain` | `f9c9e10` | see below | passed at `d1d1b05`; not read at `f9c9e10` | **14, then 5 more on 2026-11-15, all answered** — the reviewers' to close | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules and limits are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`** |
-| **#47** | `claude/scan-paper` | `9ebf489` | 5, **on #46** | passed at `70cd3f8`; not read at `9ebf489` | **4 from CodeRabbit, all answered** | **SCAN SHEET IS THE DOOR.** The Down Sheet's own SCAN SHEET button takes the photo, works out which of the three sheets it is and opens that sheet's own scanner with the photos loaded. The separate SCAN PAPER button it was first built as is gone. **Stacked on #46 — its base is `claude/heat-check-domain`, not `main`** |
+| **#47** | `claude/scan-paper` | `8e5e364` | 6, **on #46** | passed at `9ebf489`; not read at `8e5e364` | **4, then 2 more, from CodeRabbit, all answered** | **SCAN SHEET IS THE DOOR.** The Down Sheet's own SCAN SHEET button takes the photo, works out which of the three sheets it is and opens that sheet's own scanner with the photos loaded. The separate SCAN PAPER button it was first built as is gone. **Stacked on #46 — its base is `claude/heat-check-domain`, not `main`** |
 | **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
 Heads, commits ahead, CI and thread counts were read from GitHub on 2026-11-13
@@ -152,8 +152,26 @@ the photos change while a read was running, and on the Down Sheet the import
 that followed replaced the sheet without the added page. All four are answered
 in `9ebf489`, each on its own thread, with a ledger comment; a cold read of
 those answers found eight more things, six fixed, one unchanged and one
-declined (next paragraph). **Nobody has reviewed `9ebf489`: ask CodeRabbit
-again before calling it ready, and read its CI.**
+declined (next paragraph).
+
+**ITS SECOND PASS, on `9ebf489`, left two Minor findings and one open
+question, answered in `8e5e364`.** The notes box and its "keep" tick stayed
+live under a read in the sweep and Down Sheet scanners, though a read sends the
+notes it started with; both are now disabled while a scanner reads, and a
+locked box and its label dim to .55 so they do not look live (the heat
+scanner's box shares the class and now shows its lock too). **That is a flow
+change and it is Curtis's to keep or reverse:** on a hand-off the read starts
+by itself, and until `8e5e364` a note could be typed while it ran and was used
+on the next read after CHANGE PHOTOS. It was put to him the same night and is
+not answered. The open question was the keyboard: the bot would not take
+synthetic key events, so Tab and Shift+Tab were driven with trusted presses
+through the browser's input layer (17, every one `isTrusted`), including after
+a button is disabled and after the buttons are replaced, and focus stayed in
+the box each time. That is not a hand on a physical keyboard. A cold read of
+`8e5e364` found no defect; it declined-and-recorded two things: `disabled`
+rather than `readOnly` means a phone may not be able to scroll the notes during
+a read, and nothing measured a phone. **Nobody has reviewed `8e5e364`:
+CodeRabbit was asked again; read what it says and its CI.**
 
 **A SCANNER'S OWN READ HAS NO TIME LIMIT, and that is recorded, not built.**
 The first look gives up after 20 seconds; the read after it never does. On
