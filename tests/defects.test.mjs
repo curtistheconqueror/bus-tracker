@@ -4399,6 +4399,50 @@ test("a heat sheet photographed twice gives one row per bus, and a number the bo
   assert.match(of(number).reviewNote,/read 2 times and the lines do not match — one of them is probably another bus/,number);
  }
  assert.equal(of("17518"),undefined,"the misread number left no row for 17518 — which is why 17519 must be looked at, not filed");
+ /* ONE NUMBER TWICE ON ONE PHOTO IS A MISREAD EVEN WHEN ONE LINE IS BLANK.
+    The blank copy used to be set aside first, which left one written row,
+    nothing to compare it with, and a ticked N/R — on a bus that may be the
+    line above or below the one somebody checked. A page lists each bus once.
+    Found by a review bot; `sameLine` already held this for two written rows. */
+ const twice=(first,second)=>heatFindings([first,second],fleet,HEAT_NOW);
+ for(const [name,rows] of [["written first",[row("17511","N/R","10/22"),row("17511","","",{initial:""})]],["blank first",[row("17511","","",{initial:""}),row("17511","N/R","10/22")]]]){
+  const [only,...rest]=twice(...rows);
+  assert.equal(rest.length,0,name);
+  assert.equal(only.action,"look",name+": not fileable");
+  assert.equal(only.selected,false,name);
+  assert.equal(canFileHeatFinding(only),false,name);
+  assert.equal(only.written,"N/R",name+": the row shown is the one somebody wrote on");
+  assert.match(only.reviewNote,/read 2 times and the lines do not match/,name);
+ }
+ /* ACROSS two photos the same pair is an honest overlap, and still files. */
+ assert.equal(twice(row("17511","","",{initial:""}),row("17511","N/R","10/22",{pageNumber:2}))[0].action,"file");
+ /* And two lines nobody wrote on are left alone: nothing can be filed. */
+ assert.equal(twice(row("17511","","",{initial:""}),row("17511","","",{initial:""}))[0].action,"nothing");
+ /* ONLY A WRITTEN ROW THAT SHARES ITS PHOTO WITH A COPY. A clean N/R on one
+    photo is not refused because ANOTHER photo, taken earlier in the walk, has
+    the number on two blank lines — that misread is the other photo's, on
+    lines nobody wrote on. The first version of this fix asked the whole
+    group, and a cold read drove the case. */
+ const blank=page=>row("17511","","",{initial:"",pageNumber:page});
+ for(const rows of [[row("17511","N/R","10/22"),blank(2),blank(2)],[blank(1),blank(1),row("17511","N/R","10/22",{pageNumber:2})],[blank(2),row("17511","N/R","10/22"),blank(2)]]){
+  const [only]=heatFindings(rows,fleet,HEAT_NOW);
+  assert.equal(only.action,"file",JSON.stringify(rows.map(item=>[item.pageNumber,item.written])));
+  assert.equal(only.written,"N/R");
+ }
+ /* The same line read cleanly twice AND crowded on one of its photos is still
+    a conflict: the row shown is the crowded one. */
+ const crowded=heatFindings([row("17511","N/R","10/22"),blank(1),row("17511","N/R","10/22",{pageNumber:2})],fleet,HEAT_NOW)[0];
+ assert.equal(crowded.action,"look");
+ assert.equal(crowded.pageNumber,1);
+ assert.match(crowded.reviewNote,/read 3 times/);
+ /* EVERY MARK, not only N/R: an OK or a struck line beside a blank copy on
+    one photo is as likely to be the neighbour's, and logging a check from it
+    would put HEAT OK on a bus nobody looked at. */
+ for(const [name,written,extra] of [["OK","OK",{}],["struck","N/R",{struck:true}]]){
+  const [only]=twice(row("17511",written,"10/22",extra),row("17511","","",{initial:""}));
+  assert.equal(only.action,"look",name);
+  assert.equal((await import("../src/lib/defects/heat-check-log.ts")).heatChecksFromFindings([only],HEAT_NOW).length,0,name+" logs no check");
+ }
  assert.equal(of("17520").busId,"b-17520","the board's number is matched however it was typed");
 
  assert.equal(of("17523").mark,"blank");
@@ -4663,6 +4707,33 @@ test("the heat check log keeps every check as its own event, and reading the sam
  const arrived=[...after,row("099","no-heat")];
  const withNew=heatWalkRoster(arrived,"todo",walk).map(item=>item.busNumber);
  assert.deepEqual(withNew,[...walk,"099"],"the newcomer is last, not first, even though its standing ranks it first");
+ /* A NEWCOMER IS HELD FROM THE NEXT RECORDED CHECK. It was drawn on the end
+    and held by nothing, so HEAT OK on it took its row out from under the next
+    newcomer and NO HEAT re-ranked the newcomers among themselves. The board
+    pins what is on the screen on every recorded check; this is that, on rows.
+    Found by a review bot. */
+ const {heatWalkPin}=await import("../src/lib/defects/heat-check-log.ts");
+ const two=[...after,row("098","unchecked"),row("099","unchecked")];
+ /* What the next recorded check pins: the held order, plus the two newcomers
+    as they are drawn. This is the function the board calls on every check. */
+ const drawn=heatWalkPin(walk,heatWalkRoster(two,"todo",walk));
+ assert.deepEqual(drawn,[...walk,"098","099"]);
+ assert.deepEqual(heatWalkPin(null,heatWalkRoster(before,"todo",null)),walk,"the first check pins the ranked order as it stands");
+ assert.deepEqual(heatWalkPin(walk,heatWalkRoster(after,"todo",walk)),walk,"with nobody new, pinning again changes nothing");
+ /* ADDED TO, NEVER REPLACED. A held bus off the roster for a moment keeps its
+    place: taking the screen's rows as the new order forgot it, and it came
+    back on the end. */
+ const gone=[row("101","unchecked"),row("103","no-heat"),row("104","unchecked"),row("098","unchecked")];
+ const pinnedWhileGone=heatWalkPin(walk,heatWalkRoster(gone,"todo",walk));
+ assert.deepEqual(pinnedWhileGone,[...walk,"098"],"102 is off the board and still in the order");
+ assert.deepEqual(heatWalkRoster([...gone,row("102","unchecked")],"todo",pinnedWhileGone).map(item=>item.busNumber),[...walk,"098"],"so it returns to its own row, not the end");
+ const tapped=[row("103","no-heat"),row("101","unchecked"),row("102","unchecked"),row("104","unchecked"),row("099","unchecked"),row("098","ok")];
+ assert.deepEqual(heatWalkRoster(tapped,"todo",walk).map(item=>item.busNumber),[...walk,"099"],"held on the OLD order, HEAT OK on a newcomer takes its row away and 099 moves up into it");
+ assert.deepEqual(heatWalkRoster(tapped,"todo",drawn).map(item=>item.busNumber),drawn,"held on what was on the screen, nothing moves");
+ assert.equal(heatWalkRoster(tapped,"todo",drawn)[4].status,"ok");
+ const cold=[row("099","no-heat"),row("103","no-heat"),row("101","unchecked"),row("102","unchecked"),row("104","unchecked"),row("098","unchecked")];
+ assert.deepEqual(heatWalkRoster(cold,"todo",walk).map(item=>item.busNumber),[...walk,"099","098"],"and NO HEAT on the second newcomer jumped it over the first");
+ assert.deepEqual(heatWalkRoster(cold,"todo",drawn).map(item=>item.busNumber),drawn);
  /* A bus that has LEFT the board is simply gone; the hold never invents a row. */
  assert.deepEqual(heatWalkRoster([row("101","unchecked"),row("102","unchecked")],"todo",walk).map(item=>item.busNumber),["101","102"]);
  /* The hold is the walk's, not the lane's: a lane asked for fresh still ranks. */
@@ -4697,6 +4768,15 @@ test("the heat check log keeps every check as its own event, and reading the sam
  assert.deepEqual(undoHeatCheck(shelfStorage,"no such check"),{ok:true,removed:false});
  assert.deepEqual(undoHeatCheck(shelfStorage,walked[0].id),{ok:true,removed:true});
  assert.deepEqual(readHeatChecks(shelfStorage),[]);
+ /* A LOG THAT CANNOT BE READ IS NOT "NOTHING TO UNDO". It read as empty, the
+    id was "not in it", and this said the undo had worked — so the page put
+    its UNDO bar away with the check still on disk. The question
+    `dropScanChecks` asks first. Found by a review bot. */
+ const unreadable=value=>({getItem:()=>value,setItem(){throw new Error("must not write")}});
+ assert.deepEqual(undoHeatCheck(unreadable("{not json"),"any"),{ok:false,why:"unreadable",removed:false});
+ assert.deepEqual(undoHeatCheck(unreadable('{"not":"a list"}'),"any"),{ok:false,why:"unreadable",removed:false});
+ assert.deepEqual(undoHeatCheck({getItem(){throw new Error("blocked")},setItem(){}},"any"),{ok:false,why:"unreadable",removed:false});
+ assert.deepEqual(undoHeatCheck(unreadable(null),"any"),{ok:true,removed:false},"nothing stored is an empty log, and readable");
 
  /* And the scan files a defect for every N/R the board did not already hold. */
  const filing=heatFiling(findings,READ);
@@ -5203,6 +5283,64 @@ test("a heat scan taken out, put back and taken out again leaves each bus the wa
  assert.match(scanRestoreLeftOff(late),/3 were left off because the bus already has that repair open/);
  for(const n of ["17510","17511","17512","17514"])assert.equal(quickFilterDefects(on(late.fleet,n),"no-cabin-heat",BACK).length,1,n+" has its heat repair once");
  assert.match(scanRestoreLeftOff({duplicate:1}),/1 was left off/);
+ /* A HEAT RECORD DOES NOT GO BACK ONTO A BUS ALREADY ON NO HEAT BUSES. After
+    the removal somebody logs a boost pump on 17510 by hand. That is not the
+    same repair as "No heat", so the check above lets the scan's record back
+    and the bus has two open heat repairs — the pair `applyHeatFiling` refuses
+    to file. Found by a review bot. */
+ const pump={id:"pump-1",category:"A/C and HVAC",issue:"Heating - Heater boost pump",details:"",operability:"service",state:"open",createdAt:OUT,updatedAt:OUT};
+ const pumped=out.fleet.map(item=>item.n==="17510"?{...item,defects:[...(item.defects||[]),pump]}:item);
+ const overPump=restoreScanBatch(pumped,snapshot,BACK);
+ assert.equal(overPump.tagged,1);
+ assert.equal(overPump.duplicate,0);
+ assert.equal(overPump.restored,3,"the other three buses get theirs back");
+ assert.deepEqual(on(overPump.fleet,"17510").defects.map(defect=>defect.id),["pump-1"],"17510 keeps the one heat repair it has");
+ assert.ok(!overPump.restoredIds.some(id=>on(overPump.fleet,"17510").defects.some(defect=>defect.id===id)));
+ assert.equal(scanRestoreLeftOff(overPump),"; 1 No Heat record was left off because the bus already has a heat repair open");
+ assert.equal(scanRestoreLeftOff({duplicate:2,tagged:3}),"; 2 were left off because the bus already has that repair open; 3 No Heat records were left off because the bus already has a heat repair open");
+ assert.equal(back.tagged,0,"an ordinary PUT BACK leaves none off");
+ /* THE BUS IS ASKED, NOT THE LIST OF ITS RECORDS — the question the filing
+    asks. A bus with an EMPTY defect list and a heat line in its old free-text
+    field is on No Heat Buses; asking the list alone let the record back. */
+ const typed=out.fleet.map(item=>item.n==="17510"?{...item,defects:[],pendingRepair:"heater / defroster inop"}:item);
+ assert.equal(quickFilterDefects(on(typed,"17510"),"no-cabin-heat",BACK).length>0,true,"the fixture is on No Heat Buses");
+ assert.equal(restoreScanBatch(typed,snapshot,BACK).tagged,1);
+ /* WHEN NOTHING WENT BACK, the AI Operator says why in a sentence of its own.
+    It knew two reasons, and with this third it answered "every record from
+    that scan is already back on its bus" about a record that was not. */
+ const {scanRestoreNothingWords}=await import("../src/lib/defects/scan-batches.ts");
+ const one=scanBatchUndoSnapshot(out.removed.filter(record=>record.busNumber==="17510"),"Removed 1 record",OUT);
+ const none=restoreScanBatch(pumped,one,BACK);
+ assert.deepEqual([none.restored,none.missing,none.duplicate,none.tagged],[0,0,0,1]);
+ assert.equal(scanRestoreNothingWords(none),"Nothing was put back; 1 No Heat record was left off because the bus already has a heat repair open.");
+ assert.equal(scanRestoreNothingWords({missing:0,duplicate:2,tagged:0}),"Nothing was put back; 2 were left off because the bus already has that repair open.");
+ assert.equal(scanRestoreNothingWords({missing:0,duplicate:0}),"Every record from that scan is already back on its bus.");
+ assert.equal(scanRestoreNothingWords({missing:3,duplicate:1,tagged:1}),"Those records' buses are no longer on this device, so nothing could be put back.");
+ const mapPage=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ assert.match(mapPage,/if\(!result\.restored\)\{localStorage\.removeItem\(SCAN_BATCH_UNDO_KEY\);return \{ok:false,message:scanRestoreNothingWords\(result\)\}\}/);
+ assert.doesNotMatch(mapPage,/already back on its bus/,"the sentence is said in one place");
+ /* A FINISHED heat repair is history and stands in nobody's way; and a record
+    that is not a heat record is never held to the heat rule. */
+ assert.equal(restoreScanBatch(out.fleet.map(item=>item.n==="17510"?{...item,defects:[{...pump,state:"completed",completedAt:OUT}]}:item),snapshot,BACK).tagged,0);
+ const wiper={busId:on(pumped,"17510").id,busNumber:"17510",defect:{id:"wiper-1",category:"Wipers",issue:"Wiper blade",details:"",operability:"service",state:"open",createdAt:FILED,updatedAt:FILED}};
+ const mixed=restoreScanBatch(pumped,scanBatchUndoSnapshot([wiper],"Removed 1 record",OUT),BACK);
+ assert.equal(mixed.tagged,0);
+ assert.equal(mixed.restored,1);
+
+ /* WHICH WAY BACK "PUT BACK" MEANS when the page holds one and the device
+    another. The stored write can be refused: then the device has nothing, or
+    the removal BEFORE this one, and the button on the screen is for the one
+    just made. Found by a review bot — PUT BACK read the device alone. */
+ const {latestScanBatchUndo}=await import("../src/lib/defects/scan-batches.ts");
+ const older=scanBatchUndoSnapshot(out.removed.slice(0,1),"older",OUT),newer=scanBatchUndoSnapshot(out.removed,"newer",BACK);
+ assert.equal(latestScanBatchUndo(null,null),null);
+ assert.equal(latestScanBatchUndo(null,newer),newer,"the write was refused and nothing was there: the page's copy");
+ assert.equal(latestScanBatchUndo(older,newer),newer,"the write was refused over an older removal: still the page's copy");
+ assert.equal(latestScanBatchUndo(newer,older),newer,"another tab removed a scan since: the device's copy");
+ assert.equal(latestScanBatchUndo(newer,null),newer,"after a reload the page holds none");
+ assert.equal(latestScanBatchUndo(newer,newer),newer);
+ const logPageSource=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(logPageSource,/const snapshot=latestScanBatchUndo\(readScanBatchUndo\(localStorage\.getItem\(SCAN_BATCH_UNDO_KEY\)\),batchUndo\);/);
  /* Only an OPEN copy stands in the way. A heat repair finished on the bus is
     history, and the scan's record goes back beside it. */
  const finished={...out.removed.find(record=>record.busNumber==="17514").defect,id:"done-1",state:"completed",completedAt:OUT,updatedAt:OUT};
@@ -5469,7 +5607,9 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
     reports — and a refused tap wrote nothing, so it must not freeze the order
     either. It did: `onCheck` returned void, the board pinned regardless, and a
     cancelled question left the list frozen for the rest of that lane view. */
- assert.match(board,/const order=shown\.map\(item=>item\.busNumber\);\s*if\(onCheck\(row,result\)&&held===null\)setHeld\(order\);/,"the order is taken off the committed render and pinned only when the check filed");
+ assert.match(board,/const order=heatWalkPin\(held,shown\);\s*if\(onCheck\(row,result\)\)setHeld\(order\);/,"the order is taken off the committed render and pinned only when the check filed — and on EVERY check that files, so a bus that arrived mid-walk is held from the next one");
+ assert.doesNotMatch(board,/held===null\)setHeld/,"pinning only the first time left newcomers held by nothing");
+ assert.doesNotMatch(board,/shown\.map\(item=>item\.busNumber\)/,"what a check pins is heatWalkPin's to say, not the board's");
  assert.match(board,/onCheck:\(row:HeatRosterRow,result:HeatResult\)=>boolean;/,"so the board can tell a recorded check from a refused one");
  const listsPage=lists;
  assert.match(listsPage,/const checkHeat=\(row:HeatRosterRow,result:HeatResult\):boolean=>\{/,"and the page reports it");

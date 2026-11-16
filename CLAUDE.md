@@ -749,7 +749,12 @@ became DEFECT when the scan filed on it, as it would for a defect logged by
 hand. **PUT BACK stamps `scanRestoredAt`** beside the `updatedAt` it has to
 move, so a returned record still reads as untouched and the scan can be taken
 out again; and it leaves off a repair the bus already has open, which is what a
-re-scan between the removal and the PUT BACK would otherwise double.
+re-scan between the removal and the PUT BACK would otherwise double. **It also
+leaves a No Heat record off a bus that is already on No Heat Buses** — the pair
+`applyHeatFiling` refuses to file, since "Heater boost pump" is not the same
+repair as "No heat" and the same-repair check cannot see it. Both doors say
+what was left off and why, from the restore's own counts (`scanRestoreLeftOff`,
+`scanRestoreNothingWords`).
 
 **A heat log that cannot be READ is not written over.** It draws as empty, and
 every write to it is refused and says why — the board's rule, for the case of a
@@ -805,7 +810,11 @@ come back.* So `heatWalkRoster` (`heat-check-log.ts`) draws the walk's own
 order — bus numbers pinned at the first RECORDED check, not on mount, so the
 list still opens ranked — and it is dropped on a lane change or on closing the
 list. A held row stays even when its new standing would take it out of the
-lane; a bus that arrives mid-walk from another device goes on the end.
+lane; a bus that arrives mid-walk from another device goes on the end. **Every
+recorded check adds what is on the screen to the held order, not only the
+first** (`heatWalkPin`): a newcomer drawn on the end was in nobody's held order,
+so HEAT OK on it took its row out from under the next one — the thing the hold
+exists to stop.
 
 **Only a recorded check pins it.** `checkHeat` reports whether it filed, because
 a tap can be refused — no initials, a cancelled NO HEAT question, a log that

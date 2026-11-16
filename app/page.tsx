@@ -48,7 +48,7 @@ import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDo
 import SaveAlert from "@/src/components/shared/save-alert";
 import ShopCloudLive from "@/src/components/shared/shop-cloud-live";
 import RefreshButton,{refreshTrackerApp} from "@/src/components/shared/refresh-button";
-import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,scanBatchWords,scanRestoreLeftOff} from "@/src/lib/defects/scan-batches";
+import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,scanBatchWords,scanRestoreLeftOff,scanRestoreNothingWords} from "@/src/lib/defects/scan-batches";
 import {dropScanChecks,heatCleanupLeftBehind,heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
 import {forgetRemovedEntries,readMergedAway,rememberRemovedEntries,writeMergedAway} from "@/src/lib/cloud/cloud-sync";
 import AppName from "@/src/components/shared/app-name";
@@ -508,7 +508,7 @@ const executeOperator=(plan:OperatorPlan):{ok:boolean;message:string}=>{
   const snapshot=readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY));
   if(!snapshot)return {ok:false,message:"There is no removed scan to put back on this device."};
   const now=new Date().toISOString(),result=restoreScanBatch(buses,snapshot,now);
-  if(!result.restored){localStorage.removeItem(SCAN_BATCH_UNDO_KEY);return {ok:false,message:result.missing?"Those records' buses are no longer on this device, so nothing could be put back.":result.duplicate?"Nothing was put back: every record from that scan is already on its bus, or the bus already has that repair open.":"Every record from that scan is already back on its bus."}}
+  if(!result.restored){localStorage.removeItem(SCAN_BATCH_UNDO_KEY);return {ok:false,message:scanRestoreNothingWords(result)}}
   const written=writeFleetStorageResult(localStorage,result.fleet);
   setSaveProblem(written.reason||"");
   if(!written.ok)return {ok:false,message:"The board could not be saved on this device, so nothing was put back."};

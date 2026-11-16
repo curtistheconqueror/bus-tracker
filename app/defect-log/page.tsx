@@ -30,7 +30,7 @@ import {applyHeatFiling} from "@/src/lib/defects/heat-check-apply";
 import {HEAT_SCAN_PARAM,HEAT_SCAN_VALUE,addHeatChecks,dropScanChecks,heatChecksFromFindings,heatCleanupLeftBehind,heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
 import {sweepDefect,type SweepFinding} from "@/src/lib/defects/sweep-scan-import";
 import ScanBatchesPanel from "./_components/scan-batches-panel";
-import {findScanBatch,readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,scanBatchWords,scanRestoreLeftOff,type ScanBatch,type ScanBatchUndo} from "@/src/lib/defects/scan-batches";
+import {findScanBatch,latestScanBatchUndo,readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,scanBatchWords,scanRestoreLeftOff,type ScanBatch,type ScanBatchUndo} from "@/src/lib/defects/scan-batches";
 import {readMergedAway,writeMergedAway} from "@/src/lib/cloud/cloud-sync";
 import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
 import OfflineBackupReminder from "./_components/offline-backup-reminder";
@@ -1561,7 +1561,9 @@ export default function DefectLog(){
     removal sent — and the ledger forgets them, so the shop cloud accepts them
     back over the deletion instead of dropping the restore as an older write. */
  const restoreBatch=()=>{
-  const snapshot=readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY));
+  /* The device's copy AND the one this page is holding: the stored write can
+     be refused, and the button being pressed is for the one on the screen. */
+  const snapshot=latestScanBatchUndo(readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY)),batchUndo);
   if(!snapshot){setBatchUndo(null);alert("There is no removed scan to put back on this device.");return}
   const now=new Date().toISOString(),result=restoreScanBatch(fleet,snapshot,now);
   if(result.restored&&!persist(result.fleet,downEntries).ok)return;
