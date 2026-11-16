@@ -117,7 +117,7 @@ check a fix on his phone that has not been published.
 | --- | --- | --- | --- | --- | --- | --- |
 | **#45** | `claude/typecheck-gate-windows` | `a7b7152` | 2 | not re-read | **1, answered** — the reviewer's to close | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
 | **#46** | `claude/heat-check-domain` | `d1d1b05` | see below | not re-read | **14, all answered** — the reviewers' to close | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules and limits are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`** |
-| **#47** | `claude/scan-paper` | `63d10bf` | 2, **on #46** | not read | none yet | **SCAN PAPER.** One button on the Defect Log and the Down Sheet in front of the three scanners: take the photo, the app works out which sheet it is and opens that sheet's own scanner with the photos loaded. **Stacked on #46 — its base is `claude/heat-check-domain`, not `main`** |
+| **#47** | `claude/scan-paper` | `70cd3f8` | 3, **on #46** | not read | none yet | **SCAN SHEET IS THE DOOR.** The Down Sheet's own SCAN SHEET button takes the photo, works out which of the three sheets it is and opens that sheet's own scanner with the photos loaded. The separate SCAN PAPER button it was first built as is gone. **Stacked on #46 — its base is `claude/heat-check-domain`, not `main`** |
 | **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
 Heads, commits ahead, CI and thread counts were read from GitHub on 2026-11-13
@@ -125,12 +125,28 @@ before the merges, except #47's, which is as pushed. **"Ahead" is against the `m
 three now sit behind `main` by the 27 merged commits and will need rebasing
 before they can land.
 
-**#47 is SCAN PAPER, built on 2026-11-13 after Curtis approved the design, and
-it is STACKED ON #46** because the heat scanner only exists there. It merges
-after #46 and not before. One cold read by a subagent found 14 things, one
-Major (CANCEL did not cancel a look in flight); all 14 are answered in its one
-commit and listed in the PR body. **No review bot has read it and its CI was
-not read.** Three things about it worth knowing before touching it:
+**#47 was built on 2026-11-13 as SCAN PAPER, a fourth button on two pages, and
+REBUILT on 2026-11-15 as the Down Sheet's own SCAN SHEET button** (`70cd3f8`).
+Curtis: *"I'd rather the current scan button just do the job"* and *"we will
+put the other button on the back burner."* The Defect Log has no door now; its
+SCAN SWEEP and SCAN HEAT SHEET open their scanner directly, and it still takes
+photos handed over from the Down Sheet. He also said *"we can just place this
+button anywhere we want for ease of access"* — the component takes its route
+as a prop for that, and WHERE it goes is his call before it moves.
+
+**It is STACKED ON #46** because the heat scanner only exists there, and merges
+after it. Two cold reads by a subagent: 14 findings on the first build, 9 on
+the rebuild, each with one Major, all answered and listed in the PR body. The
+rebuild's Major is worth knowing: with no direct button left, the door could
+strand a Down Sheet the look had split or cut short, so every question screen
+now has a way to send every page to any sheet, and the look gives up after 20
+seconds. **No review bot has read it and its CI was not read. The 81 planted
+bugs from the first build were not re-run on the rebuild.**
+
+**What it costs, which Curtis has been told:** every Down Sheet scan pays the
+first look, and notes for one scan cannot be typed before the first read.
+
+Three more things worth knowing before touching it:
 
 - **It is the one place the app changes page with the router instead of a full
   load**, because the photos cross pages in memory only. That leaves both
@@ -156,8 +172,10 @@ it in, because the branch is published and is not rebased), so "ahead" is no
 longer one commit.
 
 **WHAT CURTIS DECIDED ON 2026-11-15, so nobody re-asks:** land #45 and #46;
-**hold #47** (SCAN PAPER) — it stays open and is kept current with #46, and is
-not to be merged until he says; leave #39 (the MCP route) until later, with
+**hold #47** — said of SCAN PAPER as a fourth button; later the same day he
+asked for SCAN SHEET to do that job instead, which is what #47 now is. It
+stays open, is kept current with #46, and is still not to be merged until he
+says; leave #39 (the MCP route) until later, with
 READ solved before any write.
 
 **#46 moved four commits on 2026-11-15, to `d1d1b05`.** `db185e6` and `0770ca5`
