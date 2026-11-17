@@ -23,6 +23,11 @@ nav[data-tracker-nav] .tracker-desktop-links{display:contents}
  .tracker-more-menu>a{display:flex;align-items:center;min-height:46px;margin:3px 0;padding:10px 12px;border-radius:8px;color:#122b4e;font-size:12px;font-weight:700;text-decoration:none}
  .tracker-more-menu>a[aria-current="page"]{background:#e8f7ef;color:#075b37;box-shadow:inset 3px 0 #08794b}
  .tracker-more-menu>a:hover{background:#edf2f8}
- .tracker-mobile-shell :is(a,button):focus-visible,main nav[data-tracker-nav] select:focus-visible{outline:3px solid #e5a632;outline-offset:2px}
+ /* Different adjacent surfaces need different ink: amber clears the navy
+    dock, while the white More panel needs a darker outline. The selector uses
+    its computed header ink so user-chosen light headers remain legible. */
+ .tracker-bottom-nav :is(a,button):focus-visible{outline:3px solid #e5a632;outline-offset:2px}
+ .tracker-more-menu :is(a,button):focus-visible{outline:3px solid #193457;outline-offset:2px}
+ main nav[data-tracker-nav] select:focus-visible{outline:3px solid currentColor;outline-offset:2px}
 }
 @media print{.tracker-mobile-shell{display:none}}

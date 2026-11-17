@@ -2171,7 +2171,7 @@ export default function DefectLog(){
      title={"Move bus "+group.bus.n+" on the Facility Map"}>
      <em>{locationLabel(group.bus.l)}</em><i aria-hidden="true">▾</i>
     </button>
-    <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>{setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}}>
+    <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={event=>{const header=event.currentTarget,card=header.closest("article"),restoreCompactFocus=cardView==="compact"&&expanded&&document.activeElement===header;setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id]);if(restoreCompactFocus)requestAnimationFrame(()=>card?.querySelector<HTMLButtonElement>(".log-compact-open")?.focus())}}>
      {/* No category glyph on the collapsed card. The round icon showed the
          category of whichever defect happened to be first, which on a MULTIPLE
          DEFECTS card is one category standing in for three. Each expanded row
