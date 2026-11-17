@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./minimalist.css";
 import CrashGuard from "./_components/crash-guard";
 import HeaderThemeLive from "@/src/components/shared/header-theme-live";
 export const metadata: Metadata = {
@@ -25,4 +26,4 @@ export const viewport: Viewport = {themeColor:"#041d47"};
    INSIDE it for the same reason and not beside it: it runs on every page, so
    a throw there is a white screen on all eight rather than on one, and it is
    the one component here with nothing of its own to lose by being caught. */
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body><CrashGuard><HeaderThemeLive/>{children}</CrashGuard></body></html>}
+export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body className="fleetstep-shell"><CrashGuard><HeaderThemeLive/>{children}</CrashGuard></body></html>}

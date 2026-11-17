@@ -6,6 +6,7 @@ import PathToRepairPanel from "@/src/components/defects/path-to-repair-panel";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,readSettings} from "@/src/lib/defects/defect-log-settings";
 import {displayStyleVars} from "@/src/lib/defects/defect-log-display-settings";
+import {CARD_VIEW_KEY,readCardView,type CardView} from "@/src/lib/settings/card-view";
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
 import "./defect-log.css";
@@ -98,9 +99,6 @@ const BOARD_SETTINGS_KEY="pace-board-settings-v1";
 /* Absent means closed. A new key rather than a settings field, so a device
    that has never opened the stats does not have to write anything to say so. */
 const STATS_OPEN_KEY="pace-defect-log-stats-open-v1";
-/* Whether ADVANCED ACTIONS is open. Its own key: a foreman who keeps it open
-   should not have to reopen it every time he comes back to the page. */
-const ADVANCED_OPEN_KEY="pace-defect-log-advanced-open-v1";
 const STATUS_LABELS:Record<string,string>={service:"In Service",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown"};
 const STATE_LABELS:Record<DefectState,string>={open:"OPEN","in-progress":"IN PROGRESS",deferred:"DEFERRED",completed:"FIXED"};
 
@@ -925,6 +923,8 @@ export default function DefectLog(){
  const [mysterySlot,setMysterySlot]=useState("#edf3ff");
  const [hydrated,setHydrated]=useState(false);
  const [expandedBusIds,setExpandedBusIds]=useState<string[]>([]);
+ const [cardView,setCardView]=useState<CardView>("detailed");
+ const [cardViewNotice,setCardViewNotice]=useState("");
  const [focusedBusId,setFocusedBusId]=useState("");
  const [partsMemory,setPartsMemory]=useState<PartsMemory>(EMPTY_PARTS_MEMORY);
  useEffect(()=>setPartsMemory(readPartsMemory(localStorage)),[]);
@@ -963,6 +963,7 @@ export default function DefectLog(){
     LocalStorage and a mismatch there is a hydration error. */
  const [coachOn,setCoachOn]=useState(false);
  const [statsOpen,setStatsOpen]=useState(false);
+ // Start each visit collapsed; keep the opener visible and leave legacy storage untouched.
  const [advancedOpen,setAdvancedOpen]=useState(false);
  const [movingMysteryBusId,setMovingMysteryBusId]=useState("");
  /* Open from any HOLD badge on the page — Curtis: "pressing it on one bus, I
@@ -1038,10 +1039,9 @@ export default function DefectLog(){
  const [batchUndo,setBatchUndo]=useState<ScanBatchUndo|null>(null);
  useEffect(()=>setBatchUndo(readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY))),[]);
 
- useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);try{const visuals=JSON.parse(localStorage.getItem(BOARD_SETTINGS_KEY)||"{}").visuals;if(typeof visuals?.downSheetBadge==="string"&&typeof visuals?.downSheetBadgeText==="string")setDownSheetBadgeColors({badge:visuals.downSheetBadge,text:visuals.downSheetBadgeText})}catch{}setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setAdvancedOpen(localStorage.getItem(ADVANCED_OPEN_KEY)==="1");setCoachOn(readCoachSettings(localStorage).on);setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1");setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
+ useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);try{const visuals=JSON.parse(localStorage.getItem(BOARD_SETTINGS_KEY)||"{}").visuals;if(typeof visuals?.downSheetBadge==="string"&&typeof visuals?.downSheetBadgeText==="string")setDownSheetBadgeColors({badge:visuals.downSheetBadge,text:visuals.downSheetBadgeText})}catch{}setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setCoachOn(readCoachSettings(localStorage).on);setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1");setFilter(nextSettings.defaultFilter);setCardView(readCardView(localStorage.getItem(CARD_VIEW_KEY)));setHydrated(true)},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,STATS_OPEN_KEY,statsOpen?"1":"0")},[statsOpen,hydrated]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,ADVANCED_OPEN_KEY,advancedOpen?"1":"0")},[advancedOpen,hydrated]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue));/* Settings are edited on the shared page now, so a change there has to reach a log that is already open - and it has to reach this page's own state, because this page writes the whole settings object back whenever one of its fields changes and would otherwise put the stale copy over the new one. */if(event.key===SETTINGS_KEY)setSettings(readSettings(event.newValue));if(event.key===SCAN_BATCH_UNDO_KEY)setBatchUndo(readScanBatchUndo(event.newValue));if(event.key===COACH_SETTINGS_KEY)setCoachOn(readCoachSettings(localStorage).on)};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const allRecords=useMemo(()=>defectLogRecords(fleet,downEntries),[fleet,downEntries]);
@@ -1940,7 +1940,7 @@ export default function DefectLog(){
      rather than conditional markup on purpose: "phone" means a WIDTH, and only
      CSS knows the width without a resize listener. Rotate the iPad and the
      answer changes on its own, with nothing stored and nothing to go stale. */
-  data-bus-rail={settings.busRail} data-bus-blue={settings.busBlueOnly} data-bus-end={settings.busEndMarker}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/>{!hiddenInLite(appMode,"deferred")&&<><DeferredNavBadge/><DeferredReviewPrompt/></>}
+  data-card-view={cardView} data-bus-rail={settings.busRail} data-bus-blue={settings.busBlueOnly} data-bus-end={settings.busEndMarker}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/>{!hiddenInLite(appMode,"deferred")&&<><DeferredNavBadge/><DeferredReviewPrompt/></>}
   <header className="log-header">
    <div><AppName/><span>FLEET MAINTENANCE</span><h1>{settings.display.labels.pageTitle||"Real-Time Defect Log"}</h1><p>{settings.display.labels.subtitle}</p></div>
    <TrackerNav active="/defect-log"/>
@@ -1977,15 +1977,7 @@ export default function DefectLog(){
     <div className="log-advanced-body">
      <div className="log-advanced-group">
       <b className="log-advanced-label">VIEW</b>
-   <div className="log-filters">{([["all","ALL"],["in-progress","IN PROGRESS"],["fixed","FIXED TODAY"],
-    /* OPEN and DOWN SHEET are not offered, but both remain choosable as a saved
-       default view. Somebody whose default is one of them would otherwise see a
-       filtered board with no button lit and nothing saying why — and no way back
-       without opening settings. The button appears only while its own filter is
-       the active one, so it explains the view and clears it, without adding two
-       buttons back for everybody else. */
-    ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
-    ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}</div>
+
       {/* A DROP-DOWN RATHER THAN MORE CHIPS, which is how Curtis asked for it —
           "like a drop-down somewhere at the work computer". The row above is
           thumb targets on a phone; this is one question asked at a desk, and a
@@ -2035,6 +2027,17 @@ export default function DefectLog(){
   </section>
   <OfflineBackupReminder buses={fleet} interval={settings.backupInterval}/>
   <section className="log-controls">
+   <div className="log-filters">{([["all","ALL"],["in-progress","IN PROGRESS"],["fixed","FIXED TODAY"],
+    /* OPEN and DOWN SHEET are not offered, but both remain choosable as a saved
+       default view. Somebody whose default is one of them would otherwise see a
+       filtered board with no button lit and nothing saying why — and no way back
+       without opening settings. The button appears only while its own filter is
+       the active one, so it explains the view and clears it, without adding two
+       buttons back for everybody else. */
+    ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
+    ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}</div>
+   <div className="card-view-selector" role="group" aria-label="Defect card view"><span>CARD VIEW</span>{(["detailed","compact"] as CardView[]).map(value=><button type="button" key={value} aria-pressed={cardView===value} onClick={()=>{setCardView(value);const result=writeSetting(localStorage,CARD_VIEW_KEY,value);setCardViewNotice(result.ok?"":"View changed for this visit. Device storage could not remember it.")}}>{value==="compact"?"COMPACT":"DETAILED"}</button>)}</div>
+   {cardViewNotice&&<p className="card-view-notice" role="status">{cardViewNotice}</p>}
    {/* First thing under the header, so the page opens on what it is for. */}
    <button className="log-primary-action" type="button" onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button>
    {/* OPEN and DOWN SHEET are gone as buttons. OPEN differed from ALL only by
@@ -2107,6 +2110,7 @@ export default function DefectLog(){
    <div className="feed-title">{/* LOG DEFECT moved to the top of the controls; it is not repeated here. */}
    {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}{/* Dropped entirely when nothing is outstanding rather than printed as "0m": the line already says 0 DEFECTS, and a zero beside it reads as a broken counter rather than as a clear board. */}{visibleEstimateMinutes>0&&<b className="feed-estimate">{formatRepairTime(visibleEstimateMinutes)} ESTIMATED</b>}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · "),roadCall=roadCallNote(group.bus.roadCalls,undefined,timeLabel);return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
+    {cardView==="compact"&&!expanded&&<button className="log-compact-open" type="button" aria-expanded={false} aria-label={"Open full details and actions for bus "+group.bus.n} onClick={event=>{const card=event.currentTarget.closest("article");setExpandedBusIds(current=>current.includes(group.bus.id)?current:[...current,group.bus.id]);requestAnimationFrame(()=>card?.querySelector<HTMLButtonElement>(".log-group-header")?.focus())}}><span className="compact-bus log-bus-number" data-status={group.bus.s}><span aria-hidden="true">▣</span><strong>{group.bus.n}</strong></span><span className="compact-issue"><strong>{preview}</strong><small>{STATUS_LABELS[group.bus.s]||group.bus.s} · {locationLabel(group.bus.l)} · {group.records.length} defect{group.records.length===1?"":"s"}{busOnDownSheet?" · DS":""}{isHeld(group.bus)?" · HOLD":""}</small></span><span className={"state "+groupState}>{STATE_LABELS[groupState]}</span><span aria-hidden="true">›</span></button>}
     <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
     {/* OUTSIDE the header button, which is why this column moved out of it at
         all: a select nested in a button is invalid, and every tap on it would
@@ -2164,7 +2168,7 @@ export default function DefectLog(){
      title={"Move bus "+group.bus.n+" on the Facility Map"}>
      <em>{locationLabel(group.bus.l)}</em><i aria-hidden="true">▾</i>
     </button>
-    <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>{setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}}>
+    <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={event=>{const header=event.currentTarget,card=header.closest("article"),restoreCompactFocus=cardView==="compact"&&expanded&&document.activeElement===header;setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id]);if(restoreCompactFocus)requestAnimationFrame(()=>card?.querySelector<HTMLButtonElement>(".log-compact-open")?.focus())}}>
      {/* No category glyph on the collapsed card. The round icon showed the
          category of whichever defect happened to be first, which on a MULTIPLE
          DEFECTS card is one category standing in for three. Each expanded row

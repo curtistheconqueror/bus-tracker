@@ -609,9 +609,9 @@ test("a render error shows a screen with a way out, not a white one",async()=>{
     that nothing renders outside the boundary, and a component added beside
     {children} INSIDE it — which is where a component that runs on every page
     belongs — is the safe case, not the one to fail on. */
- assert.match(layout,/<body><CrashGuard>[\s\S]*\{children\}[\s\S]*<\/CrashGuard><\/body>/,
+ assert.match(layout,/<body(?: className="fleetstep-shell")?><CrashGuard>[\s\S]*\{children\}[\s\S]*<\/CrashGuard><\/body>/,
    "every page is inside the boundary");
- assert.doesNotMatch(layout,/<body>(?!<CrashGuard>)/,"nothing renders outside the boundary");
+ assert.doesNotMatch(layout,/<body(?: className="fleetstep-shell")?>(?!<CrashGuard>)/,"nothing renders outside the boundary");
  assert.match(guard,/static getDerivedStateFromError/,"a class component, because componentDidCatch has no hook equivalent");
  assert.match(guard,/componentDidCatch/);
  assert.match(guard,/location\.reload/,"the one control a standalone app cannot otherwise offer");
