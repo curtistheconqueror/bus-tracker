@@ -136,14 +136,14 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
      the page the app opens on. Curtis, looking at a phone: "the facility map
      needs to get on board with title design. Fleetstep should be at top."
      Every other header is name, kicker, title, subtitle, then nav, and the map
-     is now the same. It stays a SIBLING of the header rather than moving
-     inside it because it is `position:sticky` here and only here. */
+     is now the same. The compact selector now shares the header with the brand; the persistent
+     mobile navigation lives in the shared bottom dock. */
   /* Anchored to the MARKUP, not to the bare class name: a comment in page.tsx
      mentions `.mobile-mode-nav` while explaining this very ordering, and a
      bare indexOf found the comment and failed on it. Same trap as matching a
      button by a word its own explanation also uses. */
   assert.ok(trackerPage.indexOf("<AppName/>")<trackerPage.indexOf('<TrackerNav className="mobile-mode-nav"'),"the Facility Map's name must render before its phone nav, as on every other page");
-  assert.match(trackerPage,/<\/header>\s*<TrackerNav className="mobile-mode-nav"/,"the nav follows the header rather than preceding it");
+  assert.match(trackerPage,/<TrackerNav className="mobile-mode-nav" active="\/"\/><\/header>/,"the compact selector shares the header with the brand");
   assert.match(defectPage,/save-log-middle-actions[\s\S]*?SAVE AS FIXED/);
   assert.match(defectPage,/save-fixed-bottom[\s\S]*?SAVE AS FIXED/);
   assert.match(defectPage,/FIX \/ STEPS TAKEN/);
@@ -245,7 +245,7 @@ test("every page draws the same eight links from one list",async()=>{
  assert.equal(/label:"FLEET TRACKER"/.test(pagesSource),false);
 
  // The component owns the landmark and the current-page mark.
- assert.match(nav,/<nav className=\{className\} aria-label="Tracker pages">/);
+ assert.match(nav,/<nav className=\{className\} aria-label="Tracker pages" data-tracker-nav>/);
  assert.match(nav,/aria-current=\{current\?"page":undefined\}/);
 
  // Every page renders it, marking itself, and none still carries a hand-written copy.

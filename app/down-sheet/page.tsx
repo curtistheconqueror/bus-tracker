@@ -934,12 +934,7 @@ export default function DownSheet(){
    <div className="down-advanced-body">
     <div className="down-advanced-group">
      <b className="down-advanced-label">VIEW</b>
-     <div className="shift-filter" aria-label="Filter down sheet by shift">
-      {/* "1ST" on its own said nothing — Curtis read the row and could not tell
-          what it was filtering. The word is on each button rather than only in
-          the SHOW label, because the button is what gets looked at. */}
-      <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value&&value!=="All"?"All":value)} key={value}>{value==="All"?"ALL SHIFTS":value.toUpperCase()+" SHIFT"}{value!=="All"&&<i>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</i>}</button>)}
-     </div>
+
      <label className="completed-toggle"><input type="checkbox" checked={showCompleted} onChange={event=>setShowCompleted(event.target.checked)}/><span/>SHOW COMPLETED</label>
     </div>
     <div className="down-advanced-group">
@@ -967,6 +962,14 @@ export default function DownSheet(){
    <button className="down-status-report-action" type="button" onClick={()=>setReportOpen(true)}>STATUS REPORT</button>
   </section>
 
+  <section className="down-shifts" aria-label="Down Sheet shifts">
+     <div className="shift-filter" aria-label="Filter down sheet by shift">
+      {/* "1ST" on its own said nothing — Curtis read the row and could not tell
+          what it was filtering. The word is on each button rather than only in
+          the SHOW label, because the button is what gets looked at. */}
+      <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value&&value!=="All"?"All":value)} key={value}>{value==="All"?"ALL SHIFTS":value.toUpperCase()+" SHIFT"}{value!=="All"&&<i>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</i>}</button>)}
+     </div>
+  </section>
   <section className="down-view-controls" aria-label="Search and order Down Sheet">
    <label className="down-search"><b>SEARCH</b><input type="search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, repair, mechanic or vendor" aria-label="Search Down Sheet"/></label>
    {search&&<button className="clear-search" type="button" onClick={()=>setSearch("")}>CLEAR</button>}

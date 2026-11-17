@@ -164,6 +164,8 @@ machine, because these sessions run in containers that are thrown away.
   separate debugging rounds. Also covers broader-selector overrides and
   Tailwind class-name collisions.
 
+<!-- UI-only density preference: `pace-defect-log-card-view-v1` stores compact or detailed. It never stores repair records and is not synced. -->
+
 ## Things that will get you in trouble
 
 - **Never force-push or rewrite published history.** Only clean fast-forwards of
