@@ -99,9 +99,6 @@ const BOARD_SETTINGS_KEY="pace-board-settings-v1";
 /* Absent means closed. A new key rather than a settings field, so a device
    that has never opened the stats does not have to write anything to say so. */
 const STATS_OPEN_KEY="pace-defect-log-stats-open-v1";
-/* Whether ADVANCED ACTIONS is open. Its own key: a foreman who keeps it open
-   should not have to reopen it every time he comes back to the page. */
-const ADVANCED_OPEN_KEY="pace-defect-log-advanced-open-v1";
 const STATUS_LABELS:Record<string,string>={service:"In Service",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown"};
 const STATE_LABELS:Record<DefectState,string>={open:"OPEN","in-progress":"IN PROGRESS",deferred:"DEFERRED",completed:"FIXED"};
 
@@ -926,7 +923,7 @@ export default function DefectLog(){
  const [mysterySlot,setMysterySlot]=useState("#edf3ff");
  const [hydrated,setHydrated]=useState(false);
  const [expandedBusIds,setExpandedBusIds]=useState<string[]>([]);
- const [cardView,setCardView]=useState<CardView>("compact");
+ const [cardView,setCardView]=useState<CardView>("detailed");
  const [cardViewNotice,setCardViewNotice]=useState("");
  const [focusedBusId,setFocusedBusId]=useState("");
  const [partsMemory,setPartsMemory]=useState<PartsMemory>(EMPTY_PARTS_MEMORY);
@@ -966,6 +963,7 @@ export default function DefectLog(){
     LocalStorage and a mismatch there is a hydration error. */
  const [coachOn,setCoachOn]=useState(false);
  const [statsOpen,setStatsOpen]=useState(false);
+ // Start each visit collapsed; keep the opener visible and leave legacy storage untouched.
  const [advancedOpen,setAdvancedOpen]=useState(false);
  const [movingMysteryBusId,setMovingMysteryBusId]=useState("");
  /* Open from any HOLD badge on the page — Curtis: "pressing it on one bus, I
@@ -1041,10 +1039,9 @@ export default function DefectLog(){
  const [batchUndo,setBatchUndo]=useState<ScanBatchUndo|null>(null);
  useEffect(()=>setBatchUndo(readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY))),[]);
 
- useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);try{const visuals=JSON.parse(localStorage.getItem(BOARD_SETTINGS_KEY)||"{}").visuals;if(typeof visuals?.downSheetBadge==="string"&&typeof visuals?.downSheetBadgeText==="string")setDownSheetBadgeColors({badge:visuals.downSheetBadge,text:visuals.downSheetBadgeText})}catch{}setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setAdvancedOpen(localStorage.getItem(ADVANCED_OPEN_KEY)==="1");setCoachOn(readCoachSettings(localStorage).on);setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1");setFilter(nextSettings.defaultFilter);setCardView(readCardView(localStorage.getItem(CARD_VIEW_KEY)));setHydrated(true)},[]);
+ useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);try{const visuals=JSON.parse(localStorage.getItem(BOARD_SETTINGS_KEY)||"{}").visuals;if(typeof visuals?.downSheetBadge==="string"&&typeof visuals?.downSheetBadgeText==="string")setDownSheetBadgeColors({badge:visuals.downSheetBadge,text:visuals.downSheetBadgeText})}catch{}setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setCoachOn(readCoachSettings(localStorage).on);setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1");setFilter(nextSettings.defaultFilter);setCardView(readCardView(localStorage.getItem(CARD_VIEW_KEY)));setHydrated(true)},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,STATS_OPEN_KEY,statsOpen?"1":"0")},[statsOpen,hydrated]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,ADVANCED_OPEN_KEY,advancedOpen?"1":"0")},[advancedOpen,hydrated]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue));/* Settings are edited on the shared page now, so a change there has to reach a log that is already open - and it has to reach this page's own state, because this page writes the whole settings object back whenever one of its fields changes and would otherwise put the stale copy over the new one. */if(event.key===SETTINGS_KEY)setSettings(readSettings(event.newValue));if(event.key===SCAN_BATCH_UNDO_KEY)setBatchUndo(readScanBatchUndo(event.newValue));if(event.key===COACH_SETTINGS_KEY)setCoachOn(readCoachSettings(localStorage).on)};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const allRecords=useMemo(()=>defectLogRecords(fleet,downEntries),[fleet,downEntries]);
@@ -2039,7 +2036,7 @@ export default function DefectLog(){
        buttons back for everybody else. */
     ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
     ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}</div>
-   <div className="card-view-selector" role="group" aria-label="Defect card view"><span>CARD VIEW</span>{(["compact","detailed"] as CardView[]).map(value=><button type="button" key={value} aria-pressed={cardView===value} onClick={()=>{setCardView(value);const result=writeSetting(localStorage,CARD_VIEW_KEY,value);setCardViewNotice(result.ok?"":"View changed for this visit. Device storage could not remember it.")}}>{value==="compact"?"COMPACT":"DETAILED"}</button>)}</div>
+   <div className="card-view-selector" role="group" aria-label="Defect card view"><span>CARD VIEW</span>{(["detailed","compact"] as CardView[]).map(value=><button type="button" key={value} aria-pressed={cardView===value} onClick={()=>{setCardView(value);const result=writeSetting(localStorage,CARD_VIEW_KEY,value);setCardViewNotice(result.ok?"":"View changed for this visit. Device storage could not remember it.")}}>{value==="compact"?"COMPACT":"DETAILED"}</button>)}</div>
    {cardViewNotice&&<p className="card-view-notice" role="status">{cardViewNotice}</p>}
    {/* First thing under the header, so the page opens on what it is for. */}
    <button className="log-primary-action" type="button" onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button>
