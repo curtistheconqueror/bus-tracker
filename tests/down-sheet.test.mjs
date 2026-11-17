@@ -437,12 +437,12 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /Interactive Down Sheet/);
-  /* The shift filter moved into ADVANCED ACTIONS, which opens closed, so it is
-     not in the first render at all - and that is the point of the change: what
-     the page opens on is ADD DOWN BUS and SEARCH, not a block of controls. */
+  /* Shift pills are daily view controls now; destructive and scan tools
+     still remain behind the remembered, initially closed advanced drawer. */
   assert.match(html, /class="down-advanced-toggle"[^>]*aria-expanded="false"/);
-  assert.doesNotMatch(html, /aria-pressed="true">ALL/);
-  for(const shift of [/>1ST</,/>2ND</,/>3RD</,/SHOW COMPLETED/,/SCAN SHEET/,/CLEAR DOWNSHEET/])
+  assert.match(html, /aria-pressed="true">ALL SHIFTS/);
+  for(const shift of ["1ST SHIFT","2ND SHIFT","3RD SHIFT"])assert.ok(html.includes(shift),shift+" remains visible outside advanced");
+  for(const shift of [/SHOW COMPLETED/,/SCAN SHEET/,/CLEAR DOWNSHEET/])
    assert.doesNotMatch(html, shift, "it lives behind the closed panel now");
   assert.doesNotMatch(html, /ACTIVE DOWN(?! COUNT)/, "the duplicate of TOTAL ON SHEET went with the panel; the footnote's ACTIVE DOWN COUNT is not it");
   assert.match(html, /BUS NUMBER/);
@@ -919,7 +919,7 @@ test("phone layouts expose large primary controls and category-only defect entry
   // labels are pinned once, in the test on tracker-nav.tsx.
   assert.match(trackerPage, /<TrackerNav className="mobile-mode-nav" active="\/"\/>/);
   assert.match(trackerCss, /\.mobile-mode-nav a\{[^}]*min-height:50px/);
-  assert.match(trackerPage, /className="phone-command-dock"[\s\S]*?>FIND<[\s\S]*?>FILTERS<[\s\S]*?>AI<[\s\S]*?>MORE</);
+  assert.match(trackerPage, /className="phone-command-dock"[\s\S]*?>FIND<[\s\S]*?>FILTERS<[\s\S]*?>AI<[\s\S]*?>TOOLS</);
   assert.match(trackerPage, /className="garage-scroll"[\s\S]*?className="garagegrid"/);
   assert.match(trackerPage, /COLLAPSED_SECTIONS_KEY/);
   assert.match(trackerCss, /@media\(max-width:620px\)\{[\s\S]*?\.facility\{[^}]*min-width:0!important[^}]*zoom:1!important/);
@@ -3126,11 +3126,11 @@ test("the Down Sheet gets its own ADVANCED ACTIONS, and it cannot be mistaken fo
      are the two things used on every visit and now sit together, instead of
      with six controls wedged between them. */
   const drawer=page.slice(page.indexOf('className="down-advanced open"'),page.indexOf('<section className="down-controls">'));
-  for(const inside of ["shift-filter","completed-toggle","scan-sheet-button","clear-downsheet","undo-scan","undo-clear"])
+  for(const inside of ["completed-toggle","scan-sheet-button","clear-downsheet","undo-scan","undo-clear"])
    assert.ok(drawer.includes(inside),inside+" belongs in ADVANCED ACTIONS");
   assert.ok(!drawer.includes("down-primary-action"),"ADD DOWN BUS stays out");
   assert.ok(!drawer.includes("down-search"),"SEARCH stays out");
-  const controls=page.slice(page.indexOf('<section className="down-controls">'),page.indexOf('<section className="down-view-controls"'));
+  const controls=page.slice(page.indexOf('<section className="down-controls">'),page.indexOf('<section className="down-shifts"'));
   assert.ok(controls.includes("down-primary-action"),"ADD DOWN BUS is what is left in that row");
   for(const gone of ["shift-filter","completed-toggle","scan-sheet-button","down-more"])
    assert.ok(!controls.includes(gone),gone+" moved out of the controls row");

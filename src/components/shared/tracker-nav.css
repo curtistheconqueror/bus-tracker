@@ -1,0 +1,33 @@
+/* The old surface styles target nav and nav a. Own the compact shell with
+   an attribute selector; the portal dock is not a descendant of any header. */
+nav[data-tracker-nav] .tracker-page-select{display:none}
+nav[data-tracker-nav] .tracker-desktop-links{display:contents}
+.tracker-mobile-shell{display:none}
+.tracker-nav-sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(max-width:800px){
+ main nav[data-tracker-nav]{position:static;display:block;flex:0 0 auto;width:100%;height:auto;min-height:0;max-width:100%;margin:0;padding:0;border:0;border-radius:0;background:transparent;overflow:visible;grid-template-columns:none;z-index:auto}
+ main nav[data-tracker-nav] .tracker-desktop-links{display:none}
+ main nav[data-tracker-nav] .tracker-page-select{display:flex;align-items:center;gap:10px;min-width:0;min-height:44px;margin:0;color:var(--app-header-text,var(--header-text,#fff));font:700 11px Arial,Helvetica,sans-serif}
+ main nav[data-tracker-nav] .tracker-page-select>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ main nav[data-tracker-nav] .tracker-page-select select{width:100%;min-width:0;height:44px;margin:0;padding:0 12px;border:1px solid color-mix(in srgb,currentColor 45%,transparent);border-radius:9px;background:color-mix(in srgb,currentColor 7%,transparent);color:inherit;font:700 16px Arial,Helvetica,sans-serif;letter-spacing:.02em;cursor:pointer}
+ main nav[data-tracker-nav] .tracker-page-select option{color:#122b4e;background:#fff}
+ .tracker-mobile-shell{display:block;font-family:Arial,Helvetica,sans-serif}
+ .tracker-bottom-nav{position:fixed;z-index:25;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;min-height:56px;padding:4px 8px calc(4px + env(safe-area-inset-bottom));border-top:1px solid #ffffff28;background:#041d47;color:#fff;box-shadow:0 -3px 14px #142d4b15}
+ .tracker-bottom-nav>a,.tracker-bottom-nav>button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:48px;margin:0;padding:4px 2px;border:0;border-radius:8px;background:transparent;color:#e0e8f4;text-decoration:none;text-align:center;font:700 11px Arial,Helvetica,sans-serif;cursor:pointer;touch-action:manipulation}
+ .tracker-bottom-nav>a>span,.tracker-bottom-nav>button>span:not(.tracker-nav-sr-only){font-size:19px;line-height:20px}
+ .tracker-bottom-nav>[aria-current="page"],.tracker-bottom-nav>.tracker-more-current,.tracker-bottom-nav>button[aria-expanded="true"]{background:#ffffff16;color:#fff;box-shadow:inset 0 3px #58d3a1}
+ .tracker-more-scrim{position:fixed;z-index:24;inset:0;width:100%;height:100%;border:0;border-radius:0;background:#06152c66;cursor:pointer}
+ .tracker-more-menu{position:fixed;z-index:26;left:8px;right:8px;bottom:calc(64px + env(safe-area-inset-bottom));max-height:calc(100dvh - 90px - env(safe-area-inset-bottom));overflow:auto;padding:8px;border:1px solid #c8d4e3;border-radius:14px;background:#fff;color:#122b4e;box-shadow:0 8px 36px #06152c44}
+ .tracker-more-heading{display:flex;align-items:center;justify-content:space-between;padding:0 6px 6px;font-size:13px}
+ .tracker-more-heading button{min-width:60px;min-height:44px;padding:6px 10px;border:1px solid #c8d4e3;border-radius:8px;background:#f2f6fa;color:#122b4e;font-size:12px;font-weight:700}
+ .tracker-more-menu>a{display:flex;align-items:center;min-height:46px;margin:3px 0;padding:10px 12px;border-radius:8px;color:#122b4e;font-size:12px;font-weight:700;text-decoration:none}
+ .tracker-more-menu>a[aria-current="page"]{background:#e8f7ef;color:#075b37;box-shadow:inset 3px 0 #08794b}
+ .tracker-more-menu>a:hover{background:#edf2f8}
+ /* Different adjacent surfaces need different ink: amber clears the navy
+    dock, while the white More panel needs a darker outline. The selector uses
+    its computed header ink so user-chosen light headers remain legible. */
+ .tracker-bottom-nav :is(a,button):focus-visible{outline:3px solid #e5a632;outline-offset:2px}
+ .tracker-more-menu :is(a,button):focus-visible{outline:3px solid #193457;outline-offset:2px}
+ main nav[data-tracker-nav] select:focus-visible{outline:3px solid currentColor;outline-offset:2px}
+}
+@media print{.tracker-mobile-shell{display:none}}

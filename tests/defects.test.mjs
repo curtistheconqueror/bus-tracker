@@ -689,7 +689,7 @@ test("a search ends when somebody ends it, and never says so silently", async ()
     being read — worst on a single-defect bus, where the tap opens one line and
     the entire log appears beneath it. */
  assert.doesNotMatch(page, /clearSearchOnReach/, "tapping a bus must not clear the search");
- assert.match(page, /log-card-main log-group-header[\s\S]{0,200}?onClick=\{\(\)=>\{setExpandedBusIds/);
+ assert.match(page, /log-card-main log-group-header[\s\S]{0,100}?onClick=\{event=>\{[\s\S]{0,350}?setExpandedBusIds/);
  assert.match(page, /log-focus-button[\s\S]{0,320}?onClick=\{event=>\{event\.stopPropagation\(\);setFocusedBusId\(group\.bus\.id\)\}\}/);
 
  // What it needed was never a smarter guess about when to stop; it was for the
