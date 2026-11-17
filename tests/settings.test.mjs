@@ -2041,3 +2041,439 @@ test("the header panel draws one control per row and nothing that does nothing",
     the rows do not teach by themselves. */
  assert.match(page,/Give one its own below \u2014 that wins, even on a page with its own theme\.|Give one its own below — that wins, even on a page with its own theme\./);
 });
+
+/* REOPEN WHERE YOU LEFT OFF. Curtis: "when I leave phone app and go back in I
+   want it to return to the tab I was using. Not default back to map."
+
+   The script is a STRING in its module, so the text run below is the text the
+   layout writes into the page. It is run by itself, handed a stand-in for the
+   window: nothing of its module is in scope, which is how a browser has it.
+
+   The stand-in holds the two things the script waits on - the network's
+   answer and the clock - so each case decides which comes first. Its storage
+   is one object, so the remembering half can be run against the same record
+   the script reads. */
+function resumeWindow({path="/",search="",hash="",referrer="",standalone=true,iosStandalone=false,local={},session={},sessionKeeps=true,sessionThrows=false,online=true,hasFetch=true,replaceThrows=false,fetchThrows=false}={}){
+ const store=(initial,keeps=true,throws=false)=>{
+  const data=initial instanceof Map?initial:new Map(Object.entries(initial));
+  return {data,getItem(key){if(throws)throw new Error("blocked");return data.has(key)?data.get(key):null},
+   setItem(key,value){if(throws)throw new Error("blocked");if(keeps)data.set(key,String(value))}};
+ };
+ const win={
+  replaced:null,asked:[],timers:[],answer:null,stopped:0,now:0,
+  location:{pathname:path,search,hash,replace(target){if(replaceThrows)throw new Error("no");win.replaced=target}},
+  document:{referrer,documentElement:{style:{visibility:""}}},
+  localStorage:store(local),sessionStorage:store(session,sessionKeeps,sessionThrows),
+  navigator:{standalone:iosStandalone,onLine:online},
+  matchMedia:query=>({matches:standalone&&query==="(display-mode: standalone)"}),
+  stop(){win.stopped+=1},
+  setTimeout(run,after){win.timers.push({run,at:win.now+after})},
+  /* Moves the clock to `ms`, running what fell due on the way, in order. */
+  tick(ms){
+   for(;;){
+    const due=win.timers.filter(timer=>!timer.done&&timer.at<=ms).sort((a,b)=>a.at-b.at)[0];
+    if(!due)break;
+    due.done=true;win.now=due.at;due.run();
+   }
+   win.now=ms;
+  },
+  get hidden(){return win.document.documentElement.style.visibility==="hidden"},
+ };
+ if(hasFetch)win.fetch=(url,options)=>{
+  if(fetchThrows)throw new Error("no fetch");
+  win.asked.push({url,...options});
+  return new Promise((resolve,reject)=>{win.answer={ok:()=>resolve({ok:true,status:200}),status:code=>resolve({ok:code<400,status:code}),fail:()=>reject(new TypeError("Failed to fetch"))}});
+ };
+ return win;
+}
+/* Lets the promise the script is waiting on run its handlers. */
+const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
+
+test("a fresh start from the home screen reopens the page the app was left on",async()=>{
+ const {LAST_PAGE_KEY,LAUNCH_SEEN_KEY,CRASH_REPORT_KEY,PAGE_SETTLE_MS,RESUME_CONFIG,RESUME_SOURCE,SERVICE_WORKER_PATH,pageMemory,pagePath,rememberPage,resumeScriptText}=await import("../src/lib/settings/last-page.ts");
+ const {TRACKER_PAGES}=await import("../src/lib/settings/tracker-pages.ts");
+ const text=resumeScriptText();
+ const run=win=>new Function("window","return "+text)(win);
+ const left=(page,at=new Date(Date.now()-60000).toISOString())=>({[LAST_PAGE_KEY]:JSON.stringify({version:1,path:page,at})});
+ const kept=win=>JSON.parse(win.localStorage.data.get(LAST_PAGE_KEY)||"null");
+ const WAIT=RESUME_CONFIG.wait;
+ const FLAG=RESUME_CONFIG.flag;
+
+ assert.equal(LAST_PAGE_KEY,"pace-last-page-v1");
+
+ /* THE CASE HE DESCRIBED. Left on the Defect Log, the phone closed the app,
+    the icon is tapped: a fresh start at the map. The map is hidden, the
+    network is asked, it answers, and the app goes. */
+ let win=resumeWindow({local:left("/defect-log")});
+ assert.equal(run(win),"resuming");
+ assert.equal(win.hidden,true,"the map is not drawn while the app finds out whether it can move");
+ assert.equal(win[FLAG],true,"and the map underneath is told a start is being turned round");
+ assert.equal(win.replaced,null,"nothing moves until something answers");
+ assert.deepEqual(win.asked,[{url:"/defect-log",method:"HEAD",cache:"no-store"}],"the page's headers, not the page");
+ assert.equal(win.sessionStorage.data.get(LAUNCH_SEEN_KEY),"1","marked, so the next page of this run is not a fresh start");
+ win.answer.ok();
+ await settle();
+ assert.equal(win.replaced,"/defect-log");
+ assert.equal(kept(win).path,"/defect-log");
+ assert.ok(Date.parse(kept(win).resuming)>0,"the move is marked on the record before it is made");
+ /* An answer that is not the server failing means the network is there. */
+ win=resumeWindow({local:left("/defect-log")});
+ run(win);
+ win.answer.status(405);
+ await settle();
+ assert.equal(win.replaced,"/defect-log");
+ /* No signal at all fails at once, and the phone holds every page for that. */
+ win=resumeWindow({local:left("/defect-log")});
+ run(win);
+ win.answer.fail();
+ await settle();
+ assert.equal(win.replaced,"/defect-log");
+ win=resumeWindow({local:left("/defect-log"),online:false});
+ assert.equal(run(win),"resuming");
+ assert.equal(win.replaced,"/defect-log","a phone that knows it is offline is not made to ask");
+ assert.deepEqual(win.asked,[]);
+ win=resumeWindow({local:left("/defect-log"),hasFetch:false});
+ run(win);
+ assert.equal(win.replaced,"/defect-log");
+ /* iOS says it is on a home screen through navigator.standalone. */
+ win=resumeWindow({standalone:false,iosStandalone:true,local:left("/down-sheet"),online:false});
+ run(win);
+ assert.equal(win.replaced,"/down-sheet");
+ /* Every page the app has can be reopened. */
+ for(const page of TRACKER_PAGES.filter(page=>page.href!=="/")){
+  win=resumeWindow({local:left(page.href),online:false});
+  run(win);
+  assert.equal(win.replaced,page.href);
+ }
+
+ /* WIFI THAT IS JOINED AND DEAD does not fail a request, it hangs it. The
+    map is shown, and the app stays on it for this run. */
+ win=resumeWindow({local:left("/defect-log")});
+ run(win);
+ win.tick(WAIT-1);
+ assert.equal(win.hidden,true);
+ win.tick(WAIT);
+ assert.equal(win.hidden,false,"the map is shown when nothing has answered in time");
+ assert.equal(win.replaced,null);
+ win.answer.ok();
+ await settle();
+ assert.equal(win.replaced,null,"an answer that comes after the map was shown moves nothing");
+ assert.equal(kept(win).resuming,undefined,"and no move was marked");
+ assert.equal(win.stopped,0);
+ /* A server that answers with an error of its own is not gone to. */
+ win=resumeWindow({local:left("/defect-log")});
+ run(win);
+ win.answer.status(503);
+ await settle();
+ assert.equal(win.replaced,null);
+ assert.equal(win.hidden,false);
+ assert.equal(kept(win).resuming,undefined);
+ /* A MOVE THAT WAS STARTED AND HAS NOT ARRIVED IS STOPPED before the map is
+    shown: the map is not handed to somebody and then taken away. The clock
+    for it starts when the move does, not when the page loaded. */
+ win=resumeWindow({local:left("/defect-log")});
+ run(win);
+ win.tick(2000);
+ win.answer.ok();
+ await settle();
+ assert.equal(win.replaced,"/defect-log");
+ win.tick(2000+WAIT-1);
+ assert.equal(win.hidden,true,"still waiting for the move, past the first limit");
+ assert.equal(win.stopped,0);
+ win.tick(2000+WAIT);
+ assert.equal(win.stopped,1,"stopped");
+ assert.equal(win.hidden,false,"and only then shown");
+ /* The mark stays on. Whether a stopped move really stopped cannot be read
+    back, and the mark is all that stands in front of a page that arrives late
+    and dead - so the start after this one is the map, and the page is
+    forgotten. That is the price, and it is one tap. */
+ assert.ok(kept(win).resuming);
+ let after=resumeWindow({local:win.localStorage.data,online:false});
+ assert.equal(run(after),"stayed");
+ /* Nothing leaves the page hidden for good, whichever way it went. */
+ for(const options of [{online:false},{},{hasFetch:false}]){
+  win=resumeWindow({local:left("/defect-log"),...options});
+  run(win);
+  win.tick(WAIT*2);
+  assert.equal(win.hidden,false,JSON.stringify(options));
+ }
+ /* A browser with no stop() still shows the page. */
+ win=resumeWindow({local:left("/defect-log"),online:false});
+ win.stop=undefined;
+ run(win);
+ win.tick(WAIT);
+ assert.equal(win.hidden,false);
+
+ /* EACH OF THESE IS SOMEBODY WHO ASKED FOR THE MAP, or a start that cannot be
+    told from one. One at a time, with everything else as in the case above. */
+ const stays=(options,why)=>{
+  const made=resumeWindow({local:left("/defect-log"),...options});
+  assert.equal(run(made),"stayed",why);
+  assert.equal(made.replaced,null,why);
+  assert.equal(made.hidden,false,why+": nothing is hidden");
+  assert.deepEqual(made.asked,[],why+": nothing is asked");
+  assert.deepEqual(made.timers,[],why+": nothing is left waiting");
+  assert.equal(made[FLAG],undefined,why+": the map underneath is an ordinary map");
+  return made;
+ };
+ stays({session:{[LAUNCH_SEEN_KEY]:"1"}},"a later page of the same run - a tap on the Map tile, or a reload");
+ stays({referrer:"https://app.example/defect-log"},"sent here from another page of the app");
+ stays({standalone:false},"a browser tab: a bookmark to the map opens the map");
+ stays({search:"?scan=down-sheet"},"an address that asks for something");
+ stays({hash:"#bus"},"an address with a part");
+ stays({sessionKeeps:false},"storage that will not take the mark moves nobody");
+ stays({sessionThrows:true},"session storage that refuses");
+ stays({local:left("/")},"left on the map");
+ stays({local:{}},"nothing remembered: the first time the app is opened");
+ stays({local:{[LAST_PAGE_KEY]:"{not json"}},"a record that cannot be read");
+ stays({local:{[LAST_PAGE_KEY]:"\"/defect-log\""}},"a record of the wrong shape");
+ /* Only a page the app has. A stored address is text somebody could have put
+    there, and it is never followed anywhere else. */
+ for(const path of ["/api/mcp","//elsewhere.example","https://elsewhere.example/","/defect-log?scan=heat","/defect-log/","javascript:alert(1)",7,null])
+  stays({local:{[LAST_PAGE_KEY]:JSON.stringify({version:1,path,at:new Date().toISOString()})}},"a remembered "+JSON.stringify(path));
+ /* Not on the map at all: nothing to turn round, and the script writes nothing. */
+ win=stays({path:"/fixed-repairs"},"a fresh start somewhere else");
+ assert.equal(kept(win).path,"/defect-log");
+ /* A fresh start is marked wherever it lands, so the map tapped next is not one. */
+ assert.equal(win.sessionStorage.data.get(LAUNCH_SEEN_KEY),"1");
+
+ /* THE CRASH SCREEN'S OWN RECORD keeps a page shut too. */
+ const then=Date.now()-60000;
+ const crash=(url,at)=>({[CRASH_REPORT_KEY]:JSON.stringify({url,at:new Date(at).toISOString(),message:"x"})});
+ stays({local:{...left("/defect-log",new Date(then).toISOString()),...crash("/defect-log",then+5000)}},"stopped after it was remembered");
+ stays({local:{...left("/defect-log",new Date(then).toISOString()),...crash("/defect-log",then)}},"stopped in the same instant");
+ stays({local:{...left("/defect-log",new Date(then).toISOString()),...crash("/defect-log/",then+5000)}},"the crash record keeps the address as it was typed");
+ stays({local:{[LAST_PAGE_KEY]:JSON.stringify({version:1,path:"/defect-log"}),...crash("/defect-log",then-999999)}},"remembered with no time, and it has crashed: kept shut");
+ const goes=(local,why)=>{const made=resumeWindow({local,online:false});run(made);assert.equal(made.replaced,"/defect-log",why)};
+ goes({...left("/defect-log",new Date(then).toISOString()),...crash("/defect-log",then-5000)},"a crash from before it was last remembered: the page has come up since");
+ goes({...left("/defect-log",new Date(then).toISOString()),...crash("/down-sheet",then+5000)},"another page's crash");
+ goes({[LAST_PAGE_KEY]:JSON.stringify({version:1,path:"/defect-log"})},"remembered with no time and no crash");
+ goes({...left("/defect-log"),[CRASH_REPORT_KEY]:JSON.stringify({url:"/defect-log",at:"some time"})},"a crash that cannot be placed does not shut a page for ever");
+
+ /* IF THE MARK CANNOT BE WRITTEN, nothing moves and the map is shown. */
+ win=resumeWindow({local:left("/defect-log"),online:false});
+ win.localStorage.setItem=()=>{throw new Error("full")};
+ assert.equal(run(win),"resuming");
+ assert.equal(win.replaced,null);
+ assert.equal(win.hidden,false);
+ win=resumeWindow({local:left("/defect-log"),online:false});
+ win.localStorage.setItem=()=>{};
+ run(win);
+ assert.equal(win.replaced,null,"storage that says yes and keeps nothing");
+ assert.equal(win.hidden,false);
+ /* IF ANYTHING IN IT FAILS, the page is left as it was found: shown. */
+ win=resumeWindow({local:left("/defect-log"),online:false,replaceThrows:true});
+ run(win);
+ assert.equal(win.hidden,false,"the move itself refused");
+ assert.deepEqual(kept(win),JSON.parse(left("/defect-log",kept(win).at)[LAST_PAGE_KEY]),"a move that never started leaves no mark behind");
+ win.tick(WAIT*2);
+ assert.equal(win.stopped,0,"and nothing to stop, on a map somebody is now using");
+ win=resumeWindow({local:left("/defect-log"),fetchThrows:true});
+ assert.equal(run(win),"stayed");
+ assert.equal(win.hidden,false,"the question itself refused");
+ win=resumeWindow({local:left("/defect-log")});
+ win.matchMedia=()=>{throw new Error("no")};
+ assert.equal(run(win),"stayed");
+ win=resumeWindow({local:left("/defect-log")});
+ win.localStorage.getItem=()=>{throw new Error("blocked")};
+ assert.equal(run(win),"stayed");
+ assert.equal(win.hidden,false);
+
+ /* THE SCRIPT WRITES ONE KEY AND ONE MARK, and the key only when it moves. */
+ for(const options of [{local:left("/defect-log"),online:false},{path:"/down-sheet"},{path:"/settings",standalone:false},{}]){
+  win=resumeWindow(options);
+  run(win);
+  assert.deepEqual([...win.localStorage.data.keys()].filter(key=>key!==LAST_PAGE_KEY),[]);
+  assert.deepEqual([...win.sessionStorage.data.keys()],[LAUNCH_SEEN_KEY]);
+ }
+ win=resumeWindow({path:"/down-sheet"});
+ run(win);
+ assert.equal(win.localStorage.data.size,0,"it does not remember; a page that has come up does");
+
+ /* REMEMBERING. The address only, and only a page the app has. */
+ const fresh=()=>{const data=new Map();return {data,getItem:key=>data.has(key)?data.get(key):null,setItem:(key,value)=>{data.set(key,String(value))}}};
+ let storage=fresh();
+ const now=new Date("2026-11-17T12:00:00.000Z");
+ assert.equal(rememberPage(storage,"/defect-log",{now}),true);
+ assert.deepEqual(JSON.parse(storage.data.get(LAST_PAGE_KEY)),{version:1,path:"/defect-log",at:"2026-11-17T12:00:00.000Z"});
+ assert.equal(rememberPage(storage,"/down-sheet/",{now}),true);
+ assert.equal(JSON.parse(storage.data.get(LAST_PAGE_KEY)).path,"/down-sheet","one page, with or without the slash");
+ for(const path of ["/api/scan-identify","/defect-log?scan=heat","/nowhere",7])
+  assert.equal(rememberPage(storage,path,{now}),false,JSON.stringify(path));
+ assert.equal(JSON.parse(storage.data.get(LAST_PAGE_KEY)).path,"/down-sheet","a page the app does not have does not wipe what was remembered");
+ /* An address with nothing in it is the map. */
+ for(const path of ["",undefined,null])
+  assert.equal(rememberPage(storage,path,{now}),true,JSON.stringify(path));
+ assert.equal(JSON.parse(storage.data.get(LAST_PAGE_KEY)).path,"/");
+ assert.equal(pagePath(""),"/");
+ assert.equal(pagePath("/lists/"),"/lists");
+ assert.equal(rememberPage({getItem:()=>null,setItem(){throw new Error("full")}},"/defect-log"),false,"a full device is not an error on the page");
+ assert.equal(rememberPage({getItem(){throw new Error("blocked")},setItem(){}},"/defect-log",{keepMark:true}),true,"nor is one that will not be read");
+ /* The probation mark is carried only when asked, and only for the same page. */
+ const marked=JSON.stringify({version:1,path:"/defect-log",at:"2026-11-17T11:00:00.000Z",resuming:"2026-11-17T11:59:59.000Z"});
+ storage=fresh();storage.data.set(LAST_PAGE_KEY,marked);
+ rememberPage(storage,"/defect-log",{keepMark:true,now});
+ assert.deepEqual(JSON.parse(storage.data.get(LAST_PAGE_KEY)),{version:1,path:"/defect-log",at:"2026-11-17T12:00:00.000Z",resuming:"2026-11-17T11:59:59.000Z"});
+ rememberPage(storage,"/defect-log",{now});
+ assert.equal(JSON.parse(storage.data.get(LAST_PAGE_KEY)).resuming,undefined,"written fresh, the mark is gone");
+ storage=fresh();storage.data.set(LAST_PAGE_KEY,marked);
+ rememberPage(storage,"/down-sheet",{keepMark:true,now});
+ assert.equal(JSON.parse(storage.data.get(LAST_PAGE_KEY)).resuming,undefined,"a mark is one page's, not the next one's");
+ /* What the two halves call a page is the same thing. */
+ for(const page of TRACKER_PAGES){
+  storage=fresh();
+  rememberPage(storage,page.href+"/");
+  win=resumeWindow({local:storage.data,online:false});
+  run(win);
+  assert.equal(win.replaced,page.href==="/"?null:page.href,page.href);
+ }
+
+ /* THE TWO HALVES ON ONE RECORD, across a start and the start after it. `page`
+    is what the component tells the memory about; a fresh start gets a new
+    window over the same storage. */
+ const start=(data,options={})=>{const made=resumeWindow({local:data,online:false,...options});return {made,result:run(made)}};
+ const page=(made,path,turnedRound=made[FLAG]===true)=>pageMemory(made.localStorage,()=>path,turnedRound);
+ const record=data=>JSON.parse(data.get(LAST_PAGE_KEY)||"null");
+
+ /* An ordinary page: remembered when it is drawn, and again as it is left. */
+ let data=new Map();
+ let memory=pageMemory({getItem:key=>data.get(key)??null,setItem:(key,value)=>data.set(key,value)},()=>"/defect-log",false);
+ assert.equal(memory.up(),true);
+ assert.equal(record(data).path,"/defect-log");
+ assert.equal(memory.used(),false,"a touch is nothing to an ordinary page");
+ assert.equal(memory.settled(),true);
+ assert.equal(memory.left(),true);
+
+ /* A REOPENED PAGE THAT STAYS UP. The map underneath writes nothing at any
+    point - not when it is drawn, not as it is left for the other page. */
+ data=new Map(Object.entries(left("/defect-log")));
+ let first=start(data);
+ assert.equal(first.made.replaced,"/defect-log");
+ let map=page(first.made,"/");
+ assert.deepEqual([map.up(),map.settled(),map.left()],[false,false,false]);
+ assert.ok(record(data).resuming,"so the mark reaches the page it was written for");
+ let reopened=page(first.made,"/defect-log",false);
+ reopened.up();
+ assert.ok(record(data).resuming,"drawn is not yet up: its records are read after the first draw");
+ reopened.left();
+ assert.ok(record(data).resuming,"nor is being left before it has stayed up");
+ reopened.settled();
+ assert.equal(record(data).resuming,undefined,"it stayed up");
+ assert.equal(record(data).path,"/defect-log");
+ assert.equal(start(data).made.replaced,"/defect-log","and is reopened the next time");
+
+ /* A REOPENED PAGE THAT THROWS ON ITS OWN RECORDS, a moment after it is
+    drawn, with a phone too full to save a crash report. The first cut of this
+    ended probation on the first draw and reopened that page for ever. */
+ data=new Map(Object.entries(left("/defect-log")));
+ first=start(data);
+ page(first.made,"/defect-log",false).up();
+ let second=start(data);
+ assert.equal(second.result,"stayed","the next start is the map");
+ assert.equal(second.made[FLAG],undefined);
+ page(second.made,"/").up();
+ assert.deepEqual({path:record(data).path,resuming:record(data).resuming},{path:"/",resuming:undefined},"an ordinary map, remembered");
+ assert.equal(start(data).result,"stayed","and so is the one after");
+ /* ...and one that never draws at all. */
+ data=new Map(Object.entries(left("/defect-log")));
+ start(data);
+ assert.equal(start(data).result,"stayed");
+
+ /* A START THAT GAVE UP DOES NOT FORGET THE PAGE. The map came up underneath
+    and was shown, and nobody touched it. */
+ data=new Map(Object.entries(left("/defect-log")));
+ first=start(data,{online:true});
+ first.made.tick(WAIT);
+ assert.equal(first.made.hidden,false);
+ map=page(first.made,"/");
+ assert.deepEqual([map.up(),map.settled(),map.left()],[false,false,false]);
+ assert.equal(record(data).path,"/defect-log");
+ assert.equal(start(data).made.replaced,"/defect-log","the next start, with the network back, goes there");
+ /* Touched, it is where the person was. */
+ data=new Map(Object.entries(left("/defect-log")));
+ first=start(data,{online:true});
+ first.made.tick(WAIT);
+ map=page(first.made,"/");
+ map.up();
+ assert.equal(map.used(),true);
+ assert.equal(record(data).path,"/");
+ assert.equal(map.used(),false,"once");
+ assert.equal(map.left(),true);
+ assert.equal(start(data).result,"stayed");
+ /* The flag is about the map it was raised on, and nothing else. */
+ let where="/";
+ memory=pageMemory(first.made.localStorage,()=>where,true);
+ assert.equal(memory.up(),false);
+ where="/down-sheet";
+ assert.equal(memory.left(),true);
+ assert.equal(record(data).path,"/down-sheet");
+
+ /* EVERY PAGE IT CAN REOPEN IS A PAGE THE PHONE HOLDS FOR A BAY WITH NO
+    SIGNAL. A page reopened and not held would be a blank screen where the map
+    used to load. */
+ const worker=await readFile(new URL("../public/sw.js",import.meta.url),"utf8");
+ const held=JSON.parse(worker.match(/CORE_PAGES = (\[[^\]]*\])/)[1]);
+ assert.deepEqual(RESUME_CONFIG.pages,TRACKER_PAGES.map(page=>page.href));
+ assert.deepEqual([...RESUME_CONFIG.pages].sort(),[...held].sort());
+ /* The worker passes a request that is not a GET straight to the network, so
+    the question the script asks is answered by the network and not a cache. */
+ assert.match(worker,/if \(request\.method !== "GET"\) return;/);
+
+ /* THE TEXT STANDS BY ITSELF. It ran above with nothing of its module in
+    scope. It is a string, so a build carries it as it is - which is the whole
+    reason it is one, and these hold what that asks of it. */
+ assert.equal(text.startsWith("("+RESUME_SOURCE+")("),true);
+ assert.doesNotMatch(RESUME_SOURCE,/[<`\\]|\$\{/,"it can sit in a template literal and in a script tag");
+ assert.doesNotMatch(RESUME_SOURCE,/\/\*|\/\/ /,"no comment is sent with every page");
+ assert.doesNotMatch(RESUME_SOURCE,/=>|\?\.|\?\?|\.\.\.|\b(?:let|const|async|await|class)\b/,"the oldest JavaScript that will do");
+ assert.doesNotMatch(text,/\b(?:TRACKER_PAGES|RESUME_CONFIG|LAST_PAGE_KEY|LAUNCH_SEEN_KEY|CRASH_REPORT_KEY|PAGE_SETTLE_MS|rememberPage|pageMemory|pagePath)\b/);
+ assert.doesNotMatch(resumeScriptText({...RESUME_CONFIG,pages:["</script><script>alert(1)"]}),/<\/script/i,"settings cannot end the tag");
+ const moduleSource=await readFile(new URL("../src/lib/settings/last-page.ts",import.meta.url),"utf8");
+ assert.doesNotMatch(moduleSource,/\.toString\(\)\s*\+|resumeLastPage/,"not a function written out with toString: a build re-prints those");
+ /* And the build does carry it as it is. `npm test` builds first; a run of
+    this file alone against an older build is told to build. */
+ const built=await readFile(new URL("../dist/server/index.js",import.meta.url),"utf8").catch(()=>"");
+ if(built)assert.ok(built.includes(RESUME_SOURCE),"dist/server/index.js does not hold the script as written - run `npm run build`, and if it still does not, the build is rewriting it");
+
+ /* WHERE THE TWO HALVES ARE MOUNTED. */
+ const [layout,script,live,guard,mapPage]=await Promise.all([
+  readFile(new URL("../app/layout.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/_components/resume-last-page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/_components/last-page-live.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/_components/crash-guard.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+ ]);
+ assert.match(layout,/<CrashGuard><HeaderThemeLive\/><ResumeLastPage\/><LastPageLive\/>\{children\}<\/CrashGuard>/);
+ /* The script is written by the server, ahead of the page: an effect would
+    run after the map was already on screen. */
+ assert.doesNotMatch(script,/^\s*["']use client["']/m);
+ assert.doesNotMatch(script,/useEffect|useLayoutEffect/);
+ assert.match(script,/<script dangerouslySetInnerHTML=\{\{__html:resumeScriptText\(\)\}\}\/>/);
+ /* The remembering is driven from an effect INSIDE the crash boundary, and
+    holds no rule of its own: it tells the memory the four moments. */
+ assert.match(live,/^"use client";/);
+ assert.match(live,/\[RESUME_CONFIG\.flag\]===true/,"it reads the flag the script raises, by the one name");
+ assert.match(live,/pageMemory\(window\.localStorage,\(\)=>window\.location\.pathname,turnedRound\)/);
+ assert.match(live,/memory\.up\(\);\s*const timer=window\.setTimeout\(\(\)=>\{memory\.settled\(\)\},PAGE_SETTLE_MS\)/);
+ assert.match(live,/window\.clearTimeout\(timer\)/,"a page that goes down before it has stayed up never says it did");
+ assert.match(live,/if\(document\.visibilityState==="hidden"\)memory\.left\(\)/);
+ assert.match(live,/if\(event\.persisted\)memory\.left\(\)/,"and when Back brings a page back without loading it");
+ for(const [type,handler,capture] of [["visibilitychange","left",""],["pageshow","back",""],["pointerdown","used",",true"],["keydown","used",",true"]]){
+  assert.ok(live.includes('addEventListener("'+type+'",'+handler+capture+')'),type+" is listened for");
+  assert.ok(live.includes('removeEventListener("'+type+'",'+handler+capture+')'),type+" is let go of");
+ }
+ assert.match(live,/\},\[pathname\]\);/,"it follows the one move that changes the page without loading one");
+ assert.doesNotMatch(live,/setItem|getItem|rememberPage|pace-/,"it writes through the memory and names no key");
+ assert.ok(PAGE_SETTLE_MS>=1000,"long enough for a page to read its records and fall over on them");
+ /* The offline worker is asked for from every page now, not only the map. */
+ assert.equal(SERVICE_WORKER_PATH,"/sw.js");
+ assert.match(live,/navigator\.serviceWorker\.register\(SERVICE_WORKER_PATH\)/);
+ assert.match(mapPage,/navigator\.serviceWorker\.register\("\/sw\.js"\)/,"and the map still asks");
+ /* The crash screen's key is spelled in two files that cannot import each other. */
+ assert.match(guard,new RegExp('CRASH_STORAGE_KEY="'+CRASH_REPORT_KEY+'"'));
+ assert.match(guard,/url:typeof location==="undefined"\?"":location\.pathname/,"the crash record still says which page stopped");
+ /* The manifest still starts at the map: iOS reads it once, when the icon is
+    made, so changing it would reach nobody who already has the app. */
+ const manifest=JSON.parse(await readFile(new URL("../public/manifest.webmanifest",import.meta.url),"utf8"));
+ assert.equal(manifest.start_url,RESUME_CONFIG.home);
+});

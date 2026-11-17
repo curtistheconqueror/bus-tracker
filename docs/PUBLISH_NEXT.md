@@ -1,58 +1,103 @@
 # Publish next
 
-**STATUS: ONE RELEASE PENDING — application release 197, a door on the Doors group.** Not published. Application release 196 is live as Sites Version 191, deployed 2026-11-17 at 07:12:36.997726 UTC, from `a9f610d42123cd6cfaaf32b61d8c78048d585c82`; that is also the rollback for 197. PR39 MCP remains separately held and unmerged, and **is not in this release.**
+**STATUS: ONE RELEASE PENDING — application release 197: the app reopens on the page it was left on, and a door on the Doors group.** Not published. Application release 196 is live as Sites Version 191, deployed 2026-11-17 at 07:12:36.997726 UTC, from `a9f610d42123cd6cfaaf32b61d8c78048d585c82`; that is also the rollback for 197. PR39 MCP remains separately held and unmerged, and **is not in this release.**
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
-One release is pending. It is one commit, two files, and one glyph on one label.
+One release is pending. It holds two changes Curtis asked for on 2026-11-17.
 
 | Release | What it is | State |
 | --- | --- | --- |
+| 197 | The installed app reopens on the page it was left on, not the Facility Map | Queued, not published |
 | 197 | The Doors group under Bus Accessories is drawn as "🚪 Doors" | Queued, not published |
 
 The record of 196 and everything before it is in `docs/RELEASES.md`; the former queue is in `docs/archive/PUBLISH_RELEASE_194_195.md`.
 
-## 197 — a door on the Doors group
+## 197 — reopen where you left off, and a door on Doors
 
 ### Source
 
-Release source: `0dc91ce`, on `main`. Previous: `4086c98`, the commit that recorded 196's live verification.
+Release source: `6308003`, on `main`. Previous: `4086c98`, the commit that recorded 196's live verification.
 
-The three blocks below were run at `0dc91ce`, the commit below the one this file is updated in.
+The three blocks below were run at `6308003`, the commit below the one this file is updated in.
 
 ```
-$ git log --oneline 4086c98..0dc91ce
+$ git log --oneline 4086c98..6308003
+6308003 The app reopens on the page it was left on
+a27d269 Queue the door on the Doors group as 197
 0dc91ce A door on the Doors group
 ```
 
 ```
-$ git diff --name-only 4086c98..0dc91ce -- app src tests
+$ git diff --name-only 4086c98..6308003 -- app src tests
+app/_components/last-page-live.tsx
+app/_components/resume-last-page.tsx
+app/layout.tsx
 src/lib/defects/repair-catalog.ts
+src/lib/settings/last-page.ts
 tests/defects.test.mjs
+tests/settings.test.mjs
 ```
 
 ```
-$ git diff --shortstat 4086c98..0dc91ce
- 2 files changed, 24 insertions(+), 4 deletions(-)
+$ git diff --shortstat 4086c98..6308003
+ 9 files changed, 983 insertions(+), 13 deletions(-)
 ```
 
 Proof of no infrastructure change. This returned nothing:
 
 ```
-$ git diff --name-only 4086c98..0dc91ce -- supabase package.json package-lock.json .github public worker
+$ git diff --name-only 4086c98..6308003 -- supabase package.json package-lock.json .github public worker
 ```
+
+`public/sw.js` and `public/manifest.webmanifest` are untouched. The cache name is not bumped and does not need to be.
 
 ### Migrations
 
-None. No storage key is added, renamed or read differently. No route, no schema, no service worker change. Nothing stored is rewritten: the group is still saved as "Doors", and a defect saved before this reads the same after it.
+None, and nothing stored is rewritten.
+
+**One new LocalStorage key: `pace-last-page-v1`.** It holds the address of the page this device was left on and two times. Per device, never synced, not in MASTER EXPORT. It is listed in `CLAUDE.md`.
+
+One `sessionStorage` name, `pace-launch-seen`, marks the first page of a run of the app. It is gone when the app is closed, which is what it is for.
+
+**For Codex, one thing to check that is not a migration.** Every page's HTML now begins its `<body>` with an inline `<script>` that starts `(function(config,win){`. It is a string constant in `src/lib/settings/last-page.ts`, and a test finds it whole in `dist/server/index.js`. If the deploy step re-bundles or minifies the server output, check the live page source still holds that script as written. If it has been rewritten, the feature fails safe — the page is shown and nothing moves — but it will not work.
 
 ### What was asked for
 
-Curtis: *"Please put a door 🚪 emoji on the doors defect."*
+Curtis, on the reopening: *"when I leave phone app and go back in I want it to return to the tab I was using. Not default back to map. I was using the defect log. This may be the correct way to use the app or most apps."*
 
-Doors is a group inside the Bus Accessories category. It is the first group in that list, directly above Ramp, Lift and Kneeler and Wheelchair Securement, which are both drawn with the ♿ mark. Doors had no mark.
+Curtis, on the door: *"Please put a door 🚪 emoji on the doors defect."*
 
-### What changed
+### Why it went back to the map
+
+The app saved to a home screen starts at the address its manifest names, which is the Facility Map. A phone keeps an app alive in the background for a while and then closes it without saying so. The next tap on the icon is a fresh start at the map. Changing the manifest would not help anybody who already has the icon: iOS reads the start address once, when the icon is made.
+
+### What changed: reopening
+
+**Close or leave the app on any page, and the next time it starts fresh it opens on that page.** Any of the eight: Facility Map, Down Sheet, Defect Log, Fixed Repairs, Fleet Campaigns, Incidents, Shop Talk, Settings.
+
+What a person will see:
+
+- **A fresh start on, say, the Defect Log.** The screen is blank for a moment longer than before — the app starts at the map as it always did, checks the network is there, and moves. The map is not drawn in between.
+- **Only the page comes back, not what was open on it.** A half-typed defect, an open scanner, a search box: gone when the phone closes the app, as before.
+- **Tapping Map always goes to the map.** So does every other tile, the page list in the header, REFRESH, and RELOAD on the crash screen. Only a fresh start is turned round.
+- **Only an installed copy does this.** The app on a phone's or iPad's home screen, or installed from a desktop browser. An ordinary browser tab is left alone, so a bookmark to the map still opens the map.
+
+What it does when things are wrong:
+
+- **Wifi that is joined but dead.** If the network has not answered in 2.5 seconds, the map is shown and the app stays there for that run. The page that was left is still remembered for next time, unless somebody uses the map.
+- **A page that will not draw.** A reopened page is on probation until it has stayed up for two seconds. If it never does, the next fresh start is the map. Closing the app and opening it again is still the way out of a broken page.
+- **No signal at all.** It moves at once; the phone holds every page for that.
+
+Three costs, known and left:
+
+1. **A fresh start is a little slower when it reopens a page other than the map.** It loads the map's page, asks one small question of the network, then loads the other page.
+2. **A good page can be forgotten once.** Reopen the app, glance at it and pocket the phone inside two seconds, and if the phone then closes the app, the next start is the map. The same happens after a start where the network answered and the page then stalled. Each costs one tap.
+3. **On a shared device, the app opens where the last person left it** — Incidents and Settings included.
+
+There is no switch for this in Settings. One is a UI change and Curtis's call.
+
+### What changed: the door
 
 The Doors group is drawn as **🚪 Doors** wherever a person picks a group:
 
@@ -60,40 +105,66 @@ The Doors group is drawn as **🚪 Doors** wherever a person picks a group:
 - **Facility Map, the bus editor's ADD DEFECT, and the multi-bus tool.** The group list's first choice reads 🚪 Doors.
 - **Down Sheet, the editor's defect picker.** It draws the same rows the Defect Log does.
 
-What did **not** change:
+What did not change: **a logged door defect looks as it did.** The mark is on the group in the picker, where the ♿ is, not on a defect card, the bus quick view, a Down Sheet line, a report or a share. The eleven choices inside Doors are unmarked. Nothing stored carries the mark.
 
-- **A logged door defect looks as it did.** The mark is on the group in the picker, where the ♿ is, not on a defect card, the bus quick view, a Down Sheet line, a report or a share. If Curtis meant the logged defect, that is a second, separate change and has not been built.
-- **The eleven choices inside Doors are unmarked**, as they were.
-- **Nothing stored carries the mark.** A test holds that for every choice and every group in the catalog.
+In the Facility Map's group list, pressing **D** on a keyboard no longer jumps to Doors, because the line now starts with the glyph. The same is already true of R and W for the two ♿ groups.
 
-One thing a keyboard user on the shop computer may notice: in the Facility Map's group list, pressing **D** no longer jumps to Doors, because the line now starts with the glyph. The same is already true of R and W for the two ♿ groups.
+One fix rode along: a defect whose wording is exactly the word "constructor" was drawn with a line of program text in front of it. No catalog choice has that wording. It is drawn plain now.
 
-One fix rode along, in the same function family: a defect whose wording is exactly the word "constructor" was drawn with a line of program text in front of it. No catalog choice has that wording, so it could only be reached by a hand-typed or imported record. It is drawn plain now.
+### One thing that changed underneath
+
+**The service worker is now registered from every page, not only the map.** The map did it alone, and until this every fresh start loaded the map. A start that is turned round may never run the map's code. `public/sw.js` itself is unchanged. Its own note says registration runs "on every map load", which is now short of the truth; it was left, because changing that file re-installs the worker on every phone.
 
 ### Verified
 
-- `npm test` on Windows — **469 pass, 0 fail**, re-run after the review's changes.
+- `npm test` on Windows — **470 pass, 0 fail**.
 - `npm run lint` — no error; one warning, in a tool file that is not part of the app.
-- In a browser at 390 wide, on the development server:
-  - Defect Log, LOG DEFECT, Bus Accessories: the group row reads "🚪 Doors" with its count of 11, and the choices under it are unmarked.
-  - Defect Log, searching "rear door" with no category: four matches read "🚪 Doors · ♿ Bus Accessories" on their second line; no row's text overflows its box.
-  - Facility Map, bus editor, ADD DEFECT, Bus Accessories: the first group choice's text is "🚪 Doors" and the value it stores is "Doors".
-- A cold read of the diff by one subagent that had not seen the reasoning: no defect, five notes. Each is answered in the commit message of the release source — three fixed, two declined with the reason.
+- **32 bugs planted** one at a time in the reopening module; the tests caught all 32.
+- **The built app, served locally**, sent the tested script byte for byte as the first thing in `<body>` on all eight pages, and answered a HEAD request with 200 on each. That run was on the version before the last review's small changes; the test that finds the script whole in the build was run again after them.
+- **In Chromium at 390 wide on the development server.** A real installed copy cannot be made there, so the page's own script was run against a stand-in that says it is installed:
+  - Left on the Defect Log, a start at the map was hidden, asked the network, and landed on the Defect Log. The history was no longer than before.
+  - With a network that never answers, the map was hidden at 2.4 seconds and shown by 2.65, and nothing moved.
+  - A record already on probation stayed on the map.
+  - A tap on the Map tile went to the map.
+  - A page on probation kept its mark when it was drawn and lost it once it had stayed up.
+  - The service worker was registered from the Defect Log with the map never opened.
+- **The door**, in the same browser: the Defect Log's group row reads "🚪 Doors" with its eleven choices unmarked; a search for "rear door" shows "🚪 Doors · ♿ Bus Accessories" under four matches with no row overflowing; the Facility Map's group choice reads "🚪 Doors" and stores "Doors".
+- **Three cold reads of the reopening and one of the door**, each by one subagent that had not seen the reasoning. The first two each found a way the app could be left on a page that would not draw, and both are fixed. Every finding is answered in the commit messages of the release source.
 
 **Not verified:**
 
-- **The Down Sheet editor's picker** was read, not driven. It draws from the same search index through the same component as the Defect Log's.
-- **The multi-bus tool's group list** on the Facility Map was read, not driven. It is the same line of code as the bus editor's, which was.
-- **No physical phone, iPad or shop computer.** How the door glyph is drawn depends on the device's own emoji font; it was seen on Windows Chromium only.
-- **The built worker** was not run. The check was on the development server.
+- **It has never run on a phone, an iPad or a real installed copy.** The design rests on a reopened home-screen app starting with no memory of its last run and with nothing having sent it there. That was read, not measured. If a phone does not behave that way, the app opens on the map as it does today.
+- **Stopping a stalled move.** In Chromium a move to an address that never answers was still on the same page seven seconds after being stopped. The browser pane may have refused that address outright, so this is not proof. Where a browser will not stop a move, the map can still be shown and then replaced late.
+- **What stopping costs.** It also ends anything the map was still loading and any request it had in flight, a Shop Cloud pull included. Not measured.
+- **The changes made after the third cold read** were not read cold again. They are small: a move that could not start leaves no mark, and the wait before a page counts as up went from four seconds to two.
+- **Whether Sites serves the built server file as built.** See Migrations.
+- **The Down Sheet editor's picker and the multi-bus tool's group list** were read, not driven, for the door.
+- **How the door glyph is drawn** depends on the device's own emoji font; it was seen on Windows Chromium only.
 
 ### What to check once it is live
 
-1. Defect Log → **+ LOG DEFECT** → choose **Bus Accessories** → tap the arrow on SPECIFIC DEFECT OR SYMPTOM. The first row should read **🚪 Doors**, above the two ♿ rows.
-2. Tap **🚪 Doors**. The choices — Front door, Front door will not open, and so on — should have no mark in front of them.
-3. Clear the category, then type **rear door** in SPECIFIC DEFECT OR SYMPTOM. Under each door match the small line should read **🚪 Doors · ♿ Bus Accessories**.
-4. Facility Map → tap a bus → **+ ADD DEFECT** → category **Bus Accessories**. The group list's first choice should read **🚪 Doors**.
-5. Save a door defect on a test bus and look at its card. It should read as a door defect always has, with no glyph added — that is expected.
+On a phone with the app on its home screen. Open the app once after the update before starting, so it has the new version.
+
+1. Open the app and tap **Defects**. Wait a few seconds.
+2. Swipe the app away to close it fully. Tap the icon. **It should open on the Defect Log**, after a blank moment, without the map appearing first.
+3. Tap **Map**. It should go to the Facility Map and stay there.
+4. Close the app fully from the map and open it again. It should open on the map.
+5. Go to the **Down Sheet**, switch to another app for a minute without closing this one, and come back. It should still be on the Down Sheet, as before.
+6. Go to the Defect Log and leave the phone alone until it has closed the app by itself — an hour, or overnight. Open it. **This is the real test, and the one that could not be run:** it should open on the Defect Log.
+7. If it opens on the map in step 2 or 6, say so. Nothing is broken; the phone does not start the app the way the design assumed, and that needs a different approach.
+8. In the garage with the wifi down or weak: close the app fully on the Defect Log and open it. It should open on the Defect Log with no signal at all, and on the map after about two and a half seconds if the wifi is joined but dead. It should not sit on a blank screen.
+
+For the door:
+
+9. Defect Log → **+ LOG DEFECT** → choose **Bus Accessories** → tap the arrow on SPECIFIC DEFECT OR SYMPTOM. The first row should read **🚪 Doors**, above the two ♿ rows.
+10. Tap **🚪 Doors**. The choices should have no mark in front of them.
+11. Facility Map → tap a bus → **+ ADD DEFECT** → category **Bus Accessories**. The group list's first choice should read **🚪 Doors**.
+
+### Open questions for Curtis
+
+- **A switch in Settings** to turn reopening off on a device. Not built.
+- **Incidents and Settings** are reopened like any other page. On a shared iPad that puts the last person's page in front of the next one. Either can be left out.
+- **The door on a logged defect's card**, not only in the picker. Not built.
 
 ### Rollback
 
