@@ -93,7 +93,7 @@ branding.** Counted at this commit —
 | | what it is | where |
 | --- | --- | --- |
 | the yard's geometry | six independent descriptions of one building that must agree, plus **179 slot-prefix literals across 17 files** (`grep -rhoE` over `app src`, see below), some carrying BEHAVIOUR (`smart-status`, `mystery-buses`, `road-calls`) | `docs/roadmap/facility-config.md`, scoped and not built |
-| 50 storage keys | all prefixed `pace-`, and renaming one is forbidden above | the key list below |
+| 52 storage keys | all prefixed `pace-`, and renaming one is forbidden above | the key list below |
 | the Shop Cloud | one project, one shop login, and RLS grants any authenticated user full insert and update | `supabase/migrations/0002_shared_records.sql` |
 | the MCP | one `MCP_TOKEN` with no issuer and no per-organisation identity | `docs/AGENT_MCP.md` |
 
@@ -261,6 +261,7 @@ the cloud's bookkeeping, per device
 
 per-device settings, never synced
   pace-app-mode-v1                 FULL or LITE on this device, and whether it was ever asked
+  pace-last-page-v1                the page this device was left on, reopened on a fresh start from the home screen
   pace-sweep-v1                    FULL SWEEP: when this walk began, and where from
   pace-role-v1                     the job title chosen on the home screen — COSMETIC, never a permission
   pace-feedback-settings-v1        sound and vibration on this device, both OFF
@@ -287,7 +288,90 @@ per-device view state — which panel is open, what has been dismissed
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
   pace-status-report-picks-v1          which boxes are ticked on the STATUS REPORT
+  pace-defect-log-card-view-v1         DETAILED or COMPACT cards on the Defect Log
 ```
+
+**`pace-last-page-v1` is where the app was left, and the app reopens there.**
+Curtis: *"when I leave phone app and go back in I want it to return to the tab
+I was using. Not default back to map. I was using the defect log."*
+
+It went back to the map because the manifest's start address is `/` and a
+phone closes a backgrounded app without saying so; the next tap on the icon is
+a fresh start there. The manifest cannot fix it: iOS reads the start address
+once, when the icon is made. So `src/lib/settings/last-page.ts` has two halves.
+**Remembering** is `pageMemory`, driven from an effect
+(`app/_components/last-page-live.tsx`), so a page is remembered only once it
+has come up. **Reopening** is a script the root layout writes at the top of
+every page, which runs before the page is drawn.
+
+**It only turns round a FRESH START OF AN INSTALLED COPY**, and all of these
+must hold: the first page of this run of the app (a mark in `sessionStorage`,
+written and read back first), no referrer, the bare `/` with no query, and the
+app running standalone. Each is a way of not bouncing somebody who tapped Map.
+A browser tab is never turned round. An installed copy on an iPad or a desktop
+is, the same as a phone.
+
+**A reopened page is ON PROBATION until it has stayed up.** The crash screen's
+only button is RELOAD, and the other way out of a page that would not draw was
+to close the app and open it again, which landed on the map. So the move is
+marked on the record before it is made, and the mark comes off only when the
+page has stayed up for `PAGE_SETTLE_MS` (two seconds); a fresh start that
+finds the mark stays on the map. That one does not depend on anything the
+broken page managed to write. A page whose crash (`pace-crash-report-v1`) is
+newer than the moment it was remembered is skipped as well, and if the mark
+cannot be written nothing moves.
+
+**Two cold reads each found a hole in that, and both are why it is shaped as
+it is.** Built first on the crash record alone: a page fails without leaving
+one when the phone is too full to save it, when its code never loads, and on a
+server error. Then with the mark coming off at the first draw: these pages
+read their records in effects AFTER the first draw, so one that throws on its
+own data had already been cleared, and was reopened on every start with no way
+to the map.
+
+**The network is asked first.** Pages load network-first, and wifi that is
+joined but dead hangs a request instead of failing it. The script asks for the
+page's headers and goes only when something answers or the request fails
+outright; a server answering with an error of its own is not gone to. After
+2.5 seconds of nothing it shows the map and stays for that run. A move that
+was started and has not arrived in another 2.5 seconds is stopped with
+`window.stop()` before the map is shown, so the map is not handed over and
+then taken away. **Where a browser will not stop a move, it still can be** -
+that is the one case left, and it has not been seen on a phone. `stop()` also
+ends whatever the map was still loading and any request it had in flight, a
+Shop Cloud pull included; what that costs has not been measured.
+
+**What the probation costs a good page, both known and left.** A page
+reopened, glanced at and pocketed inside the two seconds, on a phone that then
+closes the app, is still marked: the next start is the map. And a move that was
+started and stopped keeps its mark, because whether a stopped move really
+stopped cannot be read back - so that start, too, is followed by one on the
+map. Each costs one tap, and each errs toward the map.
+
+**The map underneath does not remember itself.** It loads behind the hidden
+screen while the script waits, and its own remembering would write "the map"
+over the page the person left: a start that gave up on slow wifi forgot the
+Defect Log for good. The script raises a flag on the window when it tries, and
+a map that was only fallen back to is remembered once somebody has touched it.
+
+**The script is a STRING, not a function written out with `toString()`.** It
+was the function first; the build re-prints a function, so what the tests ran
+was not what a phone was sent. A string is carried through as it is, the tests
+run that text by itself, and one of them finds it whole in the build. Nothing
+else checks it as code.
+
+The address only - never a `?scan=`, a search or an open form. Per device,
+never synced, and not in MASTER EXPORT. Every page can be reopened, Settings
+and Incidents included, and LITE does not change that. **`pace-launch-seen`
+looks like a key and is the `sessionStorage` mark above.** The remembering
+half also registers the service worker, from every page: the map did that
+alone, and a fresh start that is turned round may never run the map's code.
+The note in `public/sw.js` that says registration runs "on every map load" is
+now short of the truth and was left, because changing that file's bytes
+re-installs the worker on every phone. There is no switch for any of this in
+Settings; one is a UI change and Curtis's call. **Never run on a phone:** that
+iOS starts a reopened home-screen app with an empty `sessionStorage` and no
+referrer is what the design rests on, and it was read, not measured.
 
 **`pace-sweep-v1` is one person's walk, and it never travels.** FULL SWEEP is a
 STATE rather than a sequence: the Facility Map can start it and so can the
