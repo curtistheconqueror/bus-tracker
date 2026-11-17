@@ -5,8 +5,8 @@ import {CARD_VIEW_KEY,readCardView} from "../src/lib/settings/card-view.ts";
 
 test("card density is independent presentation state with a safe default",()=>{
  assert.equal(CARD_VIEW_KEY,"pace-defect-log-card-view-v1");
- for(const raw of [null,"","compact","invalid","{bad}"])assert.equal(readCardView(raw),"compact");
- assert.equal(readCardView("detailed"),"detailed");
+ for(const raw of [null,"","detailed","invalid","{bad}"])assert.equal(readCardView(raw),"detailed");
+ assert.equal(readCardView("compact"),"compact");
 });
 test("compact cards open the existing complete group, not a duplicate record flow",async()=>{
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
@@ -42,4 +42,14 @@ test("intermediate mobile widths retain usable tools and selected status filters
  const nav=await readFile(new URL("../src/components/shared/tracker-nav.css",import.meta.url),"utf8");
  assert.match(nav,/color:var\(--app-header-text,var\(--header-text,#fff\)\)/);
  assert.match(nav,/select\{[^}]*color:inherit;[^}]*16px/);
+});
+
+
+test("defect page starts with collapsed advanced actions and Detailed before Compact",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/const \[advancedOpen,setAdvancedOpen\]=useState\(false\)/);
+ assert.doesNotMatch(page,/ADVANCED_OPEN_KEY|pace-defect-log-advanced-open-v1/);
+ assert.match(page,/className="header-advanced-toggle"[^>]*aria-expanded=\{advancedOpen\}/);
+ assert.match(page,/const \[cardView,setCardView\]=useState<CardView>\("detailed"\)/);
+ assert.match(page,/\["detailed","compact"\] as CardView\[\]/);
 });
