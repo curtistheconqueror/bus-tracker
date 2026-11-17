@@ -1,9 +1,9 @@
-# Mobile minimalist redesign (unmerged)
+# Mobile minimalist redesign (released in Sites 190)
 
 Baseline: `103f00d15e73d09642720963043b16b05347c440` on `main`.
 Rollback branch: `legacy/pre-minimalist-20261117-103f00d`.
 Implementation branch: `codex/fleetstep-minimalist-20261117`.
-This work does not merge, deploy, change the existing Sites binding, or alter the queued release 194.
+PR48 was merged and published with Curtis's approval on 2026-11-17 as Sites 190 / application release 195, together with the preserved queued release 194. Source `a1d90e85a6489ab9c6ff636e50ed813d98363978`. The existing Sites binding and public audience remain unchanged.
 
 ## Scope
 

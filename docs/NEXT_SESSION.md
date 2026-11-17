@@ -1,5 +1,10 @@
 # Start here
 
+## Latest publication checkpoint - 2026-11-17
+
+Curtis approved making PR48 live. The queued 194 and mobile redesign are now published together; no queued feature was discarded. Read `docs/PUBLISH_NEXT.md` and `docs/RELEASES.md` for the current source, rollback, verification limits and publication state. The full former queue is preserved in `docs/archive/PUBLISH_RELEASE_194_195.md`. PR39 remains separate and unmerged. The historical "not live" statements below describe their time and do not override this checkpoint.
+
+
 You are a Claude Code session on the Pace South Bus Tracker. This file is the
 entry point: read it, then start working. It exists so a fresh session does not
 have to reconstruct the state of the project from a chat transcript.

@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-10-25
+Updated: 2026-11-17
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 189 (application release 193)
-Live feature checkpoint: commit a009c08fad02aa6859ec6445784f744c6e269c8d
+Live release: Sites Version 190 (application releases 194 and 195)
+Live feature checkpoint: commit a1d90e85a6489ab9c6ff636e50ed813d98363978
 
 ## Read this first
 
@@ -21,6 +21,14 @@ The project is an offline-capable fleet maintenance operations application with 
 
 6. Incidents — device-local records of events involving people and places.
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
+
+## Latest publication
+
+Sites Version 190 was deployed 2026-11-17 at 06:11:14.623645 UTC from `a1d90e85a6489ab9c6ff636e50ed813d98363978`, after Curtis approved making the redesign live. It includes the entire previously queued application release 194 plus application release 195 (PR48 compact mobile navigation and optional defect cards). No prior queued feature was discarded. PR39 remains unmerged and excluded.
+
+Exact-head CI passed; the merged source tree equals reviewed `05ea7aa`. Local production build, lint and 468 tests passed. All eight live routes returned 200; 76 emitted browser/static assets matched the release build. Live Chromium passed 24 route/viewport checks and navigation/card interaction flows. Four recoverable React #418 hydration warnings occurred on Settings: independent server/client clocks cross a minute boundary in its hidden SHIFT ENDS IN display. The component and clock module are byte-unchanged from the pre-redesign baseline. Fresh UTC/Chicago core-route checks were clean; this is not established as a cache issue. Physical iPhone/Safari/Home Screen, hardware safe areas, VoiceOver and native share are not claimed; the heat scanner and sheet identifier still need a real photograph.
+
+Previous-live rollback is Sites 189 at `a009c08fad02aa6859ec6445784f744c6e269c8d`. The requested pre-redesign code remains on `legacy/pre-minimalist-20261117-103f00d` at `103f00d15e73d09642720963043b16b05347c440`. Full queued-work history is archived in `docs/archive/PUBLISH_RELEASE_194_195.md`; release evidence is in `docs/RELEASES.md`. Older publication sections below are historical.
 
 ## Domain ownership
 
