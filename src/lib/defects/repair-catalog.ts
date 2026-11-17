@@ -417,6 +417,13 @@ export const ADA_MECHANICAL_MARK="♿ ⚙️ ";
 const ADA_GROUPS=new Set(["Door, Ramp and Kneeler Failures","Ramp, Lift and Kneeler","Wheelchair Securement"]);
 const ADA_ISSUE=/wheelchair|kneeler|q'straint|securement|\bramp\b/i;
 const ISSUE_DISPLAY_MARKS:Record<string,string>={"Fire extinguisher missing":"🧯 "};
+/* A group that is drawn with a glyph of its own. Curtis asked for the door on
+   Doors: it leads the Bus Accessories groups, directly above the two that carry
+   the chair, and had nothing. Display only, like the chair - the group is still
+   stored as "Doors". Nothing here keeps a mark off its options the way
+   ADA_GROUPS does; they are plain because none of them matches a marked
+   wording, and a test walks the group to say so. */
+const GROUP_DISPLAY_MARKS:Record<string,string>={"Doors":"🚪 "};
 
 /* What somebody standing at the bus needs to know at the moment they pick this
    defect, rather than what a manual would say about it afterwards.
@@ -613,13 +620,14 @@ export function normalizeRepairCount(value:unknown,category:unknown,issue:unknow
 
 export function repairGroupDisplayLabel(group:string){
  if(group==="Door, Ramp and Kneeler Failures")return ADA_MECHANICAL_MARK+group;
+ if(Object.prototype.hasOwnProperty.call(GROUP_DISPLAY_MARKS,group))return GROUP_DISPLAY_MARKS[group]+group;
  return ADA_GROUPS.has(group)?ADA_MARK+group:group;
 }
 /* Inside a group that already carries the mark every option would repeat it, so
    the group speaks for its contents and the options stay clean. */
 export function repairIssueDisplayLabel(issue:string,group=""){
  if(ADA_GROUPS.has(group))return issue;
- if(ISSUE_DISPLAY_MARKS[issue])return ISSUE_DISPLAY_MARKS[issue]+issue;
+ if(Object.prototype.hasOwnProperty.call(ISSUE_DISPLAY_MARKS,issue))return ISSUE_DISPLAY_MARKS[issue]+issue;
  return ADA_ISSUE.test(issue)?ADA_MARK+issue:issue;
 }
 

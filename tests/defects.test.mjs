@@ -2919,8 +2919,19 @@ test("the chair mark flags ADA equipment without touching what gets stored",asyn
  assert.equal(repairGroupDisplayLabel("Wheelchair Securement"),"♿ Wheelchair Securement");
  assert.equal(repairGroupDisplayLabel("Ramp, Lift and Kneeler"),"♿ Ramp, Lift and Kneeler");
  assert.equal(repairGroupDisplayLabel("Door, Ramp and Kneeler Failures"),"♿ ⚙️ Door, Ramp and Kneeler Failures");
- assert.equal(repairGroupDisplayLabel("Doors"),"Doors");
+ /* Doors is not ADA equipment and never took the chair. It has a door of its
+    own now, which Curtis asked for. */
+ assert.equal(repairGroupDisplayLabel("Doors"),"🚪 Doors");
+ /* Nothing in the code keeps a mark off a Doors option, so this walks the
+    group: an option added later whose wording takes the chair or the
+    extinguisher would be drawn marked under a door, and should fail here. */
+ for(const issue of REPAIR_OPTION_GROUPS["Bus Accessories"]["Doors"])
+  assert.equal(repairIssueDisplayLabel(issue,"Doors"),issue,issue+" is drawn plain under the door");
  assert.equal(repairGroupDisplayLabel("Driver Seat"),"Driver Seat");
+ // a name is looked up in each table, never read off the table's prototype
+ assert.equal(repairGroupDisplayLabel("constructor"),"constructor");
+ assert.equal(repairIssueDisplayLabel("constructor"),"constructor");
+ assert.equal(repairIssueDisplayLabel("Fire extinguisher missing"),"🧯 Fire extinguisher missing");
 
  // a marked group speaks for its options, so they are not marked twice
  assert.equal(repairIssueDisplayLabel("Q'STRAINT switch (curbside)","Wheelchair Securement"),"Q'STRAINT switch (curbside)");
@@ -2940,10 +2951,11 @@ test("the chair mark flags ADA equipment without touching what gets stored",asyn
  // mark, or a record saved after this would differ from one saved before it
  for(const category of Object.keys(REPAIR_OPTIONS))
   for(const option of REPAIR_OPTIONS[category])
-   assert.equal(option.includes("♿"),false,category+" / "+option+" must not store the mark");
+   assert.equal(/♿|🚪/u.test(option),false,category+" / "+option+" must not store the mark");
  for(const category of Object.keys(REPAIR_OPTION_GROUPS))
   for(const group of Object.keys(REPAIR_OPTION_GROUPS[category]))
-   assert.equal(group.includes("♿"),false,group+" must not store the mark");
+   assert.equal(/♿|🚪/u.test(group),false,group+" must not store the mark");
+ assert.equal(defectLabel({category:"Bus Accessories",issue:"Doors - Front door will not open",details:""}).includes("🚪"),false);
  assert.equal(defectLabel({category:"Doors, Ramp and ADA",issue:"Wheelchair Securement - Q'STRAINT switch (curbside)",details:""}).includes("♿"),false);
 
  // every picker renders through the helpers rather than printing raw text
