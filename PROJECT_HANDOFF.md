@@ -4,8 +4,8 @@ Updated: 2026-11-17
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 190 (application releases 194 and 195)
-Live feature checkpoint: commit a1d90e85a6489ab9c6ff636e50ed813d98363978
+Live release: Sites Version 191 (application release 196)
+Live feature checkpoint: commit a9f610d42123cd6cfaaf32b61d8c78048d585c82
 
 ## Read this first
 
@@ -23,6 +23,14 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 191 / application release 196 deployed 2026-11-17 at 07:12:36.997726 UTC from `a9f610d42123cd6cfaaf32b61d8c78048d585c82`. Curtis explicitly requested only two Defect Log changes and live publication: ADVANCED ACTIONS starts collapsed on each visit while its button remains; Detailed becomes the default and precedes Compact. Saved explicit card-view choices remain supported. Editor Advanced Details, other pages and operational records are unchanged.
+
+PR49 CodeRabbit completed at `50810e7` with no actionable comments and minimal merge/security risk; exact-head CI 44035855706 passed. Local production build, 469 tests and lint pass (zero lint errors, one existing ignored .remember file warning). Standalone TypeScript has the same 238 diagnostics as the isolated pre-change baseline after normalizing file paths/line numbers; no new errors. Browser interaction and physical-device verification were unavailable in this task. Previous release verification is preserved below.
+
+Rollback: Sites 190 / `sites-v190` at `a1d90e85a6489ab9c6ff636e50ed813d98363978`. Legacy-look archive remains untouched.
+
+### Previous publication
 
 Sites Version 190 was deployed 2026-11-17 at 06:11:14.623645 UTC from `a1d90e85a6489ab9c6ff636e50ed813d98363978`, after Curtis approved making the redesign live. It includes the entire previously queued application release 194 plus application release 195 (PR48 compact mobile navigation and optional defect cards). No prior queued feature was discarded. PR39 remains unmerged and excluded.
 
@@ -234,3 +242,5 @@ The future operator-facing defect-card replacement is documented at docs/roadmap
 ## Safe continuation prompt
 
 Open C:\Users\curti\pace-south-bus-tracker and read README.md, PROJECT_HANDOFF.md, CONTRIBUTING.md, docs/PUBLISH_NEXT.md, docs/RELEASES.md, and docs/SITES_PUBLISHING_RUNBOOK.md completely before acting. Inspect git status and recent commits. Preserve LocalStorage migrations, fleet identity, facility slot IDs, capacity-safe swaps, touch behavior, linked repair records, and all user data. Work in small stages, add focused tests, run npm test and git diff --check, and commit only the requested change. Never create a new hosting project or publish without explicit approval.
+
+Live verification: home, Defect Log and Down Sheet returned HTTP 200; Defect Log server output starts Detailed with Advanced Actions collapsed and drawer absent; all 27 referenced emitted JavaScript assets matched the release build byte-for-byte. This is HTTP/source verification, not fresh browser interaction.
