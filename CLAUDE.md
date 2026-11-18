@@ -362,7 +362,20 @@ else checks it as code.
 
 The address only - never a `?scan=`, a search or an open form. Per device,
 never synced, and not in MASTER EXPORT. Every page can be reopened, Settings
-and Incidents included, and LITE does not change that. **`pace-launch-seen`
+and Incidents included, and LITE does not change that.
+
+**EVERY PAGE, ON EVERY DEVICE, and that was asked and answered.** A shared iPad
+opens on whatever the last person left, Incidents included, which names who
+was hurt. Curtis, asked whether to leave Incidents and Settings out: *"Phone
+and shared iPad should act the same: reopen on whatever page I left, including
+Incidents, Settings and Defect Log. Only fall back to the map after a reset, a
+device restart, or something like that. I don't want to tap Defect Log every
+time I switch apps and come back 3 minutes later."* So do not add a list of
+pages that are skipped, and do not make the map the answer to anything that is
+not a page failing to draw or a network that will not answer. A device restart
+is NOT one of the things that lands on the map: a page cannot tell a restart
+from the phone closing the app, and the record is still there afterwards. A
+reset that clears the site's data is, because the record goes with it. **`pace-launch-seen`
 looks like a key and is the `sessionStorage` mark above.** The remembering
 half also registers the service worker, from every page: the map did that
 alone, and a fresh start that is turned round may never run the map's code.
