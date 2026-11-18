@@ -2,6 +2,11 @@
 
 import {useEffect,useState,type CSSProperties} from "react";
 import {SettingsDrawer,SettingsDrawers} from "./settings-drawer";
+/* ONE SPELLING OF THE KEY. This file held its own literal — correct, and one of
+   two copies reachable from the same page once `app/fixed-repairs/page.tsx`
+   started reading the initials out of it. CLAUDE.md forbids renaming a storage
+   key, so two literals means two forever, and the one that drifts is silent. */
+import {SETTINGS_KEY} from "@/src/lib/defects/defect-log-settings";
 
 type FixedTheme="light"|"dark"|"midnight"|"tactical"|"custom";
 type FixedFontSize="standard"|"large"|"extra";
@@ -9,7 +14,6 @@ type FixedFontFamily="clean"|"condensed"|"classic";
 export type FixedAppearance={page:string;surface:string;text:string;muted:string;header:string;headerText:string;accent:string};
 export type FixedAppearanceSettings={theme:FixedTheme;fontSize:FixedFontSize;fontFamily:FixedFontFamily;appearance:FixedAppearance};
 
-const SETTINGS_KEY="pace-defect-log-settings-v1";
 const LIGHT:FixedAppearance={page:"#e9eef6",surface:"#ffffff",text:"#172b4d",muted:"#60728c",header:"#061d45",headerText:"#ffffff",accent:"#0b64bd"};
 const THEMES:Record<Exclude<FixedTheme,"custom">,{label:string;appearance:FixedAppearance}>={
  light:{label:"Light",appearance:LIGHT},

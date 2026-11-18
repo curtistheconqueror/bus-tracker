@@ -1,3 +1,4 @@
+import {normalizeRepairHours} from "../defects/repair-catalog.ts";
 export type RepairTimeEstimate={
  repairMinutes:number;
  diagnosticMinutes:number;
@@ -45,7 +46,18 @@ const CATEGORY_REPAIR_MINUTES:Record<string,number>={
 };
 
 const SPECIFIC_ESTIMATE_RULES:EstimateRule[]=[
- {pattern:/A\/C and HVAC - (Compressor|Evaporator core|Condenser core)$/i,estimate:{repairMinutes:900,diagnosticMinutes:60,accessMinutes:0}},
+ /* THE GROUP SEGMENT IS OPTIONAL, and both halves are load-bearing. A/C and
+    HVAC became a grouped category, so the picker now stores
+    "Cooling - Compressor" and this rule is matched against
+    "A/C and HVAC - Cooling - Compressor". With the `$` sitting straight after
+    the category the three big jobs fell through to the 90-minute rule below —
+    a 16-hour compressor planned as 2h30, silently, on the Down Sheet and on
+    the Defect Log's hours badge. Nothing here migrates the issue first, so the
+    BARE wordings must keep matching too: a record written before the grouping
+    reaches this function exactly as it was stored.
+    The same shape as the Bus Accessories rules further down, which carry their
+    group for the same reason. */
+ {pattern:/A\/C and HVAC - (?:Cooling - )?(Compressor|Evaporator core|Condenser core)$/i,estimate:{repairMinutes:900,diagnosticMinutes:60,accessMinutes:0}},
  {pattern:/A\/C and HVAC - /i,estimate:{repairMinutes:90,diagnosticMinutes:60,accessMinutes:0}},
  {pattern:/Engine - (Check engine light|Stop engine light|Check engine and stop engine light|Check-engine diagnosis)$/i,estimate:{repairMinutes:120,diagnosticMinutes:60,accessMinutes:0}},
  {pattern:/Engine - Rear main seal$/i,estimate:{repairMinutes:900,diagnosticMinutes:60,accessMinutes:0}},
@@ -132,9 +144,42 @@ export function resetCoreRepairEstimate(current:RepairTimeEstimate,category:stri
  return {...current,repairMinutes:recommended.repairMinutes,diagnosticMinutes:recommended.diagnosticMinutes,accessMinutes:recommended.accessMinutes};
 }
 
+/* The seven boxes added up, with no floor under them.
+
+   `repairTimeTotal` below is what the sheet PRINTS, and it never prints less
+   than half an hour. This is what the sheet was TOLD, which is a different
+   question: a card seeded with a fifteen-minute estimate holds fifteen minutes
+   and displays thirty. Nothing in the app reads it on its own any more — the
+   carry-back onto a defect that needed it is gone — so this is
+   `repairTimeTotal`'s body, kept named because the floored and unfloored
+   answers are different facts and the tests ask for both. */
+export function repairTimeSum(estimate:RepairTimeEstimate){
+ return estimate.repairMinutes+estimate.diagnosticMinutes+estimate.accessMinutes+estimate.complicationMinutes+estimate.heatMinutes+estimate.interruptionMinutes+estimate.otherMinutes;
+}
+
 export function repairTimeTotal(estimate:RepairTimeEstimate){
- const total=estimate.repairMinutes+estimate.diagnosticMinutes+estimate.accessMinutes+estimate.complicationMinutes+estimate.heatMinutes+estimate.interruptionMinutes+estimate.otherMinutes;
- return Math.max(MINIMUM_REPAIR_MINUTES,total);
+ return Math.max(MINIMUM_REPAIR_MINUTES,repairTimeSum(estimate));
+}
+
+/* AN ESTIMATE SOMEBODY TYPED, IN THE SHAPE THE SHEET KEEPS ONE.
+
+   The Defect Log collects ESTIMATED TIME OF REPAIR as a single number of
+   hours; the Down Sheet keeps an estimate broken into repair, diagnostic,
+   access and four conditions. A card built from a defect that carries an
+   estimate has to print THAT number and not the catalog's guess, or the two
+   screens quote different figures for the same repair on the same bus — the
+   disagreement `defect-estimates.ts` and `tech-services.ts` both exist to
+   stop.
+
+   The whole figure goes into `repairMinutes`, which is where the sheet's own
+   simple ESTIMATED HOURS box puts a total it is handed, so opening the card
+   and breaking the estimate down starts from the same number rather than from
+   a split nobody chose. No estimate on the defect means the catalog's, exactly
+   as before this existed. */
+export function estimateFromHours(hours:unknown,category:string,repair:string):RepairTimeEstimate{
+ const typed=normalizeRepairHours(hours);
+ if(typed===undefined)return normalizeRepairTimeEstimate(undefined,category,repair);
+ return {repairMinutes:Math.round(typed*60),diagnosticMinutes:0,accessMinutes:0,complicationMinutes:0,heatMinutes:0,interruptionMinutes:0,otherMinutes:0,notes:""};
 }
 
 export function formatRepairTime(minutes:number){

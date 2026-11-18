@@ -4,6 +4,7 @@ import {useEffect,useMemo,useRef,useState} from "react";
 import {scanReadyPhoto} from "@/src/lib/defects/scan-photo";
 import {readScanNotes,rememberScanNotes,SCAN_NOTES_KEY,SCAN_NOTES_LIMIT} from "@/src/lib/defects/scan-notes";
 import {writeSetting} from "@/src/lib/storage/storage";
+import {handedStart,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
 import {normalizeSweepDocument,normalizeSweepRow,sweepFindings,sweepOkAgainstBoard,sweepPageVerdict,SWEEP_COLUMN_LABEL,SWEEP_ISSUE_CHOICES,type ScannedSweepRow,type SweepFinding,type SweepFleetBus,type SweepOkBus,type SweepPageVerdict} from "@/src/lib/defects/sweep-scan-import";
 
 /* The farebox / Ventra sweep scanner.
@@ -19,12 +20,21 @@ type Props={
  fleet:SweepFleetBus[];
  onClose:()=>void;
  onFile:(findings:SweepFinding[])=>void;
+ /* Set when SCAN SHEET was the way in: the photos it took, already identified
+    as this scanner's sheet. Absent for the scanner's own button. */
+ handed?:HandedPhotos|null;
 };
 
 const MAX_FILES=6;
 
-export default function SweepScanner({fleet,onClose,onFile}:Props){
- const [photos,setPhotos]=useState<SelectedPhoto[]>([]);
+export default function SweepScanner({fleet,onClose,onFile,handed}:Props){
+ /* Asked once, when the scanner opens. A hand-off is for this opening only. */
+ const [start]=useState(()=>handedStart(handed,"sweep"));
+ const [photos,setPhotos]=useState<SelectedPhoto[]>(()=>start.files.slice(0,MAX_FILES).map((file,index)=>({file,url:URL.createObjectURL(file),key:`handed-${index}-${file.name}-${file.lastModified}`})));
+ /* The lines that say SCAN SHEET opened this stay up only while the photos
+    are the ones it handed over. Once a photo is added or taken away they
+    describe a batch that is no longer the one on screen. */
+ const [fromPaper,setFromPaper]=useState(true);
  const [rows,setRows]=useState<ScannedSweepRow[]>([]);
  const [findings,setFindings]=useState<SweepFinding[]>([]);
  const [okAgainstBoard,setOkAgainstBoard]=useState<SweepOkBus[]>([]);
@@ -35,7 +45,7 @@ export default function SweepScanner({fleet,onClose,onFile}:Props){
  const [read,setRead]=useState(false);
  const [busy,setBusy]=useState(false);
  const [progress,setProgress]=useState("");
- const [error,setError]=useState("");
+ const [error,setError]=useState(start.lost);
  /* Same box as the Down Sheet scanner: what the person knows the camera will
     misread — "Cw is Carlos W", "the note at the bottom is 15506". Remembered
     on the device only when asked. */
@@ -45,27 +55,53 @@ export default function SweepScanner({fleet,onClose,onFile}:Props){
 
  useEffect(()=>{photosRef.current=photos},[photos]);
  useEffect(()=>()=>photosRef.current.forEach(photo=>URL.revokeObjectURL(photo.url)),[]);
- useEffect(()=>{const kept=readScanNotes(localStorage.getItem(SCAN_NOTES_KEY),"sweep");if(kept){setNotes(kept);setKeepNotes(true)}},[]);
+ /* Whether the kept notes have been looked for yet. A read that starts by
+    itself has to wait for this: started a render earlier it would send no
+    notes, and then write "no notes kept" over the ones the device was holding. */
+ const [notesLoaded,setNotesLoaded]=useState(false);
+ useEffect(()=>{const kept=readScanNotes(localStorage.getItem(SCAN_NOTES_KEY),"sweep");if(kept){setNotes(kept);setKeepNotes(true)}setNotesLoaded(true)},[]);
  const approved=useMemo(()=>findings.filter(finding=>finding.selected&&finding.fleetMatch==="matched"&&finding.busId),[findings]);
  const flagged=findings.filter(finding=>finding.fleetMatch!=="matched").length;
  const busesRead=useMemo(()=>new Set(rows.map(row=>row.busNumber).filter(Boolean)).size,[rows]);
 
+ /* THE PHOTOS ARE FROZEN WHILE A READ IS RUNNING, the rule the heat scanner
+    learned first. A read is about the photos it was started with. With these
+    live, a page added mid-read never reached the review and a page removed
+    mid-read was still in it — and the review then hides the photo strip, so
+    what was approved came from photos nobody could check it against. It
+    mattered less while a read only ever began with a press; a hand-off starts
+    one by itself, so the window is open the moment the scanner is. The file
+    inputs are locked with the buttons: they are invisible, and a keyboard
+    could otherwise still reach one and open a dialog under a read.
+
+    THE NOTES ARE FROZEN WITH THEM. A read sends the notes it was started
+    with, and saves "keep these" as it was ticked then. Left live, a
+    correction typed while the read ran was in neither the read nor the kept
+    copy, and the review that followed hid the box it was sitting in: the
+    person had told the app something and nothing said it was not used. They
+    are live again when the read ends: CHANGE PHOTOS goes back to the first
+    screen, and the next READ press sends whatever is in the box then.
+
+    The cost, on a hand-off only: the read starts by itself, so a note can no
+    longer be typed WHILE it runs and kept for the next one. It has to wait
+    for the read to end. */
  const addPhotos=(files:FileList|null)=>{
-  if(!files)return;
+  if(!files||busy)return;
   const incoming=Array.from(files).filter(file=>["image/jpeg","image/png","image/webp"].includes(file.type));
   setPhotos(current=>{
    const available=Math.max(0,MAX_FILES-current.length),next=incoming.slice(0,available).map((file,index)=>({file,url:URL.createObjectURL(file),key:`${file.name}-${file.lastModified}-${index}-${Math.random()}`}));
    if(incoming.length>available)setError(`Use no more than ${MAX_FILES} photos.`);else setError("");
    return [...current,...next];
   });
+  setFromPaper(false);
   if(cameraRef.current)cameraRef.current.value="";
   if(uploadRef.current)uploadRef.current.value="";
  };
- const removePhoto=(key:string)=>setPhotos(current=>{const removed=current.find(photo=>photo.key===key);if(removed)URL.revokeObjectURL(removed.url);return current.filter(photo=>photo.key!==key)});
+ const removePhoto=(key:string)=>{if(busy)return;setFromPaper(false);setPhotos(current=>{const removed=current.find(photo=>photo.key===key);if(removed)URL.revokeObjectURL(removed.url);return current.filter(photo=>photo.key!==key)})};
  const updateFinding=(key:string,patch:Partial<SweepFinding>)=>setFindings(current=>current.map(finding=>finding.key===key?{...finding,...patch}:finding));
 
  const readSheets=async()=>{
-  if(!photos.length)return;
+  if(!photos.length||busy)return;
   setBusy(true);setError("");
   writeSetting(localStorage,SCAN_NOTES_KEY,rememberScanNotes(localStorage.getItem(SCAN_NOTES_KEY),"sweep",notes,keepNotes));
   try{
@@ -92,10 +128,17 @@ export default function SweepScanner({fleet,onClose,onFile}:Props){
    setOkAgainstBoard(sweepOkAgainstBoard(scanned,fleet));
    setHeldPages(held);
    setRead(true);
-   if(held.length&&held.every(item=>item.verdict==="not-a-sweep-sheet")&&held.length===photos.length)setError("None of these photos is a farebox or Ventra check-off sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN SHEET on the Down Sheet page.");
+   if(held.length&&held.every(item=>item.verdict==="not-a-sweep-sheet")&&held.length===photos.length)setError("None of these photos is a farebox or Ventra check-off sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN SHEET on the Down Sheet page."+(fromPaper&&start.wrong?" "+start.wrong:""));
    else if(!scanned.length)setError("No marked bus rows were found. Try a clearer photo, with the whole sheet in frame.");
   }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false);setProgress("")}
  };
+ /* PHOTOS THAT SCAN SHEET HANDED IN ARE READ WITHOUT A SECOND PRESS — once,
+    and only after the kept notes are in the box, so the read sends them and
+    does not erase them. Notes KEPT on this device go with it; notes for this
+    one scan cannot be typed first. CHANGE PHOTOS afterwards comes back to the
+    ordinary first screen, where they can be, and reads again. */
+ const wantsRead=useRef(start.read);
+ useEffect(()=>{if(!notesLoaded||!wantsRead.current)return;wantsRead.current=false;void readSheets()},[notesLoaded]);// eslint-disable-line react-hooks/exhaustive-deps
  const approve=()=>{
   if(!approved.length){setError("Tick at least one fleet-matched finding.");return}
   if(!confirm(`File ${approved.length} finding${approved.length===1?"":"s"} as open defects on ${new Set(approved.map(finding=>finding.busId)).size} bus${new Set(approved.map(finding=>finding.busId)).size===1?"":"es"}?\n\nEach becomes a Tech Services record on the Defect Log with who checked and which page it came from. Nothing is closed, the Down Sheet is not touched, and UNDO LAST reverses it.`))return;
@@ -107,17 +150,19 @@ export default function SweepScanner({fleet,onClose,onFile}:Props){
   <section className="sweep-modal">
    <header className="log-editor-head"><div><span>PHOTO IMPORT</span><h2 id="sweep-title">SCAN FAREBOX / VENTRA SWEEP</h2></div><div className="log-editor-header-actions"><button type="button" onClick={onClose} aria-label="Close">×</button></div></header>
    <div className="sweep-body">
+    {fromPaper&&start.note&&<p className="sweep-handed" role="status">{start.note}</p>}
+    {fromPaper&&start.warning&&<p className="sweep-handed held-back" role="alert">{start.warning}</p>}
     {!read&&<>
      <div className="sweep-intro"><b>ADD UP TO 6 PAGES — BOTH SHEET TYPES ARE FINE TOGETHER</b><span>The Ventra sheet and the farebox check-off sheet. A tick or dash is working, ER or X is a fault, blank means nobody looked. Photos are sent for processing only after you press Read Sheets, and nothing is filed until you approve it.</span></div>
      <div className="sweep-pickers">
-      <button type="button" onClick={()=>cameraRef.current?.click()}>📷 TAKE PHOTO</button>
-      <button type="button" onClick={()=>uploadRef.current?.click()}>⇧ UPLOAD FILE</button>
-      <input ref={cameraRef} className="sweep-file-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event=>addPhotos(event.target.files)}/>
-      <input ref={uploadRef} className="sweep-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event=>addPhotos(event.target.files)}/>
+      <button type="button" disabled={busy} onClick={()=>cameraRef.current?.click()}>📷 TAKE PHOTO</button>
+      <button type="button" disabled={busy} onClick={()=>uploadRef.current?.click()}>⇧ UPLOAD FILE</button>
+      <input ref={cameraRef} className="sweep-file-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" tabIndex={-1} disabled={busy} onChange={event=>addPhotos(event.target.files)}/>
+      <input ref={uploadRef} className="sweep-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple tabIndex={-1} disabled={busy} onChange={event=>addPhotos(event.target.files)}/>
      </div>
-     <div className="sweep-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
-     <label className="sweep-notes"><span><b>NOTES FOR THIS SCAN</b><small>{notes.length}/{SCAN_NOTES_LIMIT}</small></span><textarea value={notes} maxLength={SCAN_NOTES_LIMIT} rows={3} onChange={event=>setNotes(event.target.value.slice(0,SCAN_NOTES_LIMIT))} placeholder="Anything the camera might get wrong. Cw is Carlos W. The note at the bottom is bus 15506. A note can correct how a row is read, never add a bus that is not on the sheet."/></label>
-     <label className="sweep-notes-keep"><input type="checkbox" checked={keepNotes} onChange={event=>setKeepNotes(event.target.checked)}/><span>Keep these notes on this device for the next scan</span></label>
+     <div className="sweep-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" disabled={busy} onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
+     <label className="sweep-notes"><span><b>NOTES FOR THIS SCAN</b><small>{notes.length}/{SCAN_NOTES_LIMIT}</small></span><textarea value={notes} disabled={busy} maxLength={SCAN_NOTES_LIMIT} rows={3} onChange={event=>setNotes(event.target.value.slice(0,SCAN_NOTES_LIMIT))} placeholder="Anything the camera might get wrong. Cw is Carlos W. The note at the bottom is bus 15506. A note can correct how a row is read, never add a bus that is not on the sheet."/></label>
+     <label className="sweep-notes-keep"><input type="checkbox" checked={keepNotes} disabled={busy} onChange={event=>setKeepNotes(event.target.checked)}/><span>Keep these notes on this device for the next scan</span></label>
      <button className="sweep-read" type="button" onClick={readSheets} disabled={!photos.length||busy}>{busy?progress||"READING…":"READ SHEETS"}</button>
     </>}
     {read&&<>

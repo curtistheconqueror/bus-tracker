@@ -1,0 +1,106 @@
+/* PATH TO REPAIR, styled beside the component that draws it, which is the
+   convention `combo-field.css` and `bus-selector.css` already set for shared
+   React here.
+
+   IT USED TO LIVE IN `defect-log.css` AND READ `--log-*` DIRECTLY, which was
+   fine while the Defect Log was the only page that drew it. Two pages later
+   that is a panel whose colours only exist on one route: Fixed Repairs does not
+   load `defect-log.css` at all, so every one of those variables would resolve
+   to nothing and the panel would open as black text on a transparent card.
+
+   SO IT HAS ITS OWN NAMES, with literal defaults, and a host page maps them to
+   whatever it calls its own colours. One name for the thing, overridable at the
+   edge — the shape `--app-header-fill` settled on for the same reason, and the
+   reason a third page can draw this panel without touching this file.
+
+   The defaults are the app's ordinary light surface. A host that does nothing
+   gets a readable panel rather than an invisible one, which is the failure mode
+   worth designing for. */
+.ptr-shade{
+ --ptr-text:#172b4d;
+ --ptr-muted:#60728c;
+ --ptr-border:#bac7da;
+ --ptr-surface:#fff;
+ --ptr-accent:#0b64bd;
+ --ptr-accent-text:#fff;
+ /* THE BACKDROP IS THE COMPONENT'S OWN NOW. It used to come from `.log-shade`,
+    which supplied the fixed position, the centring, the padding and the phone's
+    bottom alignment — all of it on the Defect Log's stylesheet, which the other
+    host does not load.
+
+    2147483001 IS ONE ABOVE `.log-shade`, AND THAT NUMBER IS LOAD-BEARING. The
+    panel opens on top of the Defect Log's focus view, which is deliberately
+    left open underneath so closing this returns somebody to the bus they were
+    reading. Every Defect Log shade shares `.log-shade`'s single z-index, and
+    the focus shade renders LATER in the tree — so at equal z-indexes it painted
+    over this panel and swallowed every tap on it. The panel looked perfectly
+    normal while being completely dead. Found by clicking SAVE in a browser, not
+    by reading, which is why the number is named here rather than nudged. */
+ position:fixed;z-index:2147483001;inset:0;display:flex;align-items:center;
+ justify-content:center;padding:14px;background:#03132dcc;
+}
+/* `stretch`, NOT `flex-end`, and reading the wrong rule made this a UI change
+   rather than a refactor. `.log-shade` carried THREE separate
+   `@media(max-width:760px)` rules in `defect-log.css` — `align-items:flex-end`
+   at line 96, `height:100dvh` at 238 and `align-items:stretch` at 250 — and the
+   LAST one wins, which is `cascade-check`'s own second trap. The first draft of
+   this file took `flex-end` from the first rule it found, so on every width at
+   or under 760 the panel moved from the top of the screen to the bottom, went
+   from a fixed 88vh box to a content-height one, and lost its bottom corner
+   radius. Measured at 390: y=0 h=742.7 radius 12px before, bottom-anchored
+   h=579.4 radius 12px/12px/0/0 after.
+
+   A bottom sheet is arguably the better shape — the old one leaves dead space
+   inside a short panel — but that is a decision about a screen somebody already
+   uses, so it is Curtis's and it is written down in the handoff rather than
+   taken. This restores what the app does today. */
+@media(max-width:760px){.ptr-shade{align-items:stretch;padding:0;height:100dvh}}
+
+.ptr-panel{display:flex;width:100%;max-width:620px;max-height:88vh;flex-direction:column;
+ border:1px solid var(--ptr-border);border-radius:12px;background:var(--ptr-surface);overflow:hidden}
+/* No phone override on the panel itself, which is also what it had: 620px is
+   already wider than every phone, and 88vh against the shade's own 100dvh is
+   what kept a tall writeup off the bottom edge. */
+.ptr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+ padding:13px 15px;border-bottom:1px solid var(--ptr-border);background:var(--ptr-accent);color:var(--ptr-accent-text)}
+.ptr-head>span{display:flex;min-width:0;flex-direction:column;gap:3px}
+.ptr-head small{font-size:9px;font-weight:900;letter-spacing:1.4px;opacity:.85}
+.ptr-head b{font-size:16px;font-weight:900;line-height:1.2}
+.ptr-head i{font-size:12px;font-style:normal;font-weight:700;opacity:.9;line-height:1.3}
+.ptr-close{flex:none;min-width:44px;min-height:44px;border:0;border-radius:8px;background:#ffffff26;
+ color:inherit;font-size:20px;font-weight:900;cursor:pointer}
+.ptr-body{display:flex;flex-direction:column;gap:11px;padding:15px;overflow-y:auto}
+/* The written steps, read on a phone in a garage: a real reading size, and
+   `pre-wrap` because the line breaks somebody typed ARE the steps. */
+.ptr-steps{margin:0;white-space:pre-wrap;color:var(--ptr-text);font-size:14px;line-height:1.55}
+.ptr-edit{display:flex;flex-direction:column;gap:6px;color:var(--ptr-muted);font-size:9px;font-weight:900;letter-spacing:.6px}
+/* 16px rather than 14: this is a textarea, and iOS zooms the page for any text
+   field under 16px and never zooms back. Written two days ago at 14px, which is
+   how a rule gets broken — by somebody who did not know there was one. There is
+   a test now. (This comment sat INSIDE the declaration block for one commit,
+   between `border-radius` and `background`. Legal CSS, and it split one rule in
+   half to read.) */
+.ptr-edit textarea{width:100%;min-height:150px;border:1px solid var(--ptr-border);border-radius:8px;
+ background:var(--ptr-surface);color:var(--ptr-text);padding:10px;font-size:16px;line-height:1.5;resize:vertical}
+.ptr-count{align-self:flex-end;color:var(--ptr-muted);font-size:9px;font-weight:900}
+.ptr-problem{margin:0;border:1px solid #c02b2b;border-radius:8px;background:#c02b2b14;color:#c02b2b;
+ padding:9px 11px;font-size:11px;font-weight:900}
+.ptr-empty{display:flex;margin:0;flex-direction:column;gap:5px;color:var(--ptr-muted);font-size:12px;line-height:1.5}
+.ptr-empty b{color:var(--ptr-text);font-size:14px}
+.ptr-actions{display:flex;flex-wrap:wrap;gap:8px}
+.ptr-actions button{min-height:44px;flex:1;border:0;border-radius:8px;background:var(--ptr-accent);
+ color:var(--ptr-accent-text);padding:0 16px;font-family:inherit;font-size:11px;font-weight:900;cursor:pointer}
+.ptr-actions .ptr-cancel{background:var(--ptr-surface);border:1px solid var(--ptr-border);color:var(--ptr-text)}
+.ptr-note{margin:0;color:var(--ptr-muted);font-size:10px;font-weight:700;line-height:1.5}
+.ptr-note b{color:var(--ptr-text)}
+
+/* SHOP TIME, at the top of the screen. Boxed rather than loose so it reads as a
+   stored setting instead of another line of the writeup — it is the one thing
+   here the Defect Log's hours badge reads back. */
+.ptr-hours{display:flex;flex-direction:column;gap:5px;border-bottom:1px solid var(--ptr-border);
+ background:color-mix(in srgb,var(--ptr-accent) 5%,var(--ptr-surface));padding:12px 15px}
+.ptr-hours label{display:flex;align-items:center;justify-content:space-between;gap:10px;
+ color:var(--ptr-muted);font-size:9px;font-weight:900;letter-spacing:.6px}
+.ptr-hours input{width:92px;min-height:44px;border:1px solid var(--ptr-border);border-radius:8px;
+ background:var(--ptr-surface);color:var(--ptr-text);padding:0 10px;font-size:16px;font-weight:900;text-align:center}
+.ptr-hours small{color:var(--ptr-muted);font-size:9px;font-weight:800;line-height:1.45}

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { operationalUpdateAt, stampOperationalChange } from "./helpers/modules.mjs";
+import { effectiveStyle } from "./helpers/css-rules.mjs";
 
 
 test("operational sitting time resets on either a real location or status change", () => {
@@ -352,11 +353,34 @@ test("an hours box can be typed in and emptied, on both surfaces",async()=>{
  assert.match(fieldCode,/inputMode="decimal"/,"but still a numeric keypad on a phone");
  assert.match(field,/onBlur=\{\(\)=>setDraft\(null\)\}/,"the draft is dropped on blur so the stored value takes over");
 
- /* ALL SIX inputs go through it. The decimal fault existed on BOTH surfaces, so
-    fixing the Down Sheet alone would have left the Defect Log turning 1.5 into
-    15. */
+ /* ALL EIGHT inputs go through it — the three assertions below add to eight,
+    and this line said SEVEN against 4+4 because the old SIX was incremented
+    rather than re-counted, which is the habit `fresh-context-review` exists
+    for. The decimal fault existed on BOTH surfaces, so fixing the Down Sheet
+    alone would have left the Defect Log turning 1.5 into 15.
+
+    THREE FILES NOW, not two: the PATH TO REPAIR screen moved out of the Defect
+    Log into `src/components/defects/path-to-repair-panel.tsx` when Fixed
+    Repairs started opening it too, and its SHOP TIME box went with it. The
+    total is the same eight — which is the point of re-counting rather than
+    adjusting a number. */
+ const panel=await readFile(new URL("../src/components/defects/path-to-repair-panel.tsx",import.meta.url),"utf8");
  assert.equal((editor.match(/<HoursField /g)||[]).length,4,"Down Sheet: repair, diagnostic, estimate total, and the buckets");
- assert.equal((log.match(/<HoursField /g)||[]).length,3,"Defect Log: repair, diagnostic, and the shop's time for the repair on the PATH TO REPAIR screen");
+ assert.equal((log.match(/<HoursField /g)||[]).length,3,"Defect Log: repair, diagnostic, and ESTIMATED TIME OF REPAIR");
+ assert.equal((panel.match(/<HoursField /g)||[]).length,1,"the PATH TO REPAIR panel: the shop's own time for the repair, on both screens that open it");
+ /* AND THE SENTENCE IS READ, not restated. A sum of the numbers above is
+    implied by them and can never fail on its own — a cold read pointed out
+    that changing two of the assertions to 5 and 3 keeps it green. What can
+    drift is the WORD in the comment, which is what drifted: SIX was
+    incremented to SEVEN against a real 4+4. So the word is parsed out and
+    compared. */
+ const total=(editor.match(/<HoursField /g)||[]).length+(log.match(/<HoursField /g)||[]).length
+  +(panel.match(/<HoursField /g)||[]).length;
+ const WORDS={SIX:6,SEVEN:7,EIGHT:8,NINE:9,TEN:10,ELEVEN:11,TWELVE:12};
+ const self=await readFile(new URL(import.meta.url),"utf8");
+ const claimed=self.match(/ALL ([A-Z]+) inputs go through it/)[1];
+ assert.ok(claimed in WORDS,"the comment must name a number this test can read, got "+claimed);
+ assert.equal(WORDS[claimed],total,"the comment says "+claimed+" and the source has "+total);
  /* Scoped to HOURS. The Defect Log's quantity box is also type=number and is
     left alone on purpose: it counts quarts, not time, so a trailing decimal
     point is not the thing people type into it. (It has a smaller relative of
@@ -563,7 +587,17 @@ test("the app's name is drawn top-left on every page, from one place", async () 
      one line that reads as a mistake. `text-align:left` on `.app>header` is
      what beats the phone block's `center` on the same selector — same
      specificity, later rule, which only works while this file stays in order. */
-  assert.match(css,/\.app>header\{height:auto;min-height:38px;flex-direction:column;align-items:stretch;padding:11px 12px;text-align:left\}/);
+  {
+   /* Read as declarations rather than pinned as one string: this rule's
+      padding is the Facility Map's half of the one-shape measurement below,
+      and a literal pin fails on the number changing while saying nothing
+      about why the number matters. */
+   const stack=css.match(/\.app>header\{height:auto;min-height:38px;[^}]*\}/)[0];
+   assert.ok(stack.includes("text-align:left"),
+     "text-align:left here is what beats the phone block's `center` on the same selector");
+   assert.ok(/padding:12px[;}]/.test(stack),
+     "12px, the one padding all eight headers use - measured, the title lands at the same x on every page that has no frame");
+  }
   assert.match(css,/\.app>header>h1\{margin:2px 0 1px;font-size:25px;line-height:1\.05;text-align:left\}/,
     "an explicit size, because the phone block drops the header to 11px and the h1 inherited it");
   assert.match(css,/@media\(max-width:760px\)\{\.app>header>h1\{font-size:22px\}\}/,
@@ -989,8 +1023,13 @@ test("a form redrawing around a text field does not drag the picker with it",asy
  /* A memo over an inline arrow is a comparison that can never pass. */
  assert.match(log,/const pickBus=useCallback\(\(busId:string\)=>\{onBusPicked\(busId\);setValue\(current=>\(\{\.\.\.current,busId\}\)\)\},\[onBusPicked\]\)/,
   "the callback is held still, or the memo does nothing but cost a comparison");
- assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\}\/>/,
-  "and the held callback is the one passed");
+ /* Pinned to the three moving props and to STRING LITERALS beside them. The
+    step-by-step helper added `coach="bus"`, which is stable and costs the memo
+    nothing; a prop built inline — an arrow, an object, an array — is a new
+    value every render and would make the memo a comparison that can never
+    pass, so the pattern admits the former and refuses the latter. */
+ assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\}(?: [a-zA-Z]+="[^"]*")*\/>/,
+  "and the held callback is the one passed, with nothing but string literals beside it");
  assert.doesNotMatch(log,/select=\{busId=>\{onBusPicked/,
   "no inline arrow remains on that prop");
 
@@ -1000,4 +1039,64 @@ test("a form redrawing around a text field does not drag the picker with it",asy
       + memo            median 31.0ms  p95 42.6ms  worst 47.5ms  0 over 50ms
     The median barely moves and the TAIL is where it lands, which is the half
     Curtis described: "It's not, you know, smooth and consistent." */
+});
+
+test("the cascade resolver the UI gates lean on answers like a browser", () => {
+ /* WHY THIS FILE HAS A TEST FOR A TEST HELPER.
+
+    `effectiveStyle` is what a dozen layout gates in this project ask instead of
+    reading CSS by eye, and it has twice been the reason a gate passed something
+    it was written to catch. First it was "last exact selector match wins",
+    which is not a cascade at all and let thirteen mutations through. Then,
+    after it became a real cascade, it still split `A>B` and `A B` on the same
+    regex and looked for every compound ANYWHERE up the chain - so a child
+    selector matched a grandchild, and a mutation putting a stale `>` back into
+    the Defect Log's stylesheet passed.
+
+    A gate nobody tests is a gate that passes everything. These are the cases
+    that have actually gone wrong. */
+ const css=[
+  ".bar>.note{color:red}",
+  ".bar>.note{color:blue}",
+  ".bar .note{font-size:9px}",
+  ".wrap .note{font-size:11px}",
+  ".note{font-size:30px;display:block}",
+  "@media(max-width:620px){.bar .note{font-size:7px}}",
+  ".bar .note{letter-spacing:1px}",
+  ".note{letter-spacing:9px!important}",
+  ".left+.note{display:none}",
+ ].join("\n");
+ const direct={tag:"small",classes:["note"],ancestors:[{tag:"div",classes:["bar"]}]};
+ const nested={tag:"small",classes:["note"],ancestors:[{tag:"div",classes:["bar"]},{tag:"div",classes:["wrap"]}]};
+
+ /* A CHILD SELECTOR REACHES A CHILD, and the later of two equal rules wins. */
+ assert.equal(effectiveStyle(css,direct,1180).color,"blue");
+ /* AND NOT A GRANDCHILD - the whole point. `.bar>.note` must not reach a
+    `.note` sitting inside `.wrap` inside `.bar`, which is exactly what moving
+    an element into a wrapper does to it, and exactly what nobody notices. */
+ assert.equal(effectiveStyle(css,nested,1180).color,undefined,
+  "a child rule must not apply through a wrapper");
+ /* A DESCENDANT SELECTOR STILL REACHES BOTH, and specificity then decides:
+    `.wrap .note` and `.bar .note` tie, so source order does. */
+ assert.equal(effectiveStyle(css,nested,1180).fontSizePx,11);
+ assert.equal(effectiveStyle(css,direct,1180).fontSizePx,9);
+ /* `!important` BEATS A HIGHER-SPECIFICITY NORMAL DECLARATION. That is the
+    cascade rather than the specificity order, and it is the half the first
+    version of this resolver did not have at all. */
+ assert.equal(effectiveStyle(css,direct,1180)["letter-spacing"],"9px");
+ /* AN AT-RULE IS EVALUATED AGAINST THE WIDTH ASKED FOR - at equal specificity,
+    because a media query does not add any. */
+ assert.equal(effectiveStyle(css,direct,390).fontSizePx,7);
+ assert.equal(effectiveStyle(css,direct,621).fontSizePx,9);
+ /* A SIBLING SELECTOR IS NOT ANSWERED AT ALL rather than guessed: there are no
+    siblings in this model, so `display:none` from `.left+.note` must not land
+    and the resolver must not pretend it knows. */
+ assert.equal(effectiveStyle(css,direct,1180).display,"block");
+ /* AND THE ANCESTOR CHAIN IS NEAREST LAST, which is how every caller builds
+    it. Reversed, a chain of child selectors would answer about the wrong
+    element, so the order is asserted rather than assumed. */
+ assert.equal(effectiveStyle(".a>.b>.c{color:red}",
+  {tag:"i",classes:["c"],ancestors:[{tag:"div",classes:["a"]},{tag:"div",classes:["b"]}]},1180).color,"red");
+ assert.equal(effectiveStyle(".a>.b>.c{color:red}",
+  {tag:"i",classes:["c"],ancestors:[{tag:"div",classes:["b"]},{tag:"div",classes:["a"]}]},1180).color,undefined);
 });

@@ -2,35 +2,59 @@
 
 import BusSelector from "@/src/components/shared/bus-selector";
 import HoursField from "@/src/components/shared/hours-field";
+import PathToRepairPanel from "@/src/components/defects/path-to-repair-panel";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,readSettings} from "@/src/lib/defects/defect-log-settings";
 import {displayStyleVars} from "@/src/lib/defects/defect-log-display-settings";
+import {CARD_VIEW_KEY,readCardView,type CardView} from "@/src/lib/settings/card-view";
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
 import "./defect-log.css";
-import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isFluidTopUp,FLUID_TOP_UPS,normalizeFluids,recordReportAttempt,reportAttemptCount,normalizeReportAttempts,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "@/src/lib/defects/repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isFluidTopUp,FLUID_TOP_UPS,normalizeFluids,lastReportAttemptAt,reportAttemptCount,normalizeReportAttempts,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MAX_REPAIR_HOURS,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "@/src/lib/defects/repair-catalog";
+import {applyReportReturn,refusalHeadline,refusalMessage,reportButtonState,reportTotal,type ReportReturnResult} from "@/src/lib/defects/report-returns";
 import {RECENT_DUPLICATE_WINDOW_LABEL,defectLogRecords,downSheetEntryLabel,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,unexplainedDownSheetEntries,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord,locationLabel} from "@/src/lib/defects/defect-log-sync";
+import {useHeaderColor} from "@/src/components/shared/header-theme-live";
+/* THE ACCENT HAS ITS OWN INK, computed for the accent. `--log-header-text`
+   was doing both jobs, which was harmless while it came from this page's
+   theme and stopped being harmless when it became the HEADER's computed
+   ink: picking a pale header colour turned PATH TO REPAIR's heading and
+   its buttons, the focus share buttons and the time-window chip black on
+   the accent blue — measured 3.57:1, under AA, on surfaces that are not
+   headers and that the Settings copy says nothing about. An ink is
+   computed for the surface it sits on or it is a guess. */
+import {headerTextFor} from "@/src/lib/settings/header-theme";
+import {pageThemeHeaderPair} from "@/src/lib/settings/page-header-themes";
 import SweepScanner from "./_components/sweep-scanner";
+import HeatScanner from "./_components/heat-scanner";
+import {PAPER_PHOTOS_PARAM,PAPER_SCAN_PARAM} from "@/src/lib/scan/paper-kinds";
+import {paperHandIn,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
+import {heatFiling,type HeatFinding} from "@/src/lib/defects/heat-check-import";
+import {applyHeatFiling} from "@/src/lib/defects/heat-check-apply";
+import {addHeatChecks,dropScanChecks,heatChecksFromFindings,heatCleanupLeftBehind,heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
 import {sweepDefect,type SweepFinding} from "@/src/lib/defects/sweep-scan-import";
 import ScanBatchesPanel from "./_components/scan-batches-panel";
-import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,type ScanBatch,type ScanBatchUndo} from "@/src/lib/defects/scan-batches";
+import {findScanBatch,latestScanBatchUndo,readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,scanBatchWords,scanRestoreLeftOff,type ScanBatch,type ScanBatchUndo} from "@/src/lib/defects/scan-batches";
 import {readMergedAway,writeMergedAway} from "@/src/lib/cloud/cloud-sync";
 import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
 import OfflineBackupReminder from "./_components/offline-backup-reminder";
+import FormCoachBar from "./_components/form-coach-bar";
+import {coachStep} from "@/src/lib/defects/form-coach";
+import {saveRefusal} from "@/src/lib/defects/save-refusal";
+import {readCoachSettings,COACH_SETTINGS_KEY} from "@/src/lib/settings/coach-settings";
 import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,busLoggedMinutes,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,quickFilterFromValue,type QuickFilterKey} from "@/src/lib/defects/quick-filters";
 import {recommendedRows,recommendedRank,busRecommendedMinutes} from "@/src/lib/defects/recommended-counts";
 import {busDeferredMinutes} from "@/src/lib/defects/deferred-counts";
 import {answerRecommendedBus} from "@/src/lib/defects/recommended-actions";
 import {elapsedLong} from "@/src/lib/shared/elapsed-label";
-import {MAX_PATH_TO_REPAIR,findPathToRepair,readPathToRepairs,savePathToRepair,writePathToRepairs,type PathToRepairLibrary} from "@/src/lib/defects/path-to-repair";
-import {findRepairMinutes,readRepairHoursLedger,saveRepairMinutes,writeRepairHoursLedger,type RepairHoursLedger} from "@/src/lib/defects/repair-hours-ledger";
+import {findPathToRepair,readPathToRepairs,type PathToRepairLibrary} from "@/src/lib/defects/path-to-repair";
+import {findRepairMinutes,readRepairHoursLedger,type RepairHoursLedger} from "@/src/lib/defects/repair-hours-ledger";
 import {defectEstimateMinutes,openDefectsEstimateMinutes} from "@/src/lib/defects/defect-estimates";
 import {formatRepairTime} from "@/src/lib/down-sheet/repair-time-estimates";
 import HoldBoard,{HoldBadge} from "@/src/components/fleet/hold-board";
 import {heldBusCount,isHeld,setBusHold} from "@/src/lib/fleet/bus-hold";
 import TimeWindowChips from "@/src/components/shared/time-window-chips";
 import {TIME_WINDOWS,TIME_WINDOWS_WITH_SHIFT,timeWindowLabel,timeWindowMinutes,withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
-import {FEED_WINDOWS,defectWithinFeedWindow,feedWindowLabel,feedWindowMinutes,type FeedWindowKey} from "@/src/lib/defects/feed-window";
+import {FEED_WINDOWS,defectWithinFeedWindow,feedWindowLabel,feedWindowMinutes,feedWindowUnresolved,feedWindowUnresolvedNote,type FeedWindowKey} from "@/src/lib/defects/feed-window";
 import {DEFAULT_SHIFT_SETTINGS,activeShift,readShiftSettings,shiftLabel} from "@/src/lib/settings/shift-clock";
 import {roadCallNote} from "@/src/lib/fleet/road-calls";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
@@ -41,6 +65,10 @@ import {MysteryMoveModal} from "@/src/components/down-sheet/mystery-board";
 import {candidateBusNumbers,resolveBusNumberList} from "@/src/lib/fleet/bus-number-resolver";
 import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from "@/src/lib/defects/quick-filter-share";
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
+import {defectPartsText,normalizeDefectParts,partToLearn,withDefectParts,type DefectPart} from "@/src/lib/defects/defect-parts";
+import PartsUsedList from "@/src/components/defects/parts-used-list";
+import {excludeFromFocusShare,focusShareIsEmpty,focusShareScope,focusShareScopeNote,putBackLastExclusion} from "@/src/lib/defects/focus-share-scope";
+import SwipeAwayRow from "./_components/swipe-away-row";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "@/src/lib/defects/findings-memory";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {busShareFilename,busShareHtml,busShareText,type BusShareDefect} from "@/src/lib/defects/bus-share";
@@ -63,15 +91,14 @@ type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownShee
    restore of the old fleet: the records have to come back stamped as new work,
    and the cloud ledger has to forget them, or the shop cloud keeps them deleted.
    That path lives in restoreBatch and UNDO LAST hands over to it. */
-type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string;scanBatch?:true};
+type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string;scanBatch?:true;heatScan?:string;heatChecks?:string};
 
+/* The route this page is, as the hand-off from SCAN SHEET names it. */
+const PAPER_HERE="/defect-log";
 const BOARD_SETTINGS_KEY="pace-board-settings-v1";
 /* Absent means closed. A new key rather than a settings field, so a device
    that has never opened the stats does not have to write anything to say so. */
 const STATS_OPEN_KEY="pace-defect-log-stats-open-v1";
-/* Whether ADVANCED ACTIONS is open. Its own key: a foreman who keeps it open
-   should not have to reopen it every time he comes back to the page. */
-const ADVANCED_OPEN_KEY="pace-defect-log-advanced-open-v1";
 const STATUS_LABELS:Record<string,string>={service:"In Service",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown"};
 const STATE_LABELS:Record<DefectState,string>={open:"OPEN","in-progress":"IN PROGRESS",deferred:"DEFERRED",completed:"FIXED"};
 
@@ -81,6 +108,10 @@ function readMysterySlot(raw:string|null){try{const value=JSON.parse(raw||"{}").
 function isToday(value:string){return Boolean(value)&&new Date(value).toDateString()===new Date().toDateString()}
 function timeLabel(value:string){const date=new Date(value);return Number.isNaN(date.getTime())?"Previous record":new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(date)}
 function newDraft():LogDraft{const now=new Date().toISOString();return {busId:"",quickIssue:"",onDownSheet:false,defect:{id:"defect-log-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),category:"",issue:"",details:"",operability:"service",state:"open",createdAt:now,updatedAt:now,diagnosticNote:"",actionTaken:"",partNumber:"",reportedBy:"",source:"defect-log"}}}
+/* Long enough to be a deliberate second tap with a glove on, short enough that
+   a button armed by a pocket is not still armed when the phone comes out. */
+const ARM_WINDOW_MS=6000;
+const OUTCOME_WINDOW_MS=6000;
 function recordDraft(record:DefectLogRecord):LogDraft{return {busId:record.bus.id,quickIssue:record.defect.issue==="Manual entry"||record.defect.issue==="Unspecified issue"?"":record.defect.issue,onDownSheet:record.onDownSheet,defect:{...record.defect}}}
 
 
@@ -132,8 +163,15 @@ function PartNumberPrompt({busNumber,suggestion,initial,confirm,close}:{
  </div>;
 }
 
-function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,saveFixed,showExisting,countReturn,close,onBusPicked}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;countReturn:(busId:string,defect:StructuredDefect)=>void;close:()=>void;onBusPicked:(busId:string)=>void}){
+function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,shopHours,save,saveFixed,showExisting,countReturn,close,onBusPicked}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;coachOn:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;shopHours:RepairHoursLedger;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;countReturn:(busId:string,defect:StructuredDefect)=>ReportReturnResult;close:()=>void;onBusPicked:(busId:string)=>void}){
  const [value,setValue]=useState(draft);
+ /* WHAT THE LAST PRESS DID. Both banner buttons used to change nothing a
+    person could see: OPEN IT swapped a draft under a component that ignored
+    it, and + COUNT THIS RETURN moved an italic number inside a yellow box, or
+    silently did nothing at all when the two-minute guard refused it. Curtis:
+    "it doesn't do anything... nothing happens on the screen so I don't know if
+    anything happened." */
+ const [returnNote,setReturnNote]=useState<{id:string;kind:"counted"|"refused";count:number;at:string|null;text:string}|null>(null);
  /* Held so BULLET can put the caret back after it appends — see its onClick. */
  const detailsRef=useRef<HTMLTextAreaElement|null>(null);
  /* defaultOpen is not a DOM prop, so this panel stayed shut even on a record
@@ -150,7 +188,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     for a keystroke in DETAILS. `onBusPicked` comes from the page, which does
     not re-render while the editor is open. */
  const pickBus=useCallback((busId:string)=>{onBusPicked(busId);setValue(current=>({...current,busId}))},[onBusPicked]);
- const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined));
+ const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined||draft.defect.finding));
  useEffect(()=>lockPageScroll("defect-editor-open"),[]);
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
  const repairs=REPAIR_OPTIONS[value.defect.category]||[];
@@ -167,15 +205,27 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     old onChange bodies, moved rather than rewritten — everything they reset
     (symptoms, quantity, unit, operability, the part fields) is reset for the
     same reasons it always was. */
- const chooseCategory=(category:string)=>setValue(current=>({...current,quickIssue:"",rememberScope:undefined,
-  defect:{...current.defect,category,issue:"",symptoms:[],fluids:undefined,quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:""}}));
+ /* AND THEY CLEAR THE PART ON SCREEN AS WELL AS ON THE RECORD. They always
+    cleared the record's part fields - a part number belongs to a REPAIR, and
+    the parts memory is keyed on category+issue, so HX-99 typed for a coolant
+    leak and saved under a door fault would teach the shop the wrong thing. But
+    the form now draws the box and the rows from local state, so clearing only
+    the record left the tick on screen and HX-99 still in the input over a
+    record holding nothing: press SAVE and the part was dropped with nothing
+    saying so. Shown and silently discarded is worse than the stale-part bug
+    this replaced. Both now say the same thing, which is also what the form did
+    before the rows became local state. */
+ const clearPartsOnScreen=()=>{setPartsUsed(false);setPartRows([])};
+ const chooseCategory=(category:string)=>{clearPartsOnScreen();setValue(current=>({...current,quickIssue:"",rememberScope:undefined,
+  defect:{...current.defect,category,issue:"",symptoms:[],fluids:undefined,quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:"",parts:undefined}}))};
 
  const chooseIssue=(issue:string,switchTo:string)=>{
+  clearPartsOnScreen();
   const category=switchTo||value.defect.category;
   const picked=defectCountField(category,issue);
   const oilIssue=isFluidTopUp(category,issue);
   setValue(current=>({...current,quickIssue:issue,rememberScope:undefined,
-   defect:{...current.defect,category,issue,partsUsed:false,partNumber:"",partName:"",
+   defect:{...current.defect,category,issue,partsUsed:false,partNumber:"",partName:"",parts:undefined,
     symptoms:isCheckEngineIssue(category,issue)?current.defect.symptoms||[]:[],
     /* Switching between the three top-ups keeps what is still true: pick oil
        with glycol ticked, change your mind and pick glycol, and the tick that
@@ -194,25 +244,87 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
   CATALOG_OPTIONS.find(row=>row.value===issue&&(!category||row.category===category))?.label
   ||CATALOG_OPTIONS.find(row=>row.value===issue)?.label
   ||issue;
- /* A record saved before Stage 6 has a part number but no flag, so treat an
-    existing number as parts used rather than hiding it behind an empty box. */
- const partsUsed=value.defect.partsUsed??Boolean(String(value.defect.partNumber||"").trim());
+ /* PARTS USED IS THE CHECKBOX'S OWN STATE, not a reading of the record, and
+    that is a fix. It was `value.defect.partsUsed??Boolean(partNumber)` - which
+    is right for a record arriving from storage and wrong for a form being
+    typed into, because `defectPartFields` reports `partsUsed:false` the moment
+    every row is blank. So pressing ADD ANOTHER PART on an empty row, or
+    clearing the only number, unticked the box and unmounted the whole section
+    mid-edit: measured by a reviewer at -256px of content shift on a phone and
+    -234px on the shop computer, with focus dropped to the body.
+
+    ONLY THE CHECKBOX MEANS "no parts were used". A blank row means somebody is
+    typing. What gets STORED still comes from the rows, so a blank list saves
+    as `partsUsed:false` - the record stays honest while the form stays still.
+
+    Seeded from the record, including the pre-Stage-6 shape that has a part
+    number and no flag. */
+ const [partsUsed,setPartsUsed]=useState(()=>value.defect.partsUsed??Boolean(String(value.defect.partNumber||"").trim()));
+ /* THE ROWS BEING TYPED INTO, held here rather than derived from the record on
+    every render. `defectPartFields` drops a row with nothing in it - which is
+    right for what gets STORED - so a derived list would make ADD ANOTHER PART
+    appear to do nothing at all. The editor is keyed per defect, so opening
+    another bus starts from that record's own parts. */
+ const [partRows,setPartRows]=useState<DefectPart[]>(()=>normalizeDefectParts(value.defect.parts,value.defect));
+ /* THE CHECKBOX GOES THROUGH THE ASSEMBLER, as its third argument, rather than
+    being patched on after. Without it a ticked box with the number not typed
+    yet stored `partsUsed:false` - so a repair saved in that state lost MISSING
+    PART # off its Fixed Repairs card, which is the one thing that state exists
+    to say. A blank row means somebody is mid-sentence; only the checkbox means
+    no parts were used. */
+ const setParts=(next:DefectPart[])=>{
+  setPartRows(next);
+  setValue(current=>({...current,defect:withDefectParts(current.defect,next,partsUsed)}));
+ };
  const remembered=recallPart(partsMemory,value.defect.category,value.defect.issue);
  /* Checking the box offers the remembered part; it never fills anything in
     while a defect is merely being logged, and never overwrites typing. */
- const togglePartsUsed=(checked:boolean)=>setValue(current=>{
-  if(!checked)return {...current,defect:{...current.defect,partsUsed:false,partNumber:"",partName:""}};
-  const suggestion=recallPart(partsMemory,current.defect.category,current.defect.issue);
-  const hasNumber=Boolean(String(current.defect.partNumber||"").trim());
-  return {...current,rememberScope:current.rememberScope||"issue",defect:{...current.defect,partsUsed:true,
-   partNumber:hasNumber||!suggestion?current.defect.partNumber||"":suggestion.partNumber,
-   partName:hasNumber||!suggestion?current.defect.partName||"":suggestion.partName||""}};
- });
+ const togglePartsUsed=(checked:boolean)=>{
+  setPartsUsed(checked);
+  if(!checked){
+   /* Unticking is the one gesture that means "no parts were used", so it
+      clears the whole list rather than leaving a row behind. */
+   setPartRows([]);
+   setValue(current=>({...current,defect:withDefectParts(current.defect,[],false)}));
+   return;
+  }
+  const suggestion=recallPart(partsMemory,value.defect.category,value.defect.issue);
+  /* THE SUGGESTION SEEDS THE FIRST ROW AND ONLY AN EMPTY ONE, which is the
+     behaviour this had with one pair of boxes: it never overwrites typing. */
+  const current=normalizeDefectParts(value.defect.parts,value.defect);
+  const first=current[0];
+  const seeded=suggestion&&(!first||!String(first.partNumber||"").trim())
+   ?[{id:first?first.id:"part-0",partNumber:suggestion.partNumber,...(suggestion.partName?{partName:suggestion.partName}:{})},...current.slice(1)]
+   :current;
+  const rows=seeded.length?seeded:[{id:"part-0",partNumber:""}];
+  setPartRows(rows);
+  setValue(cur=>({...cur,rememberScope:cur.rememberScope||"issue",defect:withDefectParts(cur.defect,rows,true)}));
+ };
  const diagnosticDefect=isDiagnosticDefect(value.defect.category,value.quickIssue||value.defect.issue);
- /* Scoped to the exact symptom on the form right now, so changing the picker
-    changes what is offered and a cause never leaks to a defect it was not
-    found under. */
  const learnedFindings=recallFindings(findingsMemory,value.defect.category,value.quickIssue||value.defect.issue);
+ /* WHAT THE ESTIMATE BOX IS ABOUT TO OVERRIDE, quoted inside the box.
+
+    An estimate is the top of a four-rung ladder — this number, then the hours
+    already billed on this job, then the shop's own ledger, then the catalog —
+    and a field that hides the rung beneath it invites somebody to retype a
+    figure the app already had, or to leave it blank believing nothing has been
+    estimated at all. The PATH TO REPAIR panel shows its own fallback the same
+    way and for the same reason.
+
+    IT IS EXACTLY WHAT CLEARING THE BOX WOULD YIELD, which took a correction:
+    the billed hours were stripped out as well, on the reasoning that time
+    worked is not an estimate. True, and beside the point — the sentence under
+    the box says what happens if you clear it, and on a part-billed open job
+    what happens is rung 2 answers. Measured: with 4 billed hours and a 5h
+    ledger it promised 5h and delivered 4h. So only the estimate comes out,
+    and the source is NAMED rather than assumed to be the catalog. */
+ const estimateIssue=value.quickIssue||value.defect.issue;
+ const shopEstimate=findRepairMinutes(shopHours,value.defect.category,estimateIssue);
+ const billedHours=(value.defect.repairHours||0)+(value.defect.diagnosticHours||0);
+ const estimateFallback=defectEstimateMinutes({...value.defect,issue:estimateIssue,estimateHours:undefined},shopHours);
+ const estimateFallbackSource=billedHours>0?"the hours already billed on this job"
+  :shopEstimate?"the shop's own time for this repair"
+  :"the catalog, which has never stood in this garage";
  /* Ticking a state stamps who and when. The name comes from whatever is typed
     into FIXED BY or the device default, so the common case takes one tap; where
     initials are required and none are set, the tick is refused rather than
@@ -341,12 +453,48 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
  const toggleCheckEngineSymptom=(symptom:string)=>updateDefect("symptoms",selectedSymptoms.includes(symptom)?selectedSymptoms.filter(item=>item!==symptom):[...selectedSymptoms,symptom]);
  const selectedBus=fleet.find(bus=>bus.id===value.busId),saveLabel=draft.defect.createdAt===draft.defect.updatedAt?"SAVE DEFECT":"SAVE UPDATE";
  const recentDuplicate=selectedBus&&value.quickIssue?recentDefectDuplicate(selectedBus,value.defect):null;
+ /* Tied to the defect it is about. Without this, counting a return on defect A
+    and then changing the repair to one that duplicates defect B left B's
+    banner carrying A's number. */
+ const returnNoteFor=returnNote&&recentDuplicate&&returnNote.id===recentDuplicate.id?returnNote:null;
+ /* HIDDEN FOR THIS EDITOR, not turned off. The × on the bar stops it pointing
+    at this one defect; Settings is the durable switch, and the editor is keyed
+    per defect so reopening one gets the helper back. A person who wants it
+    gone for good has one obvious place to go and one that undoes itself. */
+ const [coachHidden,setCoachHidden]=useState(false);
+ /* The step is a question about a half-filled record, so it is answered in
+    `src/lib/defects/form-coach.ts` rather than here — a rule computed inside a
+    page.tsx has to be written a second time in the MCP route to be answerable.
+    The live issue is `quickIssue`; `defect.issue` is not filled until a save. */
+ const coach=coachOn&&!coachHidden?coachStep(
+  {busId:value.busId,category:value.defect.category,issue:value.quickIssue,count:value.defect.quantity,state:value.defect.state,existing:draft.defect.createdAt!==draft.defect.updatedAt},
+  {requireInitials,completedBy:value.defect.completedBy||defaultInitials,
+   savingAsFixed:false,
+   duplicateAt:recentDuplicate?(recentDuplicate.createdAt||recentDuplicate.updatedAt||"logged"):"",
+   duplicateWhen:recentDuplicate?timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||""):"",
+   duplicateWindow:RECENT_DUPLICATE_WINDOW_LABEL})
+  :null;
+ /* And it expires, the way the card's does. Without this, counting a return,
+    clearing the repair field and retyping the same one brought the old
+    "COUNTED · REPORTED ×3" back, still carrying the number read at press
+    time — a stale count presented as current. */
+ useEffect(()=>{if(!returnNote)return;const timer=window.setTimeout(()=>setReturnNote(null),OUTCOME_WINDOW_MS);return()=>window.clearTimeout(timer)},[returnNote]);
  /* Takes an optional patch because the part prompt decides what to store at the
     moment it is confirmed. Setting that on state and then calling this would
     save the defect as it was one render ago — React has not applied the update
     yet — so the part number would be dropped on the very save that asked for
     it. Passing it through means what is validated is what is written. */
- const validateAndSave=(complete:boolean,patch:Partial<StructuredDefect>={})=>{const defect={...value.defect,...patch};const completed=complete||defect.state==="completed";const initials=(defect.reportedBy||defaultInitials).trim().toUpperCase(),completedBy=(defect.completedBy||defaultInitials).trim().toUpperCase(),details=defect.details.trim(),issue=value.quickIssue||defect.issue,count=defect.quantity;if(!selectedBus){alert("Select a bus number.");return}if(!defect.category){alert("Select a repair category.");return}if(countField?.required&&(!count||count<1||count>countField.max)){alert("Select "+countField.label.toLowerCase()+" (1 through "+countField.max+").");return}if(completed&&requireInitials&&!completedBy){alert("Put your initials or name in FIXED BY before saving this as fixed. This is required by the Defect Log setting; turn it off there to make it optional again.");return}if(recentDuplicate){alert("This same defect was already logged "+timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||"")+". Use the existing defect instead. A new report can be logged after "+RECENT_DUPLICATE_WINDOW_LABEL+".");return}const now=new Date().toISOString(),finalIssue=issue&&issue!=="Manual entry"?issue:details?"Manual entry":"Unspecified issue",finalDraft:LogDraft={...value,onDownSheet:completed?false:value.onDownSheet,defect:{...defect,issue:finalIssue,details,reportedBy:initials,completedBy:completed?completedBy:defect.completedBy,state:completed?"completed":defect.state,completedAt:completed?(defect.completedAt||now):"",deferredAt:completed?undefined:defect.deferredAt,deferredUntil:completed?undefined:defect.deferredUntil,deferredReturnedAt:completed?undefined:defect.deferredReturnedAt}};(completed?saveFixed:save)(finalDraft)};
+ /* THE PARTS GO IN AS PARTS, NOT AS A PATCH, and that is a fix a cold read
+    found. The part prompt used to hand the whole assembled record in as
+    `patch`, and `{...value.defect,...patch}` CANNOT CARRY A DELETION: the
+    assembler `delete`s `parts`, so the key is absent from the patch and the
+    stored array comes straight back through the first spread. On a repair
+    already holding `parts:[AA-1,BB-2]`, ENTER LATER left the array untouched
+    while the mirrored pair said BB-2 - the exact disagreement the prompt's own
+    comment claims to have fixed. The same `{...existing,...incoming}` trap
+    `saveDefectLogRecord` keeps an explicit field list for.
+    So the assembler runs LAST, here, where nothing can spread over it. */
+ const validateAndSave=(complete:boolean,patch:Partial<StructuredDefect>={},parts?:{rows:DefectPart[];used:boolean})=>{const patched={...value.defect,...patch};const defect=parts?withDefectParts(patched,parts.rows,parts.used):patched;const completed=complete||defect.state==="completed";const initials=(defect.reportedBy||defaultInitials).trim().toUpperCase(),completedBy=(defect.completedBy||defaultInitials).trim().toUpperCase(),details=defect.details.trim(),issue=value.quickIssue||defect.issue,count=defect.quantity;/* ONE RULE, AND THE STEP-BY-STEP HELPER ASKS IT THE SAME QUESTION. This was five inline clauses here and a hand-written copy of the same list in form-coach.ts, and the two had already disagreed about two of them - see src/lib/defects/save-refusal.ts. The messages and their order are unchanged. */const refusal=saveRefusal({busId:value.busId,category:defect.category,issue,count,state:defect.state},{savingAsFixed:completed,requireInitials,completedBy,duplicateAt:recentDuplicate?(recentDuplicate.createdAt||recentDuplicate.updatedAt||"logged"):"",duplicateWhen:recentDuplicate?timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||""):"",duplicateWindow:RECENT_DUPLICATE_WINDOW_LABEL});if(refusal){alert(refusal.message);return}const now=new Date().toISOString(),finalIssue=issue&&issue!=="Manual entry"?issue:details?"Manual entry":"Unspecified issue",finalDraft:LogDraft={...value,onDownSheet:completed?false:value.onDownSheet,defect:{...defect,issue:finalIssue,details,reportedBy:initials,completedBy:completed?completedBy:defect.completedBy,state:completed?"completed":defect.state,completedAt:completed?(defect.completedAt||now):"",deferredAt:completed?undefined:defect.deferredAt,deferredUntil:completed?undefined:defect.deferredUntil,deferredReturnedAt:completed?undefined:defect.deferredReturnedAt}};(completed?saveFixed:save)(finalDraft)};
  const submit=(event:React.FormEvent)=>{event.preventDefault();validateAndSave(false)};
  return <div className="log-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}>
   {partPrompt&&<PartNumberPrompt
@@ -354,16 +502,17 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
    suggestion={remembered?.partNumber||""}
    initial={value.defect.partNumber||""}
    close={()=>setPartPrompt(false)}
-   confirm={number=>{setPartPrompt(false);validateAndSave(true,{partsUsed:true,partNumber:number});}}/>}
+   confirm={number=>{setPartPrompt(false);/* ALWAYS `partsUsed:true`, WHICH IS WHAT ENTER LATER PROMISES. The prompt says in as many words that the repair "is marked MISSING PART # on the Fixed Repairs page until the number is added", and ENTER LATER arrives here with an empty number - which the assembler read as "no parts were used", so the repair saved completed with no flag at all and the promise on screen was false. The third argument is the checkbox's answer and ENTER LATER is somebody saying a part WAS used. THROUGH THE ASSEMBLER. This patched `{partsUsed:true,partNumber}` straight onto the record, so on a repair that already held a `parts` array the mirrored pair said one thing and the array another - and the number typed here was never learned, because the save reads the array. It becomes the FIRST row now, which is the one the memory takes. */const rows=normalizeDefectParts(value.defect.parts,value.defect);const first=rows[0];/* ENTER LATER MUST NOT ERASE A NUMBER ALREADY TYPED. It arrives here with an EMPTY number, and writing that over the first row wiped a part the mechanic had entered on the form a moment earlier - the prompt even opens prefilled with it. "I will enter it later" is a statement about a number that is NOT there; with one on the record it is a press of the wrong button, and losing the number is the expensive reading. Only a number given here replaces the row. */const next=number?[{id:first?first.id:"part-0",partNumber:number,...(first?.partName?{partName:first.partName}:{})},...rows.slice(1)]:rows;validateAndSave(true,{},{rows:next,used:true});}}/>}
   <form className="log-editor" onSubmit={submit}>
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
+   {coach&&<FormCoachBar step={coach} hide={()=>setCoachHidden(true)}/>}
    <div className="log-form">
-    <BusSelector fleet={fleet} busId={value.busId} select={pickBus}/>
+    <BusSelector fleet={fleet} busId={value.busId} select={pickBus} coach="bus"/>
     {/* TWO FIELDS, NOT FOUR. Curtis asked for a search beside each picker and
         named the risk in the same breath — "just try to make it look clean".
         One control per picker does both jobs: tap it and the whole list opens
         the way the <select> did, type in it and the same list narrows. */}
-    <ComboField label="DEFECT CATEGORY" className="wide"
+    <ComboField label="DEFECT CATEGORY" className="wide" coach="category"
      value={value.defect.category}
      display={value.defect.category?repairCategoryLabel(value.defect.category):""}
      placeholder="Type or tap to choose a category"
@@ -375,7 +524,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         you anything, so a mechanic had to know a wiper motor lives under Bus
         Accessories before he could log one. Now he types "wiper motor", picks
         it, and the category fills itself in behind him. */}
-    <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide"
+    <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide" coach="issue"
      value={value.quickIssue}
      display={value.quickIssue?issueDisplay(value.quickIssue,value.defect.category):""}
      placeholder={value.defect.category?"Type or tap — or leave it and save the category alone":"Type what is wrong, or tap to browse"}
@@ -452,11 +601,12 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         every re-render, and every second look at the form. A number nobody can
         trust is worse than no number, and this one is meant to be evidence that
         a repair is not working. One press, one return. */}
-    {recentDuplicate&&<p className="duplicate-defect-warning" role="alert">
+    {recentDuplicate&&<p className="duplicate-defect-warning" role="alert" data-coach="duplicate">
      <span><b>ALREADY LOGGED</b> {timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||"")} · Use the existing defect. A new report is allowed after {RECENT_DUPLICATE_WINDOW_LABEL}.
       {reportAttemptCount(recentDuplicate)>0&&<i className="duplicate-return-tally"> CAME BACK {reportAttemptCount(recentDuplicate)}× SINCE</i>}</span>
      <button type="button" className="open-existing-defect" onClick={()=>showExisting(value.busId,recentDuplicate)}>OPEN IT</button>
-     <button type="button" className="count-return" onClick={()=>countReturn(value.busId,recentDuplicate)} title="Records that this bus came back with the same complaint, with today's date, on the defect that is already open">+ COUNT THIS RETURN</button>
+     <button type="button" className="count-return" onClick={()=>{const result=countReturn(value.busId,recentDuplicate);setReturnNote({id:recentDuplicate.id,kind:result.counted?"counted":"refused",count:result.returns,at:result.at,text:result.counted?"":refusalMessage(result.reason||"too-soon")})}} title="Records that this bus came back with the same complaint, with today's date, on the defect that is already open">+ COUNT THIS RETURN</button>
+     {returnNoteFor&&<b className={"duplicate-return-note"+(returnNoteFor.kind==="counted"?" counted":" refused")}>{returnNoteFor.kind==="counted"?"COUNTED \u00b7 REPORTED \u00d7"+(returnNoteFor.count+1)+(returnNoteFor.at?", latest "+timeLabel(returnNoteFor.at):""):returnNoteFor.text}</b>}
     </p>}
     {checkEngineMode&&<fieldset className="wide engine-symptom-picker"><legend>CHECK ENGINE SYMPTOMS — SELECT ALL THAT APPLY</legend><div>{CHECK_ENGINE_SYMPTOMS.map(symptom=><label className={selectedSymptoms.includes(symptom)?"selected":""} key={symptom}><input type="checkbox" checked={selectedSymptoms.includes(symptom)} onChange={()=>toggleCheckEngineSymptom(symptom)}/><span>{symptom}</span></label>)}</div><small>{selectedSymptoms.length?selectedSymptoms.length+" symptom"+(selectedSymptoms.length===1?"":"s")+" selected":"Choose one or more symptoms if known."} All selections save as one defect record.</small></fieldset>}
     {diagLightMode&&<fieldset className="wide diag-light-picker"><legend>HVAC DIAG LIGHT (OPTIONAL)</legend><div className="diag-light-choices">{DIAG_LIGHTS.map(light=><label className={"diag-light-"+light+(diagLight===light?" selected":"")} key={light}><input type="checkbox" checked={diagLight===light} onChange={()=>setDiagLight(light)}/><span>{DIAG_LIGHT_LABELS[light]}</span></label>)}<label className="diag-alarm-code">ALARM #<input inputMode="numeric" maxLength={2} placeholder="00" value={value.defect.alarmCode||""} onChange={event=>updateDefect("alarmCode",event.target.value.replace(/\D/g,"").slice(0,2))}/></label></div><small className={typedAlarmDigits.length===1?"diag-alarm-warning":undefined}>{
@@ -489,14 +639,14 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         and the shop counts oil, not glycol. */
      extraFluids.length?"QUANTITY — "+pickedFluid.toUpperCase():"QUANTITY"
     }<input type="number" min="0.5" step="0.5" inputMode="decimal" value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}/></label><label>UNIT<select value={value.defect.unit||"quarts"} onChange={event=>updateDefect("unit",event.target.value)}><option value="quarts">Quarts</option><option value="gallons">Gallons</option><option value="liters">Liters</option></select></label></>}
-    {countField&&<label className="defect-count-field">{countField.label}<select value={value.defect.quantity||""} onChange={event=>setValue(current=>({...current,defect:{...current.defect,quantity:event.target.value?Number(event.target.value):undefined,unit:countField.unit}}))}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={count} key={count}>{count}</option>)}</select></label>}
+    {countField&&<label className="defect-count-field" data-coach="count">{countField.label}<select value={value.defect.quantity||""} onChange={event=>setValue(current=>({...current,defect:{...current.defect,quantity:event.target.value?Number(event.target.value):undefined,unit:countField.unit}}))}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={count} key={count}>{count}</option>)}</select></label>}
     {/* BULLET starts a new line with a dot on it, which is the whole feature:
         the breaks somebody types are kept now, so a dot at the start of a line
         IS a bullet and nothing has to parse anything. It appends rather than
         inserting at the cursor on purpose — dictating into a phone leaves the
         caret wherever the recogniser last put it, and a bullet landing in the
         middle of a sentence is worse than one landing at the end. */}
-    <label className="wide description-label"><span className="description-head">DESCRIPTION<button type="button" className="insert-bullet" aria-label="Start a new bulleted line in the description" onClick={()=>{
+    <label className="wide description-label"><span className="description-head">ADDITIONAL DETAILS<button type="button" className="insert-bullet" aria-label="Start a new bulleted line in the additional details" onClick={()=>{
      const current=value.defect.details,needsBreak=Boolean(current.trim())&&!current.endsWith("\n");
      updateDefect("details",current+(needsBreak?"\n":"")+"• ");
      /* THE CARET HAS TO FOLLOW THE BULLET. Pressing the button blurs the box
@@ -513,7 +663,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         the bus, and burying them behind a disclosure is how they would go
         unused. Placed further down the form it opened below the fold on a
         phone, which is the same way the campaign paste box got missed. */}
-    <fieldset className="wide work-state-picker"><legend>WORK DONE SO FAR — OPTIONAL</legend>
+    <fieldset className="wide work-state-picker"><legend>PRELIMS — OPTIONAL</legend>
      <div>{WORK_STATES.map(state=>{
       const stamp=value.defect.workStates?.[state.key],on=Boolean(stamp),who=workStateStampLabel(stamp);
       return <label className={on?"selected":""} key={state.key}>
@@ -538,13 +688,71 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
           rather than left for somebody to notice later on the board. */}
       <small>{brakeTestFailed(value.defect)?"Recorded as failed — BUS AVAILABILITY was set to Remove From Service. Change it below only if that is wrong.":brakeTestResult(value.defect)==="pass"?(value.defect.operability==="down"?"Recorded as passed. This bus is still set to Remove From Service — change BUS AVAILABILITY below to put it back in service.":"Recorded as passed. Availability is left as it is."):"Record whether it passed or failed. Anything more goes in the notes."}</small>
      </div>}
-     <label className="work-state-finding">WHAT WAS FOUND (OPTIONAL)
+    </fieldset>
+    {/* ESTIMATED TIME OF REPAIR, in the slot WHAT WAS FOUND used to hold.
+
+        Curtis: "where it says optional what was found replace this with
+        estimated time of repair ... We have description above, so it kind of
+        redundant." Two free-text boxes were asking nearly the same question on
+        the same screen, while how long the job runs was nowhere on this form at
+        all — and that figure is the one every other surface was guessing at.
+
+        OUTSIDE the PRELIMS fieldset rather than inside it, which is
+        where the finding sat. An estimate is not work done, and a legend saying
+        it is would be wrong about the one field under it that looks forward. It
+        is the same place on the screen: directly above WORK STATUS and outside
+        ADVANCED DETAILS, because this is typed by somebody standing at the bus
+        and anything behind a disclosure here goes unused. */}
+    <label className="wide repair-estimate-field">ESTIMATED TIME OF REPAIR — HOURS
+     <HoursField value={value.defect.estimateHours} max={MAX_REPAIR_HOURS} placeholder={String(Math.round(estimateFallback/60*100)/100)} ariaLabel="Estimated time of repair, in hours" onChange={hours=>updateDefect("estimateHours",normalizeRepairHours(hours===undefined?"":String(hours)))}/>
+     <small>{value.defect.estimateHours!==undefined
+      /* The badge counts OUTSTANDING work, so a completed repair contributes
+         nothing to it and must not be told it does. */
+      ?"Estimating "+formatRepairTime(Math.round(value.defect.estimateHours*60))+" for this bus"+(value.defect.state==="completed"?"":", which is what the hours badge on the feed reads")+". Clear the box to go back to "+formatRepairTime(estimateFallback)+" from "+estimateFallbackSource+"."
+      :"Estimating "+formatRepairTime(estimateFallback)+" from "+estimateFallbackSource+". Type what this one will really take."}</small>
+    </label>
+    <label>WORK STATUS<select value={deferred?"open":value.defect.state} disabled={deferred} onChange={event=>updateDefect("state",event.target.value as DefectState)}><option value="open">Open</option><option value="in-progress">In Progress</option><option value="completed">Fixed</option></select>{deferred&&<small>Set to DEFERRED below. Uncheck it there to pick a work status.</small>}</label>
+    <label>BUS AVAILABILITY<select value={value.defect.operability} onChange={event=>updateDefect("operability",event.target.value as DefectOperability)}><option value="service">May Stay In Service</option><option value="down">Remove From Service</option></select></label>
+    <div className="save-log-middle-actions" aria-label="Defect form actions">
+     <button type="submit" className="save-log-middle" disabled={Boolean(recentDuplicate)}>{saveLabel}</button>
+     <button type="button" className="save-fixed-middle" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button>
+     <button type="button" className="save-fixed-part-middle" disabled={Boolean(recentDuplicate)} onClick={()=>setPartPrompt(true)}>SAVE FIXED W/ PART</button>
+     <button type="button" className="close-log-middle" onClick={close}>CLOSE</button>
+    </div>
+    {!hiddenInLite(editorMode,"diagnosisFields")&&<details className="advanced-defect-details" open={advancedOpen} onToggle={event=>setAdvancedOpen(event.currentTarget.open)}><summary><span><b>ADVANCED DETAILS</b><small>Diagnosis, repair, parts and initials</small></span><em>{advancedOpen?"COLLAPSE":"TAP TO EXPAND"}</em></summary><div className="advanced-defect-grid">
+    <label>DIAGNOSIS / TEST / VERIFICATION<textarea value={value.defect.diagnosticNote||""} onChange={event=>updateDefect("diagnosticNote",event.target.value)} placeholder="Tests, codes, findings, or verification"/></label>
+    <label>FIX / STEPS TAKEN<textarea value={value.defect.actionTaken||""} onChange={event=>updateDefect("actionTaken",event.target.value)} placeholder="Repair, adjustment, replacement, or temporary action"/></label>
+    {/* WHAT WAS FOUND, with the chips that fill it, as ONE full-width cell.
+
+        Curtis took it off the main form — "We have " description above, so it
+        kind of redundant" — and ESTIMATED TIME OF REPAIR has that slot now.
+        Removing it from the page altogether is what the first version of this
+        change did, and a cold read measured the cost: the Down Sheet's own
+        finding box lives inside `{item.done && …}` and Fixed Repairs lists
+        completed repairs only, so on an OPEN defect there was nowhere left in
+        the app to type a cause, read one already stored, or clear it. The
+        DIAGNOSED work state is still on the form above with nothing to say
+        what was diagnosed.
+
+        WIDE, AND BELOW BOTH TEXTAREAS, which a second cold read measured. The
+        grid is two columns at 761px and up, and a bare label plus a bare chip
+        row took one cell each: the box landed in column 2 beside DIAGNOSIS and
+        its chips in column 1 of the next row, directly under a textarea they
+        have nothing to do with and a column away from the field they fill.
+        Fixed Repairs and the Down Sheet editor both mark that row `wide`; this
+        copy did not. One cell holding both cannot come apart that way, and
+        placing it after FIX rather than between the two textareas is what
+        keeps those two paired instead of leaving a hole beside DIAGNOSIS. */}
+    <div className="wide advanced-finding-block">
+     <label className="advanced-finding">WHAT WAS FOUND (OPTIONAL)
       <input maxLength={180} value={value.defect.finding||""} onChange={event=>updateDefect("finding",event.target.value)} placeholder="Throttle pedal reference circuit"/>
      </label>
-     {/* Causes found under this exact symptom before, offered here and nowhere
-         else. Tapping one fills the box; typing something new is always
-         allowed. Offering them is what stops the same fault being written five
-         ways, which is the whole reason a year of history is readable. */}
+     {/* Causes found under this exact symptom before. Scoped to the symptom on
+         the form right now, so changing the picker changes what is offered and
+         a cause never leaks to a defect it was not found under. Tapping one
+         fills the box; typing something new is always allowed. Offering them is
+         what stops the same fault being written five ways, which is the whole
+         reason a year of history is readable. */}
      {learnedFindings.length>0&&<div className="learned-findings" aria-label="Causes found before on this defect">
       <small>FOUND BEFORE ON {(repairIssueDisplayLabel(value.quickIssue||value.defect.issue)||"THIS DEFECT").toUpperCase()}</small>
       <div>{learnedFindings.map(entry=>{
@@ -557,29 +765,16 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
        </span>;
       })}</div>
      </div>}
-     <small>A finding is the cause, in your own words, when it is nothing the list could have offered. It shows on this repair everywhere it appears, including the Down Sheet, so the next person reads what was found and not just what was reported.</small>
-    </fieldset>
-    <label>WORK STATUS<select value={deferred?"open":value.defect.state} disabled={deferred} onChange={event=>updateDefect("state",event.target.value as DefectState)}><option value="open">Open</option><option value="in-progress">In Progress</option><option value="completed">Fixed</option></select>{deferred&&<small>Set to DEFERRED below. Uncheck it there to pick a work status.</small>}</label>
-    <label>BUS AVAILABILITY<select value={value.defect.operability} onChange={event=>updateDefect("operability",event.target.value as DefectOperability)}><option value="service">May Stay In Service</option><option value="down">Remove From Service</option></select></label>
-    <div className="save-log-middle-actions" aria-label="Defect form actions">
-     <button type="submit" className="save-log-middle" disabled={Boolean(recentDuplicate)}>{saveLabel}</button>
-     <button type="button" className="save-fixed-middle" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button>
-     <button type="button" className="save-fixed-part-middle" disabled={Boolean(recentDuplicate)} onClick={()=>setPartPrompt(true)}>SAVE FIXED W/ PART</button>
-     <button type="button" className="close-log-middle" onClick={close}>CLOSE</button>
     </div>
-    {!hiddenInLite(editorMode,"diagnosisFields")&&<details className="advanced-defect-details" open={advancedOpen} onToggle={event=>setAdvancedOpen(event.currentTarget.open)}><summary><span><b>ADVANCED DETAILS</b><small>Diagnosis, repair, parts and initials</small></span><em>{advancedOpen?"COLLAPSE":"TAP TO EXPAND"}</em></summary><div className="advanced-defect-grid">
-    <label>DIAGNOSIS / TEST / VERIFICATION<textarea value={value.defect.diagnosticNote||""} onChange={event=>updateDefect("diagnosticNote",event.target.value)} placeholder="Tests, codes, findings, or verification"/></label>
-    <label>FIX / STEPS TAKEN<textarea value={value.defect.actionTaken||""} onChange={event=>updateDefect("actionTaken",event.target.value)} placeholder="Repair, adjustment, replacement, or temporary action"/></label>
     <div className="parts-used-block">
      <label className="parts-used-toggle"><input type="checkbox" checked={partsUsed} onChange={event=>togglePartsUsed(event.target.checked)}/><span><b>PARTS USED</b><small>Record the part that fixed this defect. Leave it off if none were used.</small></span></label>
      {partsUsed&&<div className="parts-used-fields">
-      <label>PART NUMBER<input value={value.defect.partNumber||""} onChange={event=>updateDefect("partNumber",event.target.value)} placeholder="Leave blank if the number is unknown"/></label>
-      <label>PART NAME (OPTIONAL)<input value={value.defect.partName||""} onChange={event=>updateDefect("partName",event.target.value)} placeholder="Exact catalog name"/></label>
+      <PartsUsedList parts={partRows} onChange={setParts}/>
       <label className="parts-remember-scope"><input type="checkbox" checked={value.rememberScope==="category"} onChange={event=>setValue(current=>({...current,rememberScope:event.target.checked?"category":"issue"}))}/><span><b>REMEMBER FOR EVERY {repairCategoryLabel(value.defect.category||"this category").toUpperCase()} DEFECT</b><small>Off remembers the part for this exact defect only.</small></span></label>
       {remembered&&<p className="parts-remembered"><span><b>REMEMBERED</b>{remembered.partNumber}{remembered.partName?" — "+remembered.partName:""}<small>{remembered.scope==="category"?"Saved for the whole category":"Saved for this exact defect"} · used {remembered.uses}×</small></span><button type="button" onClick={()=>forgetLearned(remembered)}>FORGET</button></p>}
      </div>}
     </div>
-    <label>FIXED BY{requireInitials?" — REQUIRED":" (OPTIONAL)"}<input maxLength={12} autoCapitalize="characters" value={value.defect.completedBy||defaultInitials} onChange={event=>updateDefect("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
+    <label data-coach="initials">FIXED BY{requireInitials?" — REQUIRED":" (OPTIONAL)"}<input maxLength={12} autoCapitalize="characters" value={value.defect.completedBy||defaultInitials} onChange={event=>updateDefect("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
     <label>REPORTED BY (OPTIONAL)<input maxLength={12} autoCapitalize="characters" value={value.defect.reportedBy||defaultInitials} onChange={event=>updateDefect("reportedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
     <fieldset className={"wide billable-time"+(diagnosticDefect?" diagnostic":"")}><legend>BILLABLE TIME — OPTIONAL</legend>
      <div>
@@ -622,7 +817,14 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         it read like a field somebody had to deal with; it is only a stamp. */}
     <p className="defect-date-stamp"><b>LOGGED</b> {timeLabel(value.defect.createdAt||new Date().toISOString())}{value.defect.updatedAt&&value.defect.updatedAt!==value.defect.createdAt&&<> · <b>UPDATED</b> {timeLabel(value.defect.updatedAt)}</>}</p>
    </div>
-   <footer className="log-editor-actions"><button className="save-log" disabled={Boolean(recentDuplicate)}>{saveLabel}</button><button type="button" className="save-fixed-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button><button type="button" className="save-fixed-part-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>setPartPrompt(true)}>SAVE FIXED W/ PART</button><button type="button" onClick={close}>CLOSE</button></footer>
+   {/* THE CLOSING STEP RINGS THIS ROW, not the one in the middle of the form.
+       The helper does not scroll the page — moving it under somebody's thumb
+       is what BusSelector already refuses to do with autoFocus — so a ring on
+       the mid-form action row was measured below the fold at every width
+       tested, 360 through 1180: one of five steps pointing at something
+       nobody could see. This footer sits OUTSIDE `.log-form`, so it is on
+       screen whatever the form is scrolled to. */}
+   <footer className="log-editor-actions" data-coach="save"><button className="save-log" disabled={Boolean(recentDuplicate)}>{saveLabel}</button><button type="button" className="save-fixed-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button><button type="button" className="save-fixed-part-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>setPartPrompt(true)}>SAVE FIXED W/ PART</button><button type="button" onClick={close}>CLOSE</button></footer>
   </form>
  </div>;
 }
@@ -721,6 +923,8 @@ export default function DefectLog(){
  const [mysterySlot,setMysterySlot]=useState("#edf3ff");
  const [hydrated,setHydrated]=useState(false);
  const [expandedBusIds,setExpandedBusIds]=useState<string[]>([]);
+ const [cardView,setCardView]=useState<CardView>("detailed");
+ const [cardViewNotice,setCardViewNotice]=useState("");
  const [focusedBusId,setFocusedBusId]=useState("");
  const [partsMemory,setPartsMemory]=useState<PartsMemory>(EMPTY_PARTS_MEMORY);
  useEffect(()=>setPartsMemory(readPartsMemory(localStorage)),[]);
@@ -737,47 +941,29 @@ export default function DefectLog(){
     repair times then and then it updates. That's all that matters really." */
  const [repairHours,setRepairHours]=useState<RepairHoursLedger>({entries:[]});
  useEffect(()=>setRepairHours(readRepairHoursLedger(localStorage)),[]);
+ /* ONLY WHICH REPAIR IS OPEN LIVES HERE NOW. The panel moved to
+    `src/components/defects/path-to-repair-panel.tsx` because Fixed Repairs
+    opens it too, and it owns the draft, whether it is editing, and the two
+    checked writes — none of which this page has any other use for. Nothing
+    moved on this screen: the PTR button is still on the card and still in the
+    focus view.
+
+    The LIBRARIES stay here, because the feed reads them: the button says
+    "PTR +" when nothing is written and the hours badge reads the ledger, so a
+    panel holding its own copy would save a writeup while the button behind it
+    still said there was none. */
  const [ptrFor,setPtrFor]=useState<{category:string;issue:string}|null>(null);
- const [ptrDraft,setPtrDraft]=useState("");
- const [ptrEditing,setPtrEditing]=useState(false);
- const [ptrProblem,setPtrProblem]=useState("");
- const openPathToRepair=(category:string,issue:string)=>{
-  const existing=findPathToRepair(pathToRepairs,category,issue);
-  setPtrFor({category,issue});
-  setPtrDraft(existing?existing.steps:"");
-  /* A repair with nothing written opens straight into the editor: the empty
-     screen's only purpose is to be filled in, and making somebody press EDIT
-     to reach a blank page is a tap that teaches nothing. */
-  setPtrEditing(!existing);
-  setPtrProblem("");
- };
- const savePtr=()=>{
-  if(!ptrFor)return;
-  const next=savePathToRepair(pathToRepairs,{category:ptrFor.category,issue:ptrFor.issue,steps:ptrDraft,by:settings.defaultInitials});
-  /* The write is checked rather than assumed. A full device would otherwise
-     show the new text, having stored nothing, and the person would find out
-     when it was gone. */
-  if(!writePathToRepairs(localStorage,next)){setPtrProblem("Could not save — this device's storage is full.");return}
-  setPathToRepairs(next);
-  setPtrEditing(false);
-  setPtrProblem("");
- };
- /* Saved on its own, not folded into the steps: a time and a writeup are two
-    different claims, and somebody correcting one must not have to re-save the
-    other. An empty box removes the shop's figure and the catalog estimate
-    comes back — withdrawing a claim is the same gesture as never making it. */
- const saveShopHours=(hours:string)=>{
-  if(!ptrFor)return;
-  const next=saveRepairMinutes(repairHours,{category:ptrFor.category,issue:ptrFor.issue,hours,by:settings.defaultInitials});
-  if(!writeRepairHoursLedger(localStorage,next)){setPtrProblem("Could not save — this device's storage is full.");return}
-  setRepairHours(next);
-  setPtrProblem("");
- };
+ const openPathToRepair=(category:string,issue:string)=>setPtrFor({category,issue});
  const forgetLearnedPart=(entry:PartMemoryEntry)=>setPartsMemory(current=>{const next=forgetPart(current,entry.scope,entry.category,entry.issue);writePartsMemory(localStorage,next);return next});
  const [findingsMemory,setFindingsMemory]=useState<FindingsMemory>(EMPTY_FINDINGS_MEMORY);
  useEffect(()=>setFindingsMemory(readFindingsMemory(localStorage)),[]);
  const forgetLearnedFinding=(entry:FindingMemoryEntry)=>setFindingsMemory(current=>{const next=forgetFinding(current,entry.category,entry.issue,entry.finding);writeFindingsMemory(localStorage,next);return next});
+ /* THE STEP-BY-STEP HELPER, off until somebody turns it on. Read on mount
+    rather than in the initialiser because the server render cannot read
+    LocalStorage and a mismatch there is a hydration error. */
+ const [coachOn,setCoachOn]=useState(false);
  const [statsOpen,setStatsOpen]=useState(false);
+ // Start each visit collapsed; keep the opener visible and leave legacy storage untouched.
  const [advancedOpen,setAdvancedOpen]=useState(false);
  const [movingMysteryBusId,setMovingMysteryBusId]=useState("");
  /* Open from any HOLD badge on the page — Curtis: "pressing it on one bus, I
@@ -790,8 +976,62 @@ export default function DefectLog(){
     two open at once would be two rows mid-edit with no way to tell which
     CONFIRM belongs to which. */
  const [extending,setExtending]=useState("");
+ /* RE-REPORTING FROM THE LIST, which is where somebody is standing when they
+    hear a bus has come back with the same complaint. Until now the only way to
+    record one was to start logging a duplicate, read the banner that refused
+    it, and press the button inside that banner — a path through a refusal.
+    Curtis: "there should be like a little drop-down where you can easily add
+    another reported... just a small drop-down feature, that's it."
+
+    One press ARMS it and a second COUNTS it, the same two-step HOLD UNTIL uses
+    three buttons along. The tally is evidence that a repair is not working, so
+    a fumbled tap on a phone in a bay must not be able to inflate it. */
+ /* THE WAY OUT OF AN ACCIDENTAL PRESS IS TO DO NOTHING. There is no cancel
+    button, because the cancel button WAS the destructive part: it did not fit
+    the rail and MARK FIXED painted over it. An armed button falls back by
+    itself, and the outcome it shows clears too, so a card cannot be left
+    claiming a count somebody made ten minutes ago. */
+ const [reporting,setReporting]=useState("");
+ const [reportNote,setReportNote]=useState<{id:string;tone:"counted"|"refused";text:string}|null>(null);
+ useEffect(()=>{if(!reporting)return;const timer=window.setTimeout(()=>setReporting(""),ARM_WINDOW_MS);return()=>window.clearTimeout(timer)},[reporting]);
+ useEffect(()=>{if(!reportNote)return;const timer=window.setTimeout(()=>setReportNote(null),OUTCOME_WINDOW_MS);return()=>window.clearTimeout(timer)},[reportNote]);
  const [extendUntil,setExtendUntil]=useState("");
  const [sweepOpen,setSweepOpen]=useState(false);
+ const [heatOpen,setHeatOpen]=useState(false);
+ /* The photos SCAN SHEET on the Down Sheet hands to whichever of this page's
+    scanners reads them. Both take a hand-off; each uses only one addressed to
+    its own sheet, so a sweep's photos can never open in the heat scanner.
+    THIS PAGE HAS NO DOOR OF ITS OWN: it had a SCAN PAPER button for one
+    unpublished build, and Curtis chose the one button over a fourth. SCAN
+    SWEEP and SCAN HEAT SHEET open their scanner directly, as they always
+    did. */
+ const [handed,setHanded]=useState<HandedPhotos|null>(null);
+ /* A hand-off is for ONE opening. Left in place, the next press of SCAN SWEEP
+    would open on yesterday's photos and start reading them. Dropped when a
+    scanner SHUTS, however it came to be shut — on the change from open to
+    shut, not whenever both are shut. "Whenever both are shut" is also true
+    the moment the page opens, in the same pass as the effect below that takes
+    a hand-off off the address, and which of the two won would then have
+    depended on the order they happen to be written in. */
+ const scannerWasOpen=useRef(false);
+ useEffect(()=>{const open=sweepOpen||heatOpen;if(scannerWasOpen.current&&!open)setHanded(null);scannerWasOpen.current=open},[sweepOpen,heatOpen]);
+ /* Each of this page's sheets is NAMED. An `else` here would open the sweep
+    scanner, empty, for any sheet added to the table later and read on this
+    page — the wrong scanner being the one thing SCAN SHEET is for stopping. */
+ const openScanner=(kind:HandedPhotos["kind"])=>{if(kind==="heat")setHeatOpen(true);else if(kind==="sweep")setSweepOpen(true)};
+ /* Another page sends people here to scan: Fleet Campaigns for the heat
+    sheet, and SCAN SHEET on the Down Sheet for either of this page's two. The
+    parameters are taken off the address once acted on, the way a quick
+    filter's is, so a reload does not throw the scanner up a second time. The
+    history entry keeps the state it had, because SCAN SHEET arrives through
+    the router and the router keeps its own notes there. */
+ useEffect(()=>{
+  const url=new URL(window.location.href),arrived=paperHandIn(url.search,PAPER_HERE);
+  if(!arrived)return;
+  setHanded(arrived);openScanner(arrived.kind);
+  url.searchParams.delete(PAPER_SCAN_PARAM);url.searchParams.delete(PAPER_PHOTOS_PARAM);
+  window.history.replaceState(window.history.state,"",url.pathname+url.search+url.hash);
+ },[]);
  const [batchesOpen,setBatchesOpen]=useState(false);
  /* The last removed scan sweep, read from the device rather than held only in
     memory, so PUT BACK works after a reload and after a removal the operator
@@ -799,11 +1039,10 @@ export default function DefectLog(){
  const [batchUndo,setBatchUndo]=useState<ScanBatchUndo|null>(null);
  useEffect(()=>setBatchUndo(readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY))),[]);
 
- useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);try{const visuals=JSON.parse(localStorage.getItem(BOARD_SETTINGS_KEY)||"{}").visuals;if(typeof visuals?.downSheetBadge==="string"&&typeof visuals?.downSheetBadgeText==="string")setDownSheetBadgeColors({badge:visuals.downSheetBadge,text:visuals.downSheetBadgeText})}catch{}setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setAdvancedOpen(localStorage.getItem(ADVANCED_OPEN_KEY)==="1");setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1");setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
+ useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);try{const visuals=JSON.parse(localStorage.getItem(BOARD_SETTINGS_KEY)||"{}").visuals;if(typeof visuals?.downSheetBadge==="string"&&typeof visuals?.downSheetBadgeText==="string")setDownSheetBadgeColors({badge:visuals.downSheetBadge,text:visuals.downSheetBadgeText})}catch{}setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setCoachOn(readCoachSettings(localStorage).on);setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1");setFilter(nextSettings.defaultFilter);setCardView(readCardView(localStorage.getItem(CARD_VIEW_KEY)));setHydrated(true)},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,STATS_OPEN_KEY,statsOpen?"1":"0")},[statsOpen,hydrated]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,ADVANCED_OPEN_KEY,advancedOpen?"1":"0")},[advancedOpen,hydrated]);
- useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue));/* Settings are edited on the shared page now, so a change there has to reach a log that is already open - and it has to reach this page's own state, because this page writes the whole settings object back whenever one of its fields changes and would otherwise put the stale copy over the new one. */if(event.key===SETTINGS_KEY)setSettings(readSettings(event.newValue));if(event.key===SCAN_BATCH_UNDO_KEY)setBatchUndo(readScanBatchUndo(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue));/* Settings are edited on the shared page now, so a change there has to reach a log that is already open - and it has to reach this page's own state, because this page writes the whole settings object back whenever one of its fields changes and would otherwise put the stale copy over the new one. */if(event.key===SETTINGS_KEY)setSettings(readSettings(event.newValue));if(event.key===SCAN_BATCH_UNDO_KEY)setBatchUndo(readScanBatchUndo(event.newValue));if(event.key===COACH_SETTINGS_KEY)setCoachOn(readCoachSettings(localStorage).on)};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const allRecords=useMemo(()=>defectLogRecords(fleet,downEntries),[fleet,downEntries]);
  const batches=useMemo(()=>scanBatches(fleet),[fleet]);
@@ -929,6 +1168,13 @@ export default function DefectLog(){
     had already set aside. Zero while a search is running, because the window is
     standing down and claiming otherwise would be the lie above. */
  const feedWindowText=search.trim()?"":feedWindowLabel(feedWindow,feedWindowNow,shiftSettings);
+ /* The drop-down reads THIS SHIFT and the feed is the whole board, because the
+    hours on this device describe no window covering now. The limit and the
+    label degrade together on purpose — see `feedWindowUnresolved` — which is
+    the right failure and was also a silent one: the bar below hangs off
+    `feedWindowText`, so the whole explanation disappeared in exactly the case
+    that needed explaining. */
+ const feedWindowBroken=!search.trim()&&feedWindowUnresolved(feedWindow,feedWindowNow,shiftSettings);
  const hiddenByFeedWindow=feedWindowLimit===null?0:groupDefectLogRecords(stateOnly).length-groupDefectLogRecords(unsearched).length;
  /* Focus reads one bus at arm's length. Editing hands off to the existing
     editor, while completion reuses the same Mark Fixed path as the main log. */
@@ -942,18 +1188,89 @@ export default function DefectLog(){
     reading that message there is no filter and no way to know there was one:
     the sentence simply says this bus has two things wrong with it.
 
-    Curtis asked for the opposite in as many words — "share all the defects
-    with a bus" — so the share is built from the unfiltered records and the
-    row below says when that is more than the screen is showing. The VIEW stays
-    filtered, because that is the board doing what it was told. */
+    Curtis asked for exactly that at the time, in as many words — "share all
+    the defects with a bus" — so the share was built from the unfiltered
+    records and a row said when that was more than the screen showed.
+
+    HE THEN HIT THE OTHER SIDE OF IT and chose the window instead: "when I hit
+    like the last 24 hours of the shift, it gives me buses, but I think it's
+    giving me more than the defects that I put down in the last 24 hours", and
+    then, asked which way: "Follow the window, and add the swipe." So the share
+    is what is ON SCREEN minus anything swiped away, and the row below counts
+    the two reasons apart — a filter is not a decision. The earlier reasoning
+    is kept above because it is why this ever carried the whole bus. */
  const focusedAllRecords=focusedBusId?records.filter(record=>record.bus.id===focusedBusId):[];
- const focusHiddenByBoard=focusedGroup?focusedAllRecords.length-focusedGroup.records.length:0;
+ /* SWIPED AWAY, FOR THIS LOOK AT THIS BUS ONLY. Never a field on a defect: the
+    cloud ships unknown defect fields to every other phone, so a "don't send
+    this one" flag stored on the record would hide it for the whole shop. */
+ const [focusExcluded,setFocusExcluded]=useState<string[]>([]);
+ const focusScope=focusShareScope(focusedGroup?focusedGroup.records:[],focusedAllRecords,focusExcluded);
+ /* NOTHING LEFT TO SEND IS A REFUSAL, NOT A SHARE, and it was reachable the
+    moment the swipe existed. Hiding all three defects on a bus and pressing
+    COPY put "0 defects - shared ..." and then "No defects on this bus." on the
+    clipboard, which a recipient reads as the bus being CLEAN - the most
+    damaging sentence this app could say about a vehicle. The three outputs
+    refuse, and the buttons go dead so nobody presses one and wonders. */
+ const focusShareEmpty=focusShareIsEmpty(focusScope);
+ /* WHAT JUST HAPPENED, FOR SOMEBODY WHO CANNOT SEE THE ROW GO. A row vanishing
+    and a button appearing are both silent to a screen reader, and the HIDE
+    control that was just pressed is gone with its row - so without this a hide
+    is a press with no outcome at all. Its own region rather than the share
+    status beside it: a hide must not wipe COPIED, and a share outcome must not
+    wipe the hide. */
+ const [focusHideNote,setFocusHideNote]=useState("");
+ useEffect(()=>{setFocusHideNote("")},[focusedBusId]);
+ /* AND FOCUS HAS TO LAND SOMEWHERE. The pressed HIDE button unmounts with its
+    row, which drops focus to the document BODY: a keyboard is then at the top
+    of the page, outside a dialog it never left. PUT BACK is where the press
+    leads next, so that is where focus goes - and when PUT BACK itself empties,
+    COPY takes it, because PUT BACK is about to become unfocusable.
+    Only on a BUTTON press: a swipe holds no focus, and scrolling the panel up
+    to a control a thumb never asked for is its own bug. */
+ const focusCopyRef=useRef<HTMLButtonElement|null>(null);
+ const focusPutBackRef=useRef<HTMLButtonElement|null>(null);
+ const focusAfterCommit=(target:React.RefObject<HTMLButtonElement|null>)=>{
+  /* After the commit, not during it: the element being focused is one this
+     render is about to make focusable. */
+  if(typeof requestAnimationFrame==="function")requestAnimationFrame(()=>target.current?.focus());
+ };
+ const focusHideRecord=(record:DefectLogRecord,via:"button"|"swipe")=>{
+  setFocusExcluded(current=>excludeFromFocusShare(current,record.defect.id));
+  setFocusHideNote("HIDDEN FROM THIS SHARE — "+repairCategoryLabel(record.defect.category));
+  if(via==="button")focusAfterCommit(focusPutBackRef);
+ };
+ /* PRUNED TO WHAT IS ON SCREEN BEFORE POPPING, and it names what came back.
+    `focusExcluded` is only cleared when the BUS changes, so a defect swiped
+    away and then taken off screen by the window, the filter or a sync left an
+    id in the list that `hiddenByHand` no longer counts - and PUT BACK popped
+    that one, restoring nothing while the button still read PUT BACK. The press
+    looked broken. */
+ const focusPutBack=()=>{
+  const onScreen=focusedGroup?focusedGroup.records:[];
+  const live=onScreen.map(record=>String(record.defect.id));
+  /* THE OFF-SCREEN IDS ARE KEPT. This filtered the list and stored the FILTERED
+     result, so one press threw away every exclusion the window had taken off
+     screen: swipe A and B away, let A leave the view, press PUT BACK for B, and
+     A came back into the share on its own the next time the window widened. The
+     rule is in the lib so the ordering and the keeping are one decision. */
+  const {excluded,restored}=putBackLastExclusion(focusExcluded,live);
+  if(!restored)return;
+  setFocusExcluded(excluded);
+  const back=onScreen.find(record=>String(record.defect.id)===restored);
+  setFocusHideNote("PUT BACK — "+(back?repairCategoryLabel(back.defect.category):"1 DEFECT"));
+  /* The last one back takes PUT BACK off the row with it. */
+  if(focusScope.hiddenByHand<=1)focusAfterCommit(focusCopyRef);
+ };
  /* EVERY CHANGE OF BUS, not only the close, and the first cut only cleared on
     close — while its own comment claimed what this line now actually does. The
     focus dialog does not trap the keyboard, so a tab can reach another card's
     FOCUS button and move straight from bus A to bus B without passing through
     empty, carrying A's SHARED onto B's screen. */
  useEffect(()=>{setFocusShareStatus("")},[focusedBusId]);
+ /* AND THE SWIPED-AWAY LIST GOES WITH THE BUS, for the same reason the status
+    does: tabbing from bus A's FOCUS to bus B's never passes through empty, and
+    carrying A's hidden rows onto B would silently narrow B's share. */
+ useEffect(()=>{setFocusExcluded([])},[focusedBusId]);
  /* "Deferred" is genuinely held-back only when the bus carries no active Down
     Sheet entry — quick-filters.ts has no way to know that, since it never
     sees Down Sheet entries, so the exclusion and the wait-time sort both
@@ -1165,7 +1482,7 @@ export default function DefectLog(){
   if(!matchesSearch({bus,defect,createdAt:"",updatedAt:"",onDownSheet:false}))setSearch("");
  };
  const closeEditor=()=>{const left=window.scrollX,top=window.scrollY;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setEditing(null);const restore=()=>window.scrollTo(left,top);window.requestAnimationFrame(()=>{restore();window.requestAnimationFrame(restore)})};
- const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last "+RECENT_DUPLICATE_WINDOW_LABEL+". Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";if(draft.defect.partsUsed&&String(draft.defect.partNumber||"").trim())setPartsMemory(current=>{const next=learnPart(current,{category:draft.defect.category,issue:draft.defect.issue,partNumber:draft.defect.partNumber||"",partName:draft.defect.partName,scope:draft.rememberScope},now);writePartsMemory(localStorage,next);return next});/* Learned on any save that carries a finding, not only on one marked Diagnosed. Typing a cause is the diagnosis; making the checkbox the trigger would mean a mechanic writes the finding, sees nothing remembered, and never learns why. */if(normalizeFinding(draft.defect.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.defect.category,issue:draft.defect.issue,finding:draft.defect.finding},now);writeFindingsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[{busId:draft.busId,defectId:draft.defect.id}],now):result.fleet,result.downEntries);clearSearchIfItHides(draft.busId,draft.defect);closeEditor()};
+ const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last "+RECENT_DUPLICATE_WINDOW_LABEL+". Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";/* THE FIRST NUMBERED PART IS LEARNED, and only one. This reduced `learnPart` over every numbered part and the change called that "learns every part" - which a reviewer disproved: the memory keeps ONE entry per scope+category+issue and replaces it, so reducing over two parts taught the shop the LAST one with `uses:2`. Teaching it more than one needs more than one slot per key, which is a change to `pace-parts-memory-v1` itself. A part with only a name teaches nothing the memory could suggest, so `partToLearn` skips it. */const learnable=draft.defect.partsUsed?partToLearn(normalizeDefectParts(draft.defect.parts,draft.defect)):null;if(learnable)setPartsMemory(current=>{const next=learnPart(current,{category:draft.defect.category,issue:draft.defect.issue,partNumber:learnable.partNumber,partName:learnable.partName,scope:draft.rememberScope},now);writePartsMemory(localStorage,next);return next});/* Learned on any save that carries a finding, not only on one marked Diagnosed. Typing a cause is the diagnosis; making the checkbox the trigger would mean a mechanic writes the finding, sees nothing remembered, and never learns why. */if(normalizeFinding(draft.defect.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.defect.category,issue:draft.defect.issue,finding:draft.defect.finding},now);writeFindingsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[{busId:draft.busId,defectId:draft.defect.id}],now):result.fleet,result.downEntries);clearSearchIfItHides(draft.busId,draft.defect);closeEditor()};
  const saveDraft=(draft:LogDraft)=>persistDraft(draft,false);
  const saveFixedDraft=(draft:LogDraft)=>persistDraft(draft,true);
  const markFixed=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"completed",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:undefined,reportedBy:record.defect.reportedBy||settings.defaultInitials,completedBy:record.defect.completedBy||settings.defaultInitials},false,now);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Marked Bus "+record.bus.n+" fixed"});persist(hideDefectLogRecords(result.fleet,[{busId:record.bus.id,defectId:record.defect.id}],now),result.downEntries)};
@@ -1191,6 +1508,44 @@ export default function DefectLog(){
   setSweepOpen(false);
   alert(filed+" finding"+(filed===1?"":"s")+" filed as open Tech Services defect"+(filed===1?"":"s")+(skipped?". "+skipped+" skipped — already logged on that bus in the last 48 hours":"")+". UNDO LAST reverses it.");
  };
+ /* A reviewed heat check sheet. Two writes, in this order, and the order is the
+    point: the DEFECTS go on first, because they are the part that can be
+    refused, and the checks are logged only once the board has taken them — a
+    log saying forty buses were checked beside a board that never got the
+    forty defects would be the worse of the two half-states. The log write is
+    best effort after that: losing it costs a re-scan, since a line off the
+    paper has an id made of what the line says and reading it again adds
+    nothing twice.
+
+    One `now` for the whole press, which is what SCAN BATCHES finds it by. */
+ const fileHeat=(findings:HeatFinding[],loggable:HeatFinding[])=>{
+  const now=new Date().toISOString(),filing=heatFiling(findings,now);
+  const result=applyHeatFiling(fleet,downEntries,filing,now);
+  const filed=result.filed.length,skipped=result.skipped.length;
+  if(filed){
+   const written=persist(result.fleet,result.downEntries);
+   if(!written.ok)return;
+   /* `heatScan` is the press's stamp. UNDO LAST puts the board back, and a
+      heat filing it undoes has checks on the log that go back with it. */
+   setUndoSnapshot({fleet,downEntries,label:"Filed "+filed+" heat sheet finding"+(filed===1?"":"s"),heatScan:now});
+  }
+  /* `added` is what is NEW to this device, and that is the number said out
+     loud: a sheet scanned a second time reads sixty lines and adds none. */
+  const log=addHeatChecks(localStorage,heatChecksFromFindings(loggable,now));
+  /* A SCAN THAT FILED NOTHING STILL HAS A WAY BACK. An all-OK page leaves no
+     defect, so no batch for SCAN BATCHES to find — and it left the PREVIOUS
+     undo armed, so UNDO LAST after it reversed whatever had been done before
+     the scan. `heatChecks` is this press's stamp; UNDO LAST takes exactly the
+     checks carrying it. The board in this snapshot is the board as it is,
+     because this press did not change it. */
+  if(!filed&&log.ok&&log.added)setUndoSnapshot({fleet,downEntries,label:"Logged "+log.added+" heat check"+(log.added===1?"":"s"),heatChecks:now});
+  setHeatOpen(false);
+  alert((filed?filed+" No Heat defect"+(filed===1?"":"s")+" filed on the Defect Log":"No defects were filed")
+   +(skipped?". "+skipped+" could not be filed and "+(skipped===1?"was":"were")+" left off":"")
+   +(!log.ok?". THE HEAT CHECKS COULD NOT BE SAVED — "+heatLogProblemWords(log.why)+(log.why==="unreadable"?"":". Scan the sheet again once there is room")
+     :log.added?". "+log.added+" new heat check"+(log.added===1?"":"s")+" logged":". No new heat checks — every line on these pages was already in the log")
+   +(filed?". SCAN BATCHES takes the defects and the checks back out together.":log.ok&&log.added?". UNDO LAST takes these checks back out, for as long as you stay on this page and change nothing else.":"."));
+ };
  /* Takes a whole scan sweep back out. The batch is the set of sweep records
     sharing one creation stamp — the fingerprint fileSweep leaves by taking the
     clock once — and only the records nobody has touched since are removed.
@@ -1204,33 +1559,74 @@ export default function DefectLog(){
     MERGE DUPES writes it. With it, the removal reaches the other devices. */
  const removeBatch=(batch:ScanBatch)=>{
   const now=new Date().toISOString(),result=removeScanBatch(fleet,batch.key,now);
-  if(!result.removed.length){alert("Every record in that sweep has been worked on since — marked fixed, deferred, ticked or written on — so there is nothing untouched to remove.");return}
+  if(!result.removed.length){alert("Every record in that "+scanBatchWords(batch).short+" has been worked on since — marked fixed, deferred, ticked or written on — so there is nothing untouched to remove.");return}
   const buses=new Set(result.removed.map(record=>record.busId)).size;
-  if(!confirm("Remove "+result.removed.length+" record"+(result.removed.length===1?"":"s")+" filed by that scan sweep from "+buses+" bus"+(buses===1?"":"es")+"?"+(result.kept?" "+result.kept+" worked on since will be kept.":"")+"\n\nThe shop cloud is told, so the other devices drop them too. UNDO LAST or PUT BACK reverses it."))return;
+  if(!confirm("Remove "+result.removed.length+" record"+(result.removed.length===1?"":"s")+" filed by that "+scanBatchWords(batch).noun+" from "+buses+" bus"+(buses===1?"":"es")+"?"+(result.kept?" "+result.kept+" worked on since will be kept.":"")+"\n\nThe shop cloud is told, so the other devices drop them too. UNDO LAST or PUT BACK reverses it."))return;
   const written=persist(result.fleet,downEntries,{allowBulkDefectLoss:true});
   if(!written.ok)return;
-  const label="Removed "+result.removed.length+" scan sweep record"+(result.removed.length===1?"":"s");
+  const label="Removed "+result.removed.length+" "+scanBatchWords(batch).noun+" record"+(result.removed.length===1?"":"s");
   const snapshot=scanBatchUndoSnapshot(result.removed,label,now);
-  writeSetting(localStorage,SCAN_BATCH_UNDO_KEY,JSON.stringify(snapshot));setBatchUndo(snapshot);
+  /* The disk copy of the way back can be refused. PUT BACK still works in this
+     page from `batchUndo` in state, but it is gone on the next load — so a
+     retry offered for LATER is only honest if this write landed. */
+  const wayBack=writeSetting(localStorage,SCAN_BATCH_UNDO_KEY,JSON.stringify(snapshot));setBatchUndo(snapshot);
   writeMergedAway(localStorage,{...readMergedAway(localStorage),...Object.fromEntries(result.removed.map(record=>[record.defect.id,now]))});
   setUndoSnapshot({fleet,downEntries,label,scanBatch:true});
   setBatchesOpen(false);
-  alert(result.removed.length+" record"+(result.removed.length===1?"":"s")+" removed from "+buses+" bus"+(buses===1?"":"es")+"."+(result.kept?" "+result.kept+" kept.":"")+" PUT BACK under SCAN BATCHES reverses it.");
+  /* A heat sheet scan also logged a check for every line it read. Those go
+     with it, or the buses it called N/R would sit under VERIFY on the strength
+     of a scan somebody has just taken back. PUT BACK returns the defects and
+     not the checks; reading the sheet again returns those. The alert offers
+     the two as the ALTERNATIVES they are — it used to offer both in one
+     breath, and doing both gave every bus its defect twice until PUT BACK
+     learned to leave off a repair the bus already has open. */
+  const cut=dropScanChecks(localStorage,batch);
+  alert(result.removed.length+" record"+(result.removed.length===1?"":"s")+" removed from "+buses+" bus"+(buses===1?"":"es")+"."+(result.kept?" "+result.kept+" kept.":"")
+   +(cut.removed||!cut.ok?(cut.ok?" The "+cut.removed+" heat check"+(cut.removed===1?"":"s")+" that scan logged "+(cut.removed===1?"was":"were")+" taken out too.":" ITS HEAT CHECKS COULD NOT BE TAKEN OUT — "+heatLogProblemWords(cut.why)+"."+heatCleanupLeftBehind(cut.why,cut.removed,scanBatchWords(batch).noun,wayBack.ok)):"")
+   +" PUT BACK under SCAN BATCHES returns the records"+(cut.removed&&cut.ok?"; the checks come back by scanning the sheet again":"")+".");
  };
  /* The records go back stamped as new work — newer than the tombstones the
     removal sent — and the ledger forgets them, so the shop cloud accepts them
     back over the deletion instead of dropping the restore as an older write. */
  const restoreBatch=()=>{
-  const snapshot=readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY));
-  if(!snapshot){setBatchUndo(null);alert("There is no removed scan sweep to put back on this device.");return}
+  /* The device's copy AND the one this page is holding: the stored write can
+     be refused, and the button being pressed is for the one on the screen. */
+  const snapshot=latestScanBatchUndo(readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY)),batchUndo);
+  if(!snapshot){setBatchUndo(null);alert("There is no removed scan to put back on this device.");return}
   const now=new Date().toISOString(),result=restoreScanBatch(fleet,snapshot,now);
   if(result.restored&&!persist(result.fleet,downEntries).ok)return;
   const ledger=readMergedAway(localStorage);for(const id of result.restoredIds)delete ledger[id];writeMergedAway(localStorage,ledger);
   localStorage.removeItem(SCAN_BATCH_UNDO_KEY);setBatchUndo(null);
   if(undoSnapshot?.scanBatch)setUndoSnapshot(null);
-  alert(result.restored+" record"+(result.restored===1?"":"s")+" went back on "+(result.restored===1?"its bus":"their buses")+(result.missing?"; "+result.missing+" could not because "+(result.missing===1?"its bus is":"their buses are")+" no longer on this device":"")+".");
+  alert(result.restored+" record"+(result.restored===1?"":"s")+" went back on "+(result.restored===1?"its bus":"their buses")+(result.missing?"; "+result.missing+" could not because "+(result.missing===1?"its bus is":"their buses are")+" no longer on this device":"")+scanRestoreLeftOff(result)+".");
  };
- const undoLastChange=()=>{if(!undoSnapshot)return;if(undoSnapshot.scanBatch){restoreBatch();return}persist(undoSnapshot.fleet,undoSnapshot.downEntries);setUndoSnapshot(null)};
+ /* UNDO LAST ON A HEAT SHEET FILING IS "TAKE THAT SCAN BACK OUT", so it goes
+    through the door that does that properly. Putting the board's old copy back
+    — what UNDO LAST does for a hand-saved change — would have left three things
+    wrong for a scan: the checks it logged stayed on the log, so every bus it
+    had called N/R went to VERIFY; the shop cloud was never told, so the next
+    pull brought the defects straight back; and a filing of five or more was
+    refused as a bulk loss with the undo thrown away anyway. `removeBatch`
+    writes the tombstones, takes the checks, asks first, and leaves PUT BACK.
+    A cold read found the first of those; the other two came with it. */
+ const undoLastChange=()=>{
+  if(!undoSnapshot)return;
+  if(undoSnapshot.scanBatch){restoreBatch();return}
+  if(undoSnapshot.heatChecks){
+   const cut=dropScanChecks(localStorage,{kind:"heat",key:undoSnapshot.heatChecks});
+   /* Kept when the log refused: a failed undo that threw its own way back
+      away could not be tried again once there was room. */
+   if(cut.ok)setUndoSnapshot(null);
+   alert(cut.ok?(cut.removed?cut.removed+" heat check"+(cut.removed===1?"":"s")+" from that scan "+(cut.removed===1?"was":"were")+" taken back out. No defect was filed by it, so nothing else changed.":"Those heat checks are no longer on this device's log, so there was nothing to take out."):"THE HEAT CHECKS COULD NOT BE TAKEN OUT — "+heatLogProblemWords(cut.why)+".");
+   return;
+  }
+  if(undoSnapshot.heatScan){
+   const batch=findScanBatch(batches,undoSnapshot.heatScan);
+   if(batch){removeBatch(batch);return}
+   setUndoSnapshot(null);alert("That heat sheet scan is no longer on this device's Defect Log, so there is nothing to undo.");return;
+  }
+  persist(undoSnapshot.fleet,undoSnapshot.downEntries);setUndoSnapshot(null);
+ };
  const backInService=(record:DefectLogRecord)=>{const result=returnDefectLogBusToService(fleet,downEntries,record.bus.id,record.defect.id);if(result.error){alert(result.error==="decommissioned"?"A decommissioned bus cannot be returned to service.":"That repair is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);if(result.status==="out")alert("This bus remains Out of Service because another active downing defect is still present.")};
 /* EXTEND, from the held row itself.
 
@@ -1371,24 +1767,24 @@ export default function DefectLog(){
     The stamp goes on the STORED defect rather than the copy the banner is
     holding, so a form that has been open a while cannot write back a tally it
     read before somebody else added to it. */
- const countReturn=(busId:string,defect:StructuredDefect)=>{
-  const now=new Date().toISOString();
-  const bus=fleet.find(item=>item.id===busId);
-  if(!bus)return;
-  let counted=false;
-  const nextFleet=fleet.map(item=>item.id!==busId?item:{...item,defects:normalizeDefects(item.defects,item.pendingRepair||"",item.id)
-   .map(current=>{
-    if(current.id!==defect.id)return current;
-    const next=recordReportAttempt(current,now,settings.defaultInitials);
-    if(next!==current)counted=true;
-    return next;
-   })});
-  /* recordReportAttempt refuses a second stamp within two minutes, and a press
-     it refused must not write the board back or take an undo snapshot — an UNDO
-     offering to reverse a change nobody made is worse than the fumbled tap. */
-  if(!counted)return;
-  setUndoSnapshot({fleet,downEntries,label:"Counted a return for Bus "+bus.n});
-  persist(nextFleet,downEntries);
+ /* Returns WHAT HAPPENED, because the three things this can do — count a
+    return, refuse one, or fail to write it — are indistinguishable from
+    outside: all of them leave the button where it was.
+
+    A REFUSED WRITE IS NOT A COUNT. This reported `counted:true` over a
+    persist() whose result it threw away, so a board that could not be written
+    still produced "COUNTED — reported ×3" next to a chip that still read ×2
+    and a banner saying the board could not be saved. That is the third miss
+    named in .claude/skills/fresh-context-review, reintroduced in the change
+    that cites it. The snapshot moved below the write for the same reason: UNDO
+    must not offer to reverse something nobody managed to do. */
+ const countReturn=(busId:string,defect:StructuredDefect):ReportReturnResult=>{
+  const {fleet:nextFleet,result}=applyReportReturn(fleet,busId,defect.id,new Date().toISOString(),settings.defaultInitials);
+  if(!result.counted)return result;
+  const written=persist(nextFleet,downEntries);
+  if(!written.ok)return {counted:false,returns:result.returns-1,at:null,reason:"not-saved"};
+  setUndoSnapshot({fleet,downEntries,label:"Counted a return for Bus "+(fleet.find(item=>item.id===busId)?.n||busId)});
+  return result;
  };
  const showExistingDefect=(busId:string,defect:StructuredDefect)=>{
   const bus=fleet.find(item=>item.id===busId);
@@ -1464,7 +1860,18 @@ export default function DefectLog(){
   if(Number.isNaN(at.getTime()))return timeLabel(iso);
   return timeLabel(iso)+(at.getFullYear()!==new Date().getFullYear()?", "+at.getFullYear():"");
  };
- const focusShareRows=():BusShareDefect[]=>focusedAllRecords.map(record=>({
+ /* ALL THREE OUTPUTS READ THE SAME LIST. COPY, SHARE and SHARE PAGE are one
+    function away from each other on purpose - a page that honoured a swipe
+    while the text ignored it would be two different answers to one question,
+    and Curtis would have no way to tell which he had sent.
+
+    AND ALL THREE ASK `focusShareIsEmpty` FIRST, each in its own body rather
+    than through one wrapper, because each is also reachable from somewhere
+    else: SHARE falls back to COPY, and a guard on the wrapper only would be a
+    guard on the path somebody happened to take. An empty share sends
+    "0 defects" and "No defects on this bus." about a bus with three open
+    defects, which reads as a clean vehicle. */
+ const focusShareRows=():BusShareDefect[]=>focusScope.rows.map(record=>({
   defect:record.defect,
   state:STATE_LABELS[record.defect.state]||record.defect.state,
   logged:shareTimeLabel(record.createdAt),
@@ -1473,7 +1880,7 @@ export default function DefectLog(){
  }));
  const focusShareBus=()=>({n:focusedGroup?.bus.n||"",l:focusedGroup?.bus.l,status:focusedGroup?(STATUS_LABELS[focusedGroup.bus.s]||focusedGroup.bus.s):""});
  const copyFocusBus=async()=>{
-  if(!focusedGroup)return;
+  if(!focusedGroup||focusShareIsEmpty(focusScope))return;
   try{await copyText(busShareText(focusShareBus(),focusShareRows(),new Date().toLocaleString()));setFocusShareStatus("copied")}
   catch{setFocusShareStatus("error")}
  };
@@ -1481,14 +1888,14 @@ export default function DefectLog(){
     the same order the drawer settled on, so a browser without one never leaves
     somebody pressing a button that does nothing. */
  const shareFocusBusText=async()=>{
-  if(!focusedGroup)return;
+  if(!focusedGroup||focusShareIsEmpty(focusScope))return;
   const text=busShareText(focusShareBus(),focusShareRows(),new Date().toLocaleString());
   if(typeof navigator.share!=="function"){await copyFocusBus();return}
   try{await navigator.share({title:"Bus "+focusedGroup.bus.n+" defects",text});setFocusShareStatus("shared")}
   catch(error){if(!(error instanceof DOMException&&error.name==="AbortError"))setFocusShareStatus("error")}
  };
  const shareFocusBusPage=async()=>{
-  if(!focusedGroup)return;
+  if(!focusedGroup||focusShareIsEmpty(focusScope))return;
   const html=busShareHtml(focusShareBus(),focusShareRows(),new Date().toLocaleString());
   const outcome=await shareOrDownloadFile(new Blob([html],{type:"text/html"}),busShareFilename(focusedGroup.bus.n),"Bus "+focusedGroup.bus.n+" defects");
   /* A DOWNLOAD IS NOT A COPY. `shareOrDownloadFile` returns "saved" when there
@@ -1517,14 +1924,23 @@ export default function DefectLog(){
     always defined and so could never reach a fallback. It is gone: emitted
     only on a real choice, the plain variable does the job, and BLUE MEANS THE
     BUS reads it directly. */
- const appStyle={...(settings.groupBorder?{"--log-card-border":settings.groupBorder}:{}),"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":settings.appearance.header,"--log-header-text":settings.appearance.headerText,"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--downsheet-badge":downSheetBadgeColors.badge,"--downsheet-badge-text":downSheetBadgeColors.text,"--log-font":FONT_STACKS[settings.fontFamily],...displayStyleVars(settings.display,settings.theme)} as React.CSSProperties;
+ /* The header colour comes from the app setting now, not from this page's
+    theme preset, so all eight surfaces match by default and this one can
+    still be overridden on its own. Everything keyed to --log-header -- the
+    ADVANCED drawer, the focus panel -- follows without a rule changing. */
+ /* Its own theme's ink travels with its own theme's colour, so a page on
+    Tactical keeps Tactical's header text instead of the computed white the
+    shared colour gets. */
+ const logHeaderTheme=pageThemeHeaderPair("page",settings.theme,settings.appearance.header,settings.appearance.headerText);
+ const headerSkin=useHeaderColor("log",logHeaderTheme?.header,logHeaderTheme?.text);
+ const appStyle={...(settings.groupBorder?{"--log-card-border":settings.groupBorder}:{}),"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":headerSkin.color,"--log-header-text":headerSkin.text,"--log-accent-text":headerTextFor(settings.appearance.accent),"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--downsheet-badge":downSheetBadgeColors.badge,"--downsheet-badge-text":downSheetBadgeColors.text,"--log-font":FONT_STACKS[settings.fontFamily],...displayStyleVars(settings.display,settings.theme)} as React.CSSProperties;
 
  return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}
   /* Three view options, each "off" | "phone" | "always". They are attributes
      rather than conditional markup on purpose: "phone" means a WIDTH, and only
      CSS knows the width without a resize listener. Rotate the iPad and the
      answer changes on its own, with nothing stored and nothing to go stale. */
-  data-bus-rail={settings.busRail} data-bus-blue={settings.busBlueOnly} data-bus-end={settings.busEndMarker}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/>{!hiddenInLite(appMode,"deferred")&&<><DeferredNavBadge/><DeferredReviewPrompt/></>}
+  data-card-view={cardView} data-bus-rail={settings.busRail} data-bus-blue={settings.busBlueOnly} data-bus-end={settings.busEndMarker}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/>{!hiddenInLite(appMode,"deferred")&&<><DeferredNavBadge/><DeferredReviewPrompt/></>}
   <header className="log-header">
    <div><AppName/><span>FLEET MAINTENANCE</span><h1>{settings.display.labels.pageTitle||"Real-Time Defect Log"}</h1><p>{settings.display.labels.subtitle}</p></div>
    <TrackerNav active="/defect-log"/>
@@ -1561,15 +1977,7 @@ export default function DefectLog(){
     <div className="log-advanced-body">
      <div className="log-advanced-group">
       <b className="log-advanced-label">VIEW</b>
-   <div className="log-filters">{([["all","ALL"],["in-progress","IN PROGRESS"],["fixed","FIXED TODAY"],
-    /* OPEN and DOWN SHEET are not offered, but both remain choosable as a saved
-       default view. Somebody whose default is one of them would otherwise see a
-       filtered board with no button lit and nothing saying why — and no way back
-       without opening settings. The button appears only while its own filter is
-       the active one, so it explains the view and clears it, without adding two
-       buttons back for everybody else. */
-    ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
-    ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}</div>
+
       {/* A DROP-DOWN RATHER THAN MORE CHIPS, which is how Curtis asked for it —
           "like a drop-down somewhere at the work computer". The row above is
           thumb targets on a phone; this is one question asked at a desk, and a
@@ -1600,7 +2008,7 @@ export default function DefectLog(){
      </div>
      <div className="log-advanced-group">
       <b className="log-advanced-label">TOOLS</b>
-      <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button><button className="scan-batches-button" type="button" onClick={()=>setBatchesOpen(true)} disabled={!batches.length&&!batchUndo} title="Every scan sweep filed on this device, and the way to take one back out">↶ SCAN BATCHES</button><a className="feed-operator" href="/?operator=1" title="Opens the AI Operator on the Facility Map — this leaves the Defect Log" onClick={event=>{if(!leaveForOperator())event.preventDefault()}}><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div>
+      <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button><button className="scan-batches-button" type="button" onClick={()=>setBatchesOpen(true)} disabled={!batches.length&&!batchUndo} title="Every photo scan filed on this device, and the way to take one back out">↶ SCAN BATCHES</button><a className="feed-operator" href="/?operator=1" title="Opens the AI Operator on the Facility Map — this leaves the Defect Log" onClick={event=>{if(!leaveForOperator())event.preventDefault()}}><span aria-hidden="true">&#10022;</span> AI OPERATOR</a><button className="heat-scan-button" type="button" onClick={()=>setHeatOpen(true)} disabled={!fleet.length} title="Photograph the heat check sheet: N/R becomes a No Heat defect, and every line is logged as a check">📷 SCAN HEAT SHEET</button></div>
      </div>
     </div>
   </section>}
@@ -1619,6 +2027,17 @@ export default function DefectLog(){
   </section>
   <OfflineBackupReminder buses={fleet} interval={settings.backupInterval}/>
   <section className="log-controls">
+   <div className="log-filters">{([["all","ALL"],["in-progress","IN PROGRESS"],["fixed","FIXED TODAY"],
+    /* OPEN and DOWN SHEET are not offered, but both remain choosable as a saved
+       default view. Somebody whose default is one of them would otherwise see a
+       filtered board with no button lit and nothing saying why — and no way back
+       without opening settings. The button appears only while its own filter is
+       the active one, so it explains the view and clears it, without adding two
+       buttons back for everybody else. */
+    ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
+    ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}</div>
+   <div className="card-view-selector" role="group" aria-label="Defect card view"><span>CARD VIEW</span>{(["detailed","compact"] as CardView[]).map(value=><button type="button" key={value} aria-pressed={cardView===value} onClick={()=>{setCardView(value);const result=writeSetting(localStorage,CARD_VIEW_KEY,value);setCardViewNotice(result.ok?"":"View changed for this visit. Device storage could not remember it.")}}>{value==="compact"?"COMPACT":"DETAILED"}</button>)}</div>
+   {cardViewNotice&&<p className="card-view-notice" role="status">{cardViewNotice}</p>}
    {/* First thing under the header, so the page opens on what it is for. */}
    <button className="log-primary-action" type="button" onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button>
    {/* OPEN and DOWN SHEET are gone as buttons. OPEN differed from ALL only by
@@ -1646,13 +2065,21 @@ export default function DefectLog(){
    {feedWindowText&&<div className="log-window-filtered" role="status">
     <span>LOGGED <b>{feedWindowText}</b>{hiddenByFeedWindow>0?" · "+hiddenByFeedWindow+" OLDER BUS"+(hiddenByFeedWindow===1?"":"ES")+" HIDDEN":""}</span>
     <button type="button" className="show-all-buses" onClick={()=>setFeedWindow("all")}>SHOW ALL DATES</button>
+   </div>}
+   {/* The same bar for the case where there IS no window to describe. It
+       carries the way out too, because the drop-down that set this is behind
+       ADVANCED ACTIONS and somebody looking at a board that ignored their
+       choice should not have to go find it. */}
+   {feedWindowBroken&&<div className="log-window-filtered log-window-broken" role="status">
+    <span>{feedWindowUnresolvedNote(feedWindow)}</span>
+    <button type="button" className="show-all-buses" onClick={()=>setFeedWindow("all")}>SHOW ALL DATES</button>
    </div>}</div>
    {/* Stays here with QUICK FILTERS, which is where somebody looks for it — it is
     not a stat and must not collapse with them. A bare gear on its own read as
     decoration, so it carries its name and is shaped like the buttons beside it. */}
    
   </section>
-  {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header className="quick-filter-head"><span><small>QUICK FILTER</small><b>{quickFilterOwnedLabel}</b></span><strong aria-label={quickFilterBuses.length+" buses"}>{quickFilterBuses.length}</strong><button className="quick-filter-close" onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header>{quickFilterWindowed&&quickFilterAllBuses.length>0&&<TimeWindowChips value={quickFilterWindow} onChange={value=>{setQuickFilterWindow(value);if(quickFilter==="logged")setLoggedCountWindow(value)}} hidden={quickFilterAllBuses.length-quickFilterBuses.length} label={quickFilterLabel.toLowerCase()+" buses"} windows={quickFilterWindowChoices}/>}{quickFilter==="logged"&&!myInitials&&<p className="quick-filter-initials-note">NO INITIALS SET — SHOWING EVERYONE'S REPORTS. ADD YOUR INITIALS IN DEFECT LOG SETTINGS TO SEE ONLY YOURS.</p>}<div className="quick-filter-share-actions"><button type="button" onClick={copyQuickFilterList} aria-label="Copy filtered bus list">{quickFilterShareStatus==="copied"?"COPIED!":"COPY LIST"}</button><button type="button" onClick={shareQuickFilterList} aria-label="Share filtered bus list as text">SHARE</button><button type="button" onClick={shareQuickFilterPage} aria-label="Share filtered bus list as a page">SHARE PAGE</button>{quickFilterShareStatus==="shared"&&<small>SHARED</small>}{quickFilterShareStatus==="error"&&<small>COULD NOT SHARE — TRY COPY LIST</small>}</div><div className="quick-filter-results">{quickFilterBuses.length?quickFilterBuses.map(bus=>{/* The same lines the share will carry, narrowed by the same window — a drawer that shows more than it sends is how somebody learns not to trust the heading. */const defects=quickFilterDefects(bus,quickFilter,new Date().toISOString(),quickFilterShareOptions),fallback=quickFilterFallbackLabel(quickFilter),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):fallback,expanded=quickFilterExpandedBusIds.includes(bus.id),/* Floored at zero: a device with a wrong clock, or a record synced from
+  {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header className="quick-filter-head"><span><small>QUICK FILTER</small><b>{quickFilterOwnedLabel}</b></span><strong aria-label={quickFilterBuses.length+" buses"}>{quickFilterBuses.length}</strong><button className="quick-filter-close" onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header>{quickFilterWindowed&&quickFilterAllBuses.length>0&&<TimeWindowChips value={quickFilterWindow} onChange={value=>{setQuickFilterWindow(value);if(quickFilter==="logged")setLoggedCountWindow(value)}} hidden={quickFilterAllBuses.length-quickFilterBuses.length} label={quickFilterLabel.toLowerCase()+" buses"} windows={quickFilterWindowChoices}/>}{quickFilter==="logged"&&!myInitials&&<p className="quick-filter-initials-note">NO INITIALS SET — SHOWING EVERYONE'S REPORTS. ADD YOUR INITIALS IN DEFECT LOG SETTINGS TO SEE ONLY YOURS.</p>}{quickFilter==="logged"&&<p className="quick-filter-initials-note quick-filter-source-note">LOGGED BY HAND ONLY — BUSES READ OFF A SCANNED DOWN SHEET ARE NOT LISTED HERE. THE DOWN SHEET PAGE SHARES ITS OWN LIST.</p>}<div className="quick-filter-share-actions"><button type="button" onClick={copyQuickFilterList} aria-label="Copy filtered bus list">{quickFilterShareStatus==="copied"?"COPIED!":"COPY LIST"}</button><button type="button" onClick={shareQuickFilterList} aria-label="Share filtered bus list as text">SHARE</button><button type="button" onClick={shareQuickFilterPage} aria-label="Share filtered bus list as a page">SHARE PAGE</button>{quickFilterShareStatus==="shared"&&<small>SHARED</small>}{quickFilterShareStatus==="error"&&<small>COULD NOT SHARE — TRY COPY LIST</small>}</div><div className="quick-filter-results">{quickFilterBuses.length?quickFilterBuses.map(bus=>{/* The same lines the share will carry, narrowed by the same window — a drawer that shows more than it sends is how somebody learns not to trust the heading. */const defects=quickFilterDefects(bus,quickFilter,new Date().toISOString(),quickFilterShareOptions),fallback=quickFilterFallbackLabel(quickFilter),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):fallback,expanded=quickFilterExpandedBusIds.includes(bus.id),/* Floored at zero: a device with a wrong clock, or a record synced from
       one, can carry a deferredAt in the future, and "DEFERRED -120M" is the
       kind of number that makes somebody stop trusting every other number on
       the card. The comparisons that matter — the 90-minute alert and the
@@ -1683,6 +2110,7 @@ export default function DefectLog(){
    <div className="feed-title">{/* LOG DEFECT moved to the top of the controls; it is not repeated here. */}
    {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}{/* Dropped entirely when nothing is outstanding rather than printed as "0m": the line already says 0 DEFECTS, and a zero beside it reads as a broken counter rather than as a clear board. */}{visibleEstimateMinutes>0&&<b className="feed-estimate">{formatRepairTime(visibleEstimateMinutes)} ESTIMATED</b>}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · "),roadCall=roadCallNote(group.bus.roadCalls,undefined,timeLabel);return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
+    {cardView==="compact"&&!expanded&&<button className="log-compact-open" type="button" aria-expanded={false} aria-label={"Open full details and actions for bus "+group.bus.n} onClick={event=>{const card=event.currentTarget.closest("article");setExpandedBusIds(current=>current.includes(group.bus.id)?current:[...current,group.bus.id]);requestAnimationFrame(()=>card?.querySelector<HTMLButtonElement>(".log-group-header")?.focus())}}><span className="compact-bus log-bus-number" data-status={group.bus.s}><span aria-hidden="true">▣</span><strong>{group.bus.n}</strong></span><span className="compact-issue"><strong>{preview}</strong><small>{STATUS_LABELS[group.bus.s]||group.bus.s} · {locationLabel(group.bus.l)} · {group.records.length} defect{group.records.length===1?"":"s"}{busOnDownSheet?" · DS":""}{isHeld(group.bus)?" · HOLD":""}</small></span><span className={"state "+groupState}>{STATE_LABELS[groupState]}</span><span aria-hidden="true">›</span></button>}
     <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
     {/* OUTSIDE the header button, which is why this column moved out of it at
         all: a select nested in a button is invalid, and every tap on it would
@@ -1740,7 +2168,7 @@ export default function DefectLog(){
      title={"Move bus "+group.bus.n+" on the Facility Map"}>
      <em>{locationLabel(group.bus.l)}</em><i aria-hidden="true">▾</i>
     </button>
-    <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>{setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}}>
+    <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={event=>{const header=event.currentTarget,card=header.closest("article"),restoreCompactFocus=cardView==="compact"&&expanded&&document.activeElement===header;setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id]);if(restoreCompactFocus)requestAnimationFrame(()=>card?.querySelector<HTMLButtonElement>(".log-compact-open")?.focus())}}>
      {/* No category glyph on the collapsed card. The round icon showed the
          category of whichever defect happened to be first, which on a MULTIPLE
          DEFECTS card is one category standing in for three. Each expanded row
@@ -1775,9 +2203,9 @@ export default function DefectLog(){
          of these is the one. */}
      {unexplainedDownSheetEntries(group.records,group.bus.id,downEntries).map(entry=><p className="down-sheet-banner elsewhere" key={entry.id}><b>ON THE DOWN SHEET</b><span>{[entry.category,entry.repair,entry.customReason].map(part=>String(part||"").trim()).filter(Boolean).join(" — ")||"Repair required"} — not one of the defects below</span></p>)}{group.records.map((record,index)=><section className={"grouped-defect-row"+(record.onDownSheet?" on-down-sheet":"")} key={record.defect.id}>
      {record.downSheetEntry&&<p className="down-sheet-banner"><b>ON THE DOWN SHEET</b><span>{downSheetEntryLabel(record.downSheetEntry)}</span></p>}
-     <button className="grouped-defect-main" onClick={()=>setEditing(recordDraft(record))}><span className="grouped-defect-number">{index+1}</span><span className="log-repair"><b>{repairCategoryLabel(record.defect.category)}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}</span><span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{isDownSheetRecommended(record.defect)&&<b className="work-state-badge down-sheet-recommended" title={"Recommended for the Down Sheet"+(workStateStampLabel(record.defect.downSheetRecommendation)?" — "+workStateStampLabel(record.defect.downSheetRecommendation):"")}>DS REC</b>}{hasDeferredHistory(record.defect,activeDownBusIdSet.has(group.bus.id))&&<b className="work-state-badge deferred-history" title={"Was deferred, returned to service "+timeLabel(record.defect.deferredReturnedAt||"")+", still open"}>WAS DEFERRED</b>}{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <b className={"work-state-badge "+state.key} key={state.key} title={who?state.label+" — "+who:state.label}>{state.short}</b>})}<time>LOGGED {timeLabel(record.createdAt)}</time>{record.updatedAt!==record.createdAt&&<time>UPDATED {timeLabel(record.updatedAt)}</time>}</span></button>
+     <button className="grouped-defect-main" onClick={()=>setEditing(recordDraft(record))}><span className="grouped-defect-number">{index+1}</span><span className="log-repair"><b>{repairCategoryLabel(record.defect.category)}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{/* EVERY PART. The second of two sites in this file that read `partNumber` alone; a reviewer named both, and the first pass fixed one. */}{defectPartsText(normalizeDefectParts(record.defect.parts,record.defect))&&<small><b>PART{normalizeDefectParts(record.defect.parts,record.defect).length>1?"S":""}:</b> {defectPartsText(normalizeDefectParts(record.defect.parts,record.defect))}</small>}</span><span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{isDownSheetRecommended(record.defect)&&<b className="work-state-badge down-sheet-recommended" title={"Recommended for the Down Sheet"+(workStateStampLabel(record.defect.downSheetRecommendation)?" — "+workStateStampLabel(record.defect.downSheetRecommendation):"")}>DS REC</b>}{hasDeferredHistory(record.defect,activeDownBusIdSet.has(group.bus.id))&&<b className="work-state-badge deferred-history" title={"Was deferred, returned to service "+timeLabel(record.defect.deferredReturnedAt||"")+", still open"}>WAS DEFERRED</b>}{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <b className={"work-state-badge "+state.key} key={state.key} title={who?state.label+" — "+who:state.label}>{state.short}</b>})}{reportAttemptCount(record.defect)>0&&<b className="work-state-badge report-return" title={"Reported "+reportTotal(record.defect)+" times: the original report plus "+reportAttemptCount(record.defect)+" return"+(reportAttemptCount(record.defect)===1?"":"s")}>REPORTED &times;{reportTotal(record.defect)}</b>}<time>LOGGED {timeLabel(record.createdAt)}</time>{record.updatedAt!==record.createdAt&&<time>UPDATED {timeLabel(record.updatedAt)}</time>}{lastReportAttemptAt(record.defect)&&<time className="last-reported">LAST REPORTED {timeLabel(lastReportAttemptAt(record.defect)||"")}</time>}</span></button>
      <ShopNotesEditor record={record} label={settings.display.labels.shopNotes+(group.records.length>1?" "+(index+1):"")} save={saveShopNotes}/>
-     <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark bus "+record.bus.n+" defect "+(index+1)+" fixed"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)} aria-label={"Undo Deferred status for bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">↩</span><b>UNDO DEFERRED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&(extending===record.defect.id
+     <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark fixed: bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)} aria-label={"Undo Deferred status for bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">↩</span><b>UNDO DEFERRED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&(extending===record.defect.id
       ?<span className="extend-deferral-field"><input type="time" value={extendUntil} autoFocus
          onChange={event=>setExtendUntil(event.target.value)}
          aria-label={"Hold bus "+record.bus.n+" until"}/>
@@ -1786,7 +2214,42 @@ export default function DefectLog(){
       :<button className="extend-deferral" type="button" onClick={()=>{setExtending(record.defect.id);setExtendUntil("")}}
          aria-label={"Extend the hold on bus "+record.bus.n+" defect "+(index+1)}
          title={record.defect.deferredUntil?"Held until "+timeLabel(record.defect.deferredUntil):"No end time set"}>
-        <span aria-hidden="true">⏱</span><b>{record.defect.deferredUntil?"EXTEND":"HOLD UNTIL"}</b></button>)}{record.defect.state!=="completed"&&record.bus.s!=="defect"&&record.bus.s!=="decommissioned"&&<button className="back-service" onClick={()=>backInService(record)} aria-label={"Return bus "+record.bus.n+" to service with defect "+(index+1)+" still active"}><span aria-hidden="true">&#8593;</span><b>BACK IN SERVICE</b></button>}<button className="remove-log" onClick={()=>removeFromLog(record)} aria-label={"Remove bus "+record.bus.n+" defect "+(index+1)+" from Defect Log only"}><span aria-hidden="true">×</span><b>REMOVE</b></button></div>
+        <span aria-hidden="true">⏱</span><b>{record.defect.deferredUntil?"EXTEND":"HOLD UNTIL"}</b></button>)}{record.defect.state!=="completed"&&record.bus.s!=="defect"&&record.bus.s!=="decommissioned"&&<button className="back-service" onClick={()=>backInService(record)} aria-label={"Return bus "+record.bus.n+" to service with defect "+(index+1)+" still active"}><span aria-hidden="true">&#8593;</span><b>BACK IN SERVICE</b></button>}<button className="remove-log" onClick={()=>removeFromLog(record)} aria-label={"Remove bus "+record.bus.n+" defect "+(index+1)+" from Defect Log only"}><span aria-hidden="true">×</span><b>REMOVE</b></button>{/* LAST IN THE ROW, not first. The first version put it ahead of MARK FIXED
+          and pushed the most-used control in the rail along by one slot at every
+          width — an addition Curtis asked for, and a move he did not.
+
+          ONE BUTTON, THREE STATES, and no second element in the cell. The first
+          version armed into a span holding a label, a COUNT IT and a cancel ×:
+          roughly 130px of min-content in a cell measured at 64–97px, so the ×
+          overflowed and MARK FIXED — later in DOM order — painted over it.
+          Tapping cancel at 360 and 430 MARKED THE REPAIR COMPLETE, and on the
+          shop computer and both iPad orientations the × was clipped out of
+          reach entirely, leaving no way out of the armed state but counting.
+          A back-out gesture that completes a repair is worse than the problem
+          it was added to solve.
+
+          So arming changes this button's own words and nothing else. It falls
+          back on its own after ARM_WINDOW_MS, which is the cancel: the way out
+          of an accidental press is to do nothing. */}
+       {record.defect.state!=="completed"&&(()=>{
+        const button=reportButtonState({defectId:record.defect.id,armedId:reporting,note:reportNote,busNumber:record.bus.n,position:index+1});
+        return <button type="button" className={"report-again"+(button.tone?" "+button.tone:"")}
+         onClick={()=>{
+          if(reporting!==record.defect.id){setReporting(record.defect.id);setReportNote(null);return}
+          const result=countReturn(record.bus.id,record.defect);
+          setReporting("");
+          setReportNote({id:record.defect.id,tone:result.counted?"counted":"refused",
+           text:result.counted?"COUNTED \u00b7 \u00d7"+(result.returns+1):refusalHeadline(result.reason||"too-soon")});
+         }}
+         aria-label={button.ariaLabel}
+         title="Somebody reported this same defect again. Two taps records the return with today's date.">
+         <span aria-hidden="true">&#8635;</span>
+         {/* The outcome is the whole point of a button that changes its own
+             words, and it was reaching nobody using a screen reader: the
+             aria-label still said the pre-press name in both outcome states,
+             and the card's only live region was removed with the old note. */}
+         <b aria-live={button.announce?"polite":undefined}>{button.label}</b></button>;
+       })()}</div>
     </section>)}
     </div>}
      {/* THE CLOSING LINE, off unless asked for. Curtis wanted this one kept as
@@ -1808,50 +2271,15 @@ export default function DefectLog(){
   {/* PATH TO REPAIR. Rendered AFTER the focus shade so it stacks above the
       view it was opened from, and the focus view is deliberately left open
       underneath: closing this returns somebody to the bus they were reading
-      rather than to the top of the feed. */}
-  {ptrFor&&<div className="log-shade ptr-shade" onMouseDown={event=>{if(event.target===event.currentTarget)setPtrFor(null)}}>
-   <section className="ptr-panel" role="dialog" aria-modal="true" aria-label="Path to repair">
-    <div className="ptr-head"><span><small>PATH TO REPAIR</small><b>{repairCategoryLabel(ptrFor.category)}</b><i>{ptrFor.issue}</i></span><button className="ptr-close" type="button" onClick={()=>setPtrFor(null)} aria-label="Close path to repair">×</button></div>
-    {/* THE SHOP'S TIME, above the steps and always present. It is the one number
-        on this screen that the hours badge on the feed reads, so it is shown
-        whether or not anybody has written steps — a repair can have a time and
-        no writeup, or a writeup and no time. */}
-    {(()=>{
-     const shop=findRepairMinutes(repairHours,ptrFor.category,ptrFor.issue);
-     const fallback=defectEstimateMinutes({id:"ptr",category:ptrFor.category,issue:ptrFor.issue,details:"",operability:"service",state:"open"} as StructuredDefect);
-     return <div className="ptr-hours">
-      <label>SHOP TIME FOR THIS REPAIR<HoursField value={shop?Math.round(shop.minutes/60*100)/100:undefined} placeholder={String(Math.round(fallback/60*100)/100)} ariaLabel="Shop time for this repair, in hours" onChange={hours=>saveShopHours(hours===undefined?"":String(hours))}/></label>
-      <small>{shop
-       ?"SET BY "+(shop.updatedBy||"SOMEONE")+" · USED FOR EVERY BUS WITH THIS REPAIR"
-       :"NOT SET — ESTIMATING "+formatRepairTime(fallback)+" FROM THE CATALOG. TYPE A NUMBER TO REPLACE IT."}</small>
-     </div>;
-    })()}
-    {(()=>{
-     const saved=findPathToRepair(pathToRepairs,ptrFor.category,ptrFor.issue);
-     if(ptrEditing)return <div className="ptr-body">
-      <label className="ptr-edit">STEPS — GENERAL DIRECTION, NOT A PROCEDURE
-       <textarea value={ptrDraft} maxLength={MAX_PATH_TO_REPAIR} rows={9} autoFocus
-        placeholder="Add the first checks and useful references to help someone start this repair."
-        onChange={event=>setPtrDraft(event.target.value)}/></label>
-      <small className="ptr-count">{ptrDraft.trim().length} / {MAX_PATH_TO_REPAIR}</small>
-      {ptrProblem&&<p className="ptr-problem">{ptrProblem}</p>}
-      <div className="ptr-actions">
-       <button type="button" className="ptr-save" onClick={savePtr}>{ptrDraft.trim()?"SAVE":"CLEAR IT"}</button>
-       <button type="button" className="ptr-cancel" onClick={()=>{if(saved){setPtrDraft(saved.steps);setPtrEditing(false);setPtrProblem("")}else setPtrFor(null)}}>CANCEL</button>
-      </div>
-      {/* Said on the screen that writes it, because somebody filling this in is
-          entitled to know who will see it. */}
-      <p className="ptr-note">This is written once for <b>{repairCategoryLabel(ptrFor.category)} — {ptrFor.issue}</b> and shows on every bus with that repair. It stays on this device; it does not travel to the Shop Cloud yet.</p>
-     </div>;
-     if(!saved)return <div className="ptr-body"><p className="ptr-empty"><b>Nothing written yet for this repair.</b><span>Add the first checks and useful references to help someone start this repair.</span></p><div className="ptr-actions"><button type="button" className="ptr-save" onClick={()=>setPtrEditing(true)}>WRITE IT</button></div></div>;
-     return <div className="ptr-body">
-      <p className="ptr-steps">{saved.steps}</p>
-      <div className="ptr-actions"><button type="button" className="ptr-save" onClick={()=>{setPtrDraft(saved.steps);setPtrEditing(true)}}>EDIT</button></div>
-      <p className="ptr-note">{saved.updatedBy?"Written by "+saved.updatedBy+", ":"Written "}{saved.updatedAt?timeLabel(saved.updatedAt):"earlier"} · shows on every bus with this repair</p>
-     </div>;
-    })()}
-   </section>
-  </div>}
+      rather than to the top of the feed. The `key` remounts the panel when the
+      repair changes, which is what re-seeds its draft and its edit mode from
+      the library — the same thing `openPathToRepair` used to do by hand, and
+      now in one place rather than once per caller. */}
+  {ptrFor&&<PathToRepairPanel key={ptrFor.category+"|"+ptrFor.issue}
+   category={ptrFor.category} issue={ptrFor.issue} initials={settings.defaultInitials}
+   pathToRepairs={pathToRepairs} repairHours={repairHours}
+   onPathToRepairs={setPathToRepairs} onRepairHours={setRepairHours}
+   onClose={()=>setPtrFor(null)}/>}
   {focusedGroup&&<div className="log-shade log-focus-shade" onMouseDown={event=>{if(event.target===event.currentTarget)setFocusedBusId("")}}>
    <section className="log-focus" role="dialog" aria-modal="true" aria-label={"Bus "+focusedGroup.bus.n+" defects"}>
     <div className="log-focus-head"><span className="log-focus-bus"><small>BUS</small><strong>{focusedGroup.bus.n}</strong></span><span className="log-focus-where"><b>{locationLabel(focusedGroup.bus.l)}</b><small>{STATUS_LABELS[focusedGroup.bus.s]||focusedGroup.bus.s}</small></span><button className="add-log-focus-defect" type="button" onClick={()=>{const busId=focusedGroup.bus.id;setFocusedBusId("");setEditing({...newDraft(),busId})}} aria-label={"Add a defect to bus "+focusedGroup.bus.n}>+ ADD DEFECT</button><button className="close-log-focus" type="button" onClick={()=>setFocusedBusId("")} aria-label="Close focus view">×</button></div>
@@ -1860,9 +2288,13 @@ export default function DefectLog(){
         at the bottom is a scroll away from the thing somebody opened this to
         send. */}
     <div className="log-focus-share" role="group" aria-label={"Share bus "+focusedGroup.bus.n+" defects"}>
-     <button type="button" onClick={copyFocusBus} aria-label={"Copy bus "+focusedGroup.bus.n+" defects"}>{focusShareStatus==="copied"?"COPIED!":"COPY"}</button>
-     <button type="button" onClick={shareFocusBusText} aria-label={"Share bus "+focusedGroup.bus.n+" defects as text"}>SHARE</button>
-     <button type="button" onClick={shareFocusBusPage} aria-label={"Share bus "+focusedGroup.bus.n+" defects as a page"}>SHARE PAGE</button>
+     {/* DEAD WHEN THERE IS NOTHING LEFT TO SEND, rather than sending an empty
+         bus. `disabled` as well as the refusal inside each handler: the handler
+         is what makes it true, and this is what stops a mechanic pressing a
+         live-looking button and getting nothing. The slot below says why. */}
+     <button ref={focusCopyRef} type="button" onClick={copyFocusBus} disabled={focusShareEmpty} aria-label={"Copy bus "+focusedGroup.bus.n+" defects"}>{focusShareStatus==="copied"?"COPIED!":"COPY"}</button>
+     <button type="button" onClick={shareFocusBusText} disabled={focusShareEmpty} aria-label={"Share bus "+focusedGroup.bus.n+" defects as text"}>SHARE</button>
+     <button type="button" onClick={shareFocusBusPage} disabled={focusShareEmpty} aria-label={"Share bus "+focusedGroup.bus.n+" defects as a page"}>SHARE PAGE</button>
      {/* MOUNTED WHETHER OR NOT IT HAS ANYTHING TO SAY. A live region only
          announces what changes INSIDE it; one that appears at the same moment
          as its text is a new element to a screen reader, not an update, and is
@@ -1884,13 +2316,47 @@ export default function DefectLog(){
        focusShareStatus==="saved"?"SAVED TO THIS DEVICE":
        focusShareStatus==="error"?"COULD NOT SHARE — TRY COPY":""}
      </small>
+     {/* AND WHAT A HIDE DID, announced and never drawn. A row leaving the list
+         and a button arriving are both silent, and the HIDE control that was
+         pressed is gone with its row, so without this a hide is a press with no
+         outcome. Always visually hidden rather than hidden-when-empty: the
+         visible answer is the row going, and a second line of 7px text in this
+         bar would be competing with the one that says what will be sent. */}
+     <small className="log-focus-share-live" role="status" aria-live="polite">{focusHideNote}</small>
      {/* WHAT WILL ACTUALLY GO, when the board is hiding some of it. Pressing
          SHARE on a screen showing two and sending six is a surprise worth one
          line; with no filter on, the two numbers agree and this says nothing. */}
-     {focusHiddenByBoard>0&&<small className="log-focus-share-scope">SHARES ALL {focusedAllRecords.length} — {focusHiddenByBoard} HIDDEN BY THE BOARD FILTER</small>}
+     {/* ONE SLOT, ALWAYS MOUNTED. Both of these appear and disappear, and they
+         sit ABOVE the rows - so mounting them moved the whole list by 70px on
+         a phone and 115px on the shop computer on every hide and every undo,
+         putting a different row under the thumb that was about to swipe. The
+         slot holds its height; only its contents change.
+
+         IT CARRIED AN `aria-hidden` WHEN EMPTY AND THAT CLAIM WAS EMPTY TOO.
+         The comment said it kept an announced blank out of the tree - but this
+         slot is not a live region, so nothing announces it either way, and the
+         two things inside it are already silent when there is nothing to say:
+         an empty `<small>` reads as nothing, and PUT BACK is
+         `visibility:hidden`, which takes it out of the tree on its own. One
+         fewer condition on the markup, and one fewer sentence that is not true.
+
+         TWO REASONS, COUNTED APART. A defect the view held back is still on
+         the bus; one swiped away is somebody saying "not this one". Silent
+         when the share is the whole bus.
+
+         AND THE WAY BACK IS ON THE PAGE, not behind a menu - the rule the Down
+         Sheet's own PUT BACK follows, because an accidental swipe is exactly
+         when nobody goes looking for an undo. It takes the LAST one back, so
+         pressing it repeatedly walks the swipes off in reverse. */}
+     <div className="log-focus-share-slot">
+      <small className="log-focus-share-scope">{focusShareScopeNote(focusScope)}</small>
+      <button ref={focusPutBackRef} type="button" className="focus-put-back" onClick={focusPutBack}
+       style={focusScope.hiddenByHand>0?undefined:{visibility:"hidden"}}
+       tabIndex={focusScope.hiddenByHand>0?0:-1}><span aria-hidden="true">&#8629;</span><b>PUT BACK{focusScope.hiddenByHand>1?" ("+focusScope.hiddenByHand+")":""}</b></button>
+     </div>
     </div>
-    <div className="log-focus-body">{focusedGroup.records.map((record,index)=><article className={"log-focus-record "+record.defect.state} key={record.defect.id}>
-     <div className="log-focus-record-head"><b>{focusedGroup.records.length>1?index+1+". ":""}{repairCategoryLabel(record.defect.category)}</b><i className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</i></div>
+    <div className="log-focus-body">{focusScope.rows.map((record,index)=><SwipeAwayRow className={"log-focus-record "+record.defect.state} key={record.defect.id} hideLabel={"Hide "+repairCategoryLabel(record.defect.category)+" from this share"} onHide={via=>focusHideRecord(record,via)}>
+     <div className="log-focus-record-head"><b>{focusScope.rows.length>1?index+1+". ":""}{repairCategoryLabel(record.defect.category)}</b><i className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</i></div>
      <p className="log-focus-defect">{defectLabel(record.defect)}</p>
      {/* Spelled out here rather than abbreviated: the focus view is the one a
          foreman reads standing next to somebody, and "DIAGNOSED — CJ, Aug 27"
@@ -1902,7 +2368,7 @@ export default function DefectLog(){
      {record.defect.conditionNotDuplicated&&<p><b>RESULT</b>Defect / condition not duplicated</p>}
      {record.defect.diagnosticNote&&<p><b>DIAG</b>{record.defect.diagnosticNote}</p>}
      {record.defect.actionTaken&&<p><b>ACTION</b>{record.defect.actionTaken}</p>}
-     {record.defect.partNumber&&<p><b>PART</b>{record.defect.partNumber}</p>}
+     {/* EVERY PART. This read `partNumber`, so a second part was invisible here too. */}{defectPartsText(normalizeDefectParts(record.defect.parts,record.defect))&&<p><b>PART{normalizeDefectParts(record.defect.parts,record.defect).length>1?"S":""}</b>{defectPartsText(normalizeDefectParts(record.defect.parts,record.defect))}</p>}
      {record.defect.shopNotes&&<p><b>{settings.display.labels.shopNotes.toUpperCase()}</b>{record.defect.shopNotes}</p>}
      {reportAttemptCount(record.defect)>0&&<p className="log-focus-work-states"><b>CAME BACK</b><span><i className="work-state-badge report-return">{reportAttemptCount(record.defect)}× SINCE IT WAS LOGGED — see ADVANCED STATS below</i></span></p>}
      <div className="log-focus-record-foot">
@@ -1915,7 +2381,7 @@ export default function DefectLog(){
       </div>
       <div className="log-focus-record-meta"><time>LOGGED {timeLabel(record.createdAt)}</time>{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)}>UNDO DEFERRED</button>}</div>
      </div>
-    </article>)}
+    </SwipeAwayRow>)}
     {/* ADVANCED STATS — the last thing in the focus body, after however many
         defects the bus is carrying. Curtis: "make it viewable only in focus,
         like the bottom of however many defects listed. This way the list can
@@ -1954,10 +2420,10 @@ export default function DefectLog(){
     </div>
    </section>
   </div>}
-  {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside}/>}
+  {editing&&<DefectEditor key={editing.busId+":"+editing.defect.id} draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} coachOn={coachOn} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} shopHours={repairHours} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside}/>}
   {/* Rendered here rather than inside ADVANCED ACTIONS: closing that section
       must not tear down a scanner somebody is part-way through. */}
-  {sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}
+  {sweepOpen&&<SweepScanner fleet={fleet} handed={handed} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{heatOpen&&<HeatScanner fleet={fleet} handed={handed} onClose={()=>setHeatOpen(false)} onFile={fileHeat}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}
   {holdBoardOpen&&<HoldBoard fleet={fleet} close={()=>setHoldBoardOpen(false)} onRelease={busId=>setHold(busId,false)}/>}
   {movingMysteryBus&&<MysteryMoveModal bus={movingMysteryBus} fleet={fleet} move={moveMysteryBus} close={()=>setMovingMysteryBusId("")}/>}
   

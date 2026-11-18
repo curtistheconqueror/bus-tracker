@@ -1,6 +1,6 @@
 import {normalizeRepairTimeEstimate,repairTimeTotal} from "../down-sheet/repair-time-estimates.ts";
 import {findRepairMinutes,type RepairHoursLedger} from "./repair-hours-ledger.ts";
-import {isUnresolved,type StructuredDefect} from "./repair-catalog.ts";
+import {isUnresolved,normalizeRepairHours,type StructuredDefect} from "./repair-catalog.ts";
 
 /* HOW LONG THE WORK STANDING ON THE BOARD WOULD TAKE.
 
@@ -25,16 +25,27 @@ import {isUnresolved,type StructuredDefect} from "./repair-catalog.ts";
    overstate the board. Both halves of what the editor collects are counted,
    because diagnostic time is time: a fault nobody can find yet is work. */
 export function defectEstimateMinutes(defect:StructuredDefect,ledger?:RepairHoursLedger){
- /* THREE SOURCES, MOST SPECIFIC FIRST, and the order is the whole design.
+ /* FOUR SOURCES, MOST SPECIFIC FIRST, and the order is the whole design.
 
-    1. WHAT SOMEBODY WROTE ON THIS JOB. The hours typed on this defect describe
-       this bus on this day and beat any general figure.
-    2. WHAT THIS SHOP SAYS THE REPAIR TAKES — the ledger, set by hand. Curtis:
+    1. THE ESTIMATE SOMEBODY TYPED FOR THIS REPAIR, on this bus — ESTIMATED
+       TIME OF REPAIR in the Defect Log editor. It is the only one of the four
+       that is an answer to the question being asked, so nothing outranks it.
+    2. WHAT SOMEBODY WROTE ON THIS JOB. The billable hours typed on this defect
+       describe this bus on this day and beat any general figure.
+    3. WHAT THIS SHOP SAYS THE REPAIR TAKES — the ledger, set by hand. Curtis:
        "as long as a person can change the repair times then and then it
        updates. That's all that matters really." It is a fixed number somebody
        stands behind, not something that drifts.
-    3. THE CATALOG'S ESTIMATE, which is a guess made by somebody who has never
-       stood in this garage, and is therefore last. */
+    4. THE CATALOG'S ESTIMATE, which is a guess made by somebody who has never
+       stood in this garage, and is therefore last.
+
+    THE ESTIMATE SITS ABOVE THE BILLED HOURS and the two only ever meet on a
+    job that is part-billed and still open — a completed repair contributes
+    nothing to the badge at all. On that job the billed figure is time already
+    spent and the estimate is the whole repair, and the whole repair is what
+    "how much work is standing on this board" means. */
+ const planned=normalizeRepairHours(defect.estimateHours);
+ if(planned!==undefined)return Math.round(planned*60);
  const typed=(defect.repairHours||0)+(defect.diagnosticHours||0);
  if(typed>0)return Math.round(typed*60);
  const shop=ledger?findRepairMinutes(ledger,defect.category||"",defect.issue||""):null;

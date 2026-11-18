@@ -1,8 +1,8 @@
 import {candidateBusNumbers,resolveBusNumber} from "../fleet/bus-number-resolver.ts";
-import {REPAIR_OPTIONS,type DefectOperability,type StructuredDefect} from "../defects/repair-catalog.ts";
+import {REPAIR_OPTIONS,REPAIR_OPTION_GROUPS,migrateRepairIdentity,type DefectOperability,type StructuredDefect} from "../defects/repair-catalog.ts";
 import {analyzeFleetQuestion,findOperatorArea,findOperatorAreaMentions,type FleetInsightBus} from "../fleet/fleet-intelligence.ts";
 import type {FleetStatus} from "../fleet/smart-status.ts";
-import {describeScanBatch,scanBatches,type ScanBatch} from "../defects/scan-batches.ts";
+import {describeScanBatch,scanBatches,scanBatchWords,type ScanBatch,type ScanBatchKind} from "../defects/scan-batches.ts";
 
 export type OperatorBus=FleetInsightBus;
 
@@ -178,7 +178,83 @@ function areaFromCommand(command:string,areas:OperatorArea[]){
  return findOperatorArea(command,areas);
 }
 
-const DEFECT_CHOICES=Object.entries(REPAIR_OPTIONS).flatMap(([category,issues])=>issues.map(issue=>({category,issue,key:normalized(issue)}))).sort((a,b)=>b.key.length-a.key.length);
+/* WHAT A SPOKEN COMMAND IS MATCHED AGAINST, longest key first so the most
+   specific wording wins.
+
+   A GROUPED CATEGORY ALSO ANSWERS TO THE BARE ITEM, because nobody says the
+   group out loud. The stored identity is "Group - Item", so keying only on the
+   full string meant "defect no cooling" matched nothing the moment A/C and
+   HVAC was grouped — nineteen wordings that had worked the day before. The
+   alias restores them, and incidentally gives the other grouped categories the
+   same reach flat ones always had.
+
+   AN AMBIGUOUS ALIAS IS DROPPED RATHER THAN GUESSED. Three Tech Services
+   wordings share a tail — "INOP (general)" belongs to Farebox, Ventra and the
+   IBS Screen, and "Screen black" to both the CUBIC and IBS screens — so a bare
+   key there would pick one device out of three and send somebody to the wrong
+   box. Those keep needing the full phrase, which is the same rule the rest of
+   this app follows: where a record does not say which, nothing guesses. */
+/* AND A SHORT WAY TO SAY IT, where nothing derived from the catalog can reach
+   the words somebody actually uses.
+
+   Curtis, naming the run box entry: *"I'll just think of a way to a short hand
+   way to say it, I think run box no display might be the best one."* The entry
+   is called that and the alias above gets "run box no display" for free — but
+   a mechanic standing at the bus says "the run box", and that matched nothing
+   at all, which is the one outcome a spoken path cannot afford.
+
+   HAND-TYPED, AND DELIBERATELY SHORT. Everything above is derived from the
+   catalog, which is why it has never needed maintaining; this list is the
+   exception, and each row is a claim that one phrase can only mean one repair.
+   A row is DROPPED rather than trusted the moment that stops being true:
+
+   - A phrase the catalog already uses — as a full name, or as a bare item the
+     alias pass claimed, ambiguous or not — keeps its derived meaning. A
+     shorthand may never shadow a real wording, and a row that would override
+     a genuine ambiguity is a decision that needs its own reasoning here
+     rather than a quiet win on list order.
+   - The target resolves through `migrateRepairIdentity`, the same function
+     every stored defect is read through, so a catalog rename moves the phrase
+     with the repair. Keyed on raw wording it would point at a name that no
+     longer exists and simply stop matching — silently, which is the failure
+     PATH TO REPAIR's key argues at length about.
+   - A target no longer in the catalog at all drops the row, because filing a
+     defect under a retired identity is worse than not hearing the phrase.
+   - AND A PHRASE THAT REACHES TWO CATALOG WORDINGS DROPS, which is the rule
+     that keeps this list from aging into a guess. "Run box" is unique today;
+     the moment a second run-box repair exists it names two, and this stops
+     answering rather than quietly sending somebody to the older one — the
+     refusal the alias pass above already makes for "screen black".
+
+   A test asserts every row still resolves, so a retirement or a second
+   wording fails the build and somebody chooses, instead of going quiet. */
+export const SPOKEN_SHORTHAND:{category:string;issue:string;say:string}[]=[
+ {category:"Tech Services",issue:"IBS Screen - Run box no display",say:"run box"},
+];
+
+const DEFECT_CHOICES=(()=>{
+ const full=Object.entries(REPAIR_OPTIONS).flatMap(([category,issues])=>
+  issues.map(issue=>({category,issue,key:normalized(issue)})));
+ const taken=new Set(full.map(choice=>choice.key));
+ const counts=new Map<string,number>();
+ const aliases=Object.entries(REPAIR_OPTIONS).flatMap(([category,issues])=>
+  REPAIR_OPTION_GROUPS[category]
+   ?issues.map(issue=>({category,issue,key:normalized(issue.split(" - ").slice(1).join(" - "))}))
+   :[]).filter(choice=>choice.key&&!taken.has(choice.key));
+ for(const choice of aliases)counts.set(choice.key,(counts.get(choice.key)||0)+1);
+ /* Longest key first, so a shorthand never steals the full wording: somebody
+    who says "run box no display" still gets there through the alias, and the
+    short phrase only answers when the long one is not in the sentence. */
+ const everyWording=Object.values(REPAIR_OPTIONS).flat().map(issue=>normalized(issue));
+ const shorthand=SPOKEN_SHORTHAND.map(row=>{
+  const moved=migrateRepairIdentity(row.category,row.issue);
+  return {category:moved.category,issue:moved.issue,key:normalized(row.say)};
+ }).filter(choice=>Boolean(choice.key)&&!taken.has(choice.key)&&!counts.has(choice.key)
+  &&(REPAIR_OPTIONS[choice.category]||[]).includes(choice.issue)
+  &&everyWording.filter(wording=>wording.includes(choice.key)).length===1);
+ return [...full,...aliases.filter(choice=>counts.get(choice.key)===1),...shorthand]
+  .sort((a,b)=>b.key.length-a.key.length);
+})();
 
 function defectFromCommand(command:string):{defect:DefectDraft;flag?:"checkEngine"|"noHorn"|"badRampKneeler"}|null{
  const text=normalized(command);
@@ -205,7 +281,7 @@ function areaLabel(bus:OperatorBus,areas:OperatorArea[]){return areas.find(area=
    the last sweep filed 24 is that sweep; when it filed 19, the operator says so
    rather than removing 19 and calling it 24. A command naming a bus is not a
    batch command at all and falls through to the per-bus paths. */
-type ScanBatchIntent={action:"remove"|"restore";count:number|null;namesScan:boolean};
+type ScanBatchIntent={action:"remove"|"restore";count:number|null;namesScan:boolean;kind:ScanBatchKind|null};
 
 function scanBatchCommand(text:string):ScanBatchIntent|null{
  if(/\bbus(?:es)?\s*(?:number|no|#)?\s*\d/.test(text)||/\b\d{5}\b/.test(text))return null;
@@ -219,27 +295,38 @@ function scanBatchCommand(text:string):ScanBatchIntent|null{
  const count=counted?parseInt(counted[1],10):null;
  /* Without a count and without a scan word, "undo the last change to the log"
     is not a batch — the log's own UNDO LAST is that, and the operator says so. */
- if(!restore&&!namesScan&&count===null)return {action:"remove",count:null,namesScan:false};
- return {action:restore?"restore":"remove",count,namesScan};
+ /* "Heat" names the heat sheet's scanner; "sweep", "farebox" and "Ventra" name
+    the other one. Naming both, or neither, names no kind. */
+ const heat=/\bheat\b/.test(text),sweep=/\b(?:sweep|swept|farebox|fareboxes|ventra)\b/.test(text);
+ const kind:ScanBatchKind|null=heat===sweep?null:heat?"heat":"sweep";
+ if(!restore&&!namesScan&&count===null)return {action:"remove",count:null,namesScan:false,kind};
+ return {action:restore?"restore":"remove",count,namesScan,kind};
 }
 
 function batchLine(batch:ScanBatch){return describeScanBatch(batch)}
 
 function planScanBatch(intent:ScanBatchIntent,fleet:OperatorBus[]):OperatorPlanningResult{
- if(intent.action==="restore")return {kind:"plan",plan:{kind:"restoreScanBatch",requiresConfirmation:true,summary:"Put back the last scan sweep removed on this device — every record goes back on its bus, stamped as new work so the shop cloud accepts it over the deletion"}};
- const batches=scanBatches(fleet);
+ /* WHICH SCAN WAS ASKED FOR. Two scanners file batches now, and this used to
+    take the newest of either: "remove the last heat sheet scan" with a farebox
+    sweep filed after it planned the removal of the SWEEP, and said so in the
+    sweep's words. A command that names a kind gets that kind; one that names
+    neither — "the last 24 entries" — still means the newest of any. */
+ const asked=intent.kind?scanBatchWords({kind:intent.kind}).noun:"photo scan";
+ if(intent.action==="restore")return {kind:"plan",plan:{kind:"restoreScanBatch",requiresConfirmation:true,summary:"Put back the last scan removed on this device — every record goes back on its bus, stamped as new work so the shop cloud accepts it over the deletion"}};
+ const all=scanBatches(fleet),batches=intent.kind?all.filter(batch=>batch.kind===intent.kind):all;
  const newest=batches[0];
- if(!newest)return {kind:"message",message:"There is no scan sweep on this device's Defect Log to take out. Every record filed by SCAN SWEEP in one press shares one time stamp, and none of the records here carry one."};
- if(!intent.namesScan&&intent.count===null)return {kind:"message",message:"The Defect Log's own UNDO LAST button reverses its most recent save. From here I can take out a whole scan sweep: the most recent one filed "+batchLine(newest)+". Say “remove the last scan sweep from the defect log” and I will preview exactly that."};
+ if(!newest)return {kind:"message",message:"There is no "+asked+" on this device's Defect Log to take out. Every record a scan files in one press shares one time stamp, and none of the records here carry one."+(intent.kind&&all.length?" There is a "+scanBatchWords(all[0]).noun+": "+batchLine(all[0])+".":"")};
+ const noun=scanBatchWords(newest).noun,short=scanBatchWords(newest).short;
+ if(!intent.namesScan&&intent.count===null)return {kind:"message",message:"The Defect Log's own UNDO LAST button reverses its most recent save. From here I can take out a whole "+noun+": the most recent one filed "+batchLine(newest)+". Say “remove the last "+noun+" from the defect log” and I will preview exactly that."};
  if(intent.count!==null&&intent.count!==newest.ids.length){
   const match=batches.find(batch=>batch.ids.length===intent.count);
-  if(match)return {kind:"message",message:"The most recent scan sweep filed "+newest.ids.length+" records, not "+intent.count+". A sweep of "+intent.count+" was filed earlier: "+batchLine(match)+". Say “remove the scan sweep from "+describeWhen(match.filedAt)+"”, or “remove the last scan sweep” for the most recent one."};
-  return {kind:"message",message:"The most recent scan sweep filed "+newest.ids.length+" records, not "+intent.count+" — "+batchLine(newest)+". Say “remove the last scan sweep” to take out those "+newest.ids.length+", or open SCAN BATCHES on the Defect Log to see every sweep."};
+  if(match)return {kind:"message",message:"The most recent "+noun+" filed "+newest.ids.length+" records, not "+intent.count+". A "+scanBatchWords(match).noun+" of "+intent.count+" was filed earlier: "+batchLine(match)+". Open SCAN BATCHES on the Defect Log to take that one out, or say “remove the last "+noun+"” for the most recent one."};
+  return {kind:"message",message:"The most recent "+noun+" filed "+newest.ids.length+" records, not "+intent.count+" — "+batchLine(newest)+". Say “remove the last "+noun+"” to take out those "+newest.ids.length+", or open SCAN BATCHES on the Defect Log to see every scan."};
  }
- if(!newest.removableIds.length)return {kind:"message",message:"Every record in the most recent scan sweep ("+batchLine(newest)+") has been worked on since — marked fixed, deferred, ticked or written on — so there is nothing untouched to take out. Nothing was changed."};
+ if(!newest.removableIds.length)return {kind:"message",message:"Every record in the most recent "+noun+" ("+batchLine(newest)+") has been worked on since — marked fixed, deferred, ticked or written on — so there is nothing untouched to take out. Nothing was changed."};
  const kept=newest.keptIds.length;
  return {kind:"plan",plan:{kind:"removeScanBatch",requiresConfirmation:true,batchKey:newest.key,count:newest.ids.length,busCount:newest.busNumbers.length,
-  summary:"Remove the "+newest.removableIds.length+" Tech Services record"+(newest.removableIds.length===1?"":"s")+" SCAN SWEEP filed at "+describeWhen(newest.filedAt)+" from "+newest.busNumbers.length+" bus"+(newest.busNumbers.length===1?"":"es")+" ("+newest.busNumbers.slice(0,6).join(", ")+(newest.busNumbers.length>6?", …":"")+")."+(kept?" "+kept+" record"+(kept===1?"":"s")+" from that sweep "+(kept===1?"has":"have")+" been worked on since and will be kept.":"")+" The shop cloud is told, so the other devices drop them too. The way back is SCAN BATCHES on the Defect Log, or tell me to put the sweep back."}};
+  summary:"Remove the "+newest.removableIds.length+" "+scanBatchWords(newest).records+" record"+(newest.removableIds.length===1?"":"s")+" "+scanBatchWords(newest).filedBy+" filed at "+describeWhen(newest.filedAt)+" from "+newest.busNumbers.length+" bus"+(newest.busNumbers.length===1?"":"es")+" ("+newest.busNumbers.slice(0,6).join(", ")+(newest.busNumbers.length>6?", …":"")+")."+(kept?" "+kept+" record"+(kept===1?"":"s")+" from that "+short+" "+(kept===1?"has":"have")+" been worked on since and will be kept.":"")+(newest.kind==="heat"?" The heat checks that scan logged come off the check log with it.":"")+" The shop cloud is told, so the other devices drop them too. The way back is SCAN BATCHES on the Defect Log, or tell me to put the "+short+" back."}};
 }
 
 function describeWhen(iso:string){
@@ -421,7 +508,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
     from. Both spellings route here now, and `asked` decides what happens. */
  if(/\b(defects?|issues?|check engine|horn|ramp|kneeler)\b/.test(text)){
   const selected=defectFromCommand(command);
-  if(!selected)return {kind:"message",message:"I found Bus "+bus.n+", but I could not match the requested repair to the approved defect catalog. Try a specific item such as Check engine light, Horn, No cooling, ABS warning, or Wheelchair ramp.",context:busContext(bus)};
+  if(!selected)return {kind:"message",message:"I found Bus "+bus.n+", but I could not match the requested repair to the approved defect catalog. Try a specific item such as Check engine light, Horn, No cooling, ABS warning, or Wheelchair ramp. For a farebox or a screen, say which one.",context:busContext(bus)};
   /* THE INVERSION, CLOSED. Asked whether a bus HAS a repair, answer from the
      record rather than offering to create it. */
   if(asked){

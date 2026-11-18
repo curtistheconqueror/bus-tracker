@@ -59,7 +59,11 @@ function generationLabel(value:string){return value==="OTHER"?"OTHER":value+"s"}
    The callback has to be stable for this to bite at all; see the useCallback
    where it is passed. Given an inline arrow it would be a new prop every
    render and the memo would do nothing but cost a comparison. */
-function BusSelector({fleet,busId,select,listId="bus-number-options",autoFocus=true}:{fleet:PickerBus[];busId:string;select:(busId:string)=>void;listId?:string;autoFocus?:boolean}){
+/* `coach` names the BUS NUMBER box for the step-by-step helper to ring —
+   that fieldset rather than the generation chips above it, because the number
+   is the thing the step is asking for and the chips only narrow the list.
+   Absent on the Down Sheet, which does not draw the helper. */
+function BusSelector({fleet,busId,select,listId="bus-number-options",autoFocus=true,coach}:{fleet:PickerBus[];busId:string;select:(busId:string)=>void;listId?:string;autoFocus?:boolean;coach?:string}){
  const selected=fleet.find(bus=>bus.id===busId);
  /* THE FLEET DECIDES THESE, AND THE FLEET IS NOT WHAT CHANGES WHILE SOMEBODY
     TYPES. Every list below was rebuilt on every keystroke — see the measurement
@@ -103,7 +107,7 @@ function BusSelector({fleet,busId,select,listId="bus-number-options",autoFocus=t
    <div className="bus-generations" aria-label="Bus generation">{generations.map(value=><button type="button" className={generation===value?"active":""} aria-pressed={generation===value} onClick={()=>chooseGeneration(value)} key={value}>{generationLabel(value)}</button>)}</div>
    <small>{generation?candidates.length+" buses in "+generationLabel(generation):"Narrows the bus list below. Skip it if you know the number."}</small>
   </fieldset>
-  <fieldset className="wide bus-picker bus-picker-number"><legend>BUS NUMBER</legend>
+  <fieldset className="wide bus-picker bus-picker-number" data-coach={coach}><legend>BUS NUMBER</legend>
    <div className="bus-picker-fields">
     <label>BUS LIST<select value={busId} disabled={!generation} onChange={event=>chooseBus(event.target.value)}><option value="">{generation?"Choose a "+generationLabel(generation)+" bus":"Choose generation first"}</option>{busListOptions}</select></label>
     {/* The typed number is the way in that gets used, so it is the biggest

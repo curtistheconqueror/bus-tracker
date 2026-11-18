@@ -21,6 +21,8 @@
    not somewhere else. */
 
 import {DEFAULT_STATUS_REPORT_PICK,mysteryLabel,statusReportStamp,techSections,STATUS_REPORT_ROAD_CALL_HOURS,type FleetStatusReport,type StatusReportBusLine,type StatusReportPick} from "./fleet-status-report.ts";
+/* The report takes its heading as an option; this is only the fallback. */
+import {SITE_ORGANIZATION_CAPS} from "../settings/site-identity.ts";
 import {FORECAST_HEDGE,rangeLabel,type FleetForecast} from "./fleet-forecast.ts";
 
 /* Everything that reaches the page is a value from the board — fleet numbers,
@@ -86,7 +88,7 @@ export function statusReportPrintHtml(
  options:{pick?:StatusReportPick;title?:string;forecast?:FleetForecast|null}={}
 ){
  const pick=options.pick||DEFAULT_STATUS_REPORT_PICK;
- const title=escapeHtml(String(options.title||"PACE SOUTH").trim()||"PACE SOUTH");
+ const title=escapeHtml(String(options.title||SITE_ORGANIZATION_CAPS).trim()||SITE_ORGANIZATION_CAPS);
  const stamp=escapeHtml(statusReportStamp(board.at));
  /* One list, and the "NOT ON THE SHEET" tag against each row is gone with it:
     not on the sheet is the definition of pending now, said once in the heading

@@ -1,6 +1,7 @@
 import {DOWN_SHEET_INSPECTION_PATTERN,DOWN_SHEET_OFF_PROPERTY_PATTERN,DOWN_SHEET_VENDORS,downSheetScheduledOnly,isDownSheetReasonPlaceholder} from "./down-sheet-view.ts";
 import {correctScannedText} from "./scan-spelling.ts";
 import {reconcileScannedRepair} from "./scan-catalog-match.ts";
+import {perBusReason,printedLineConflicts} from "./scan-multi-bus.ts";
 
 export type ScanStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 
@@ -130,10 +131,20 @@ function printedLineKey(row:ScannedDownSheetRow){
 }
 
 export function fillPrintedLineSiblings(rows:ScannedDownSheetRow[]):ScannedDownSheetRow[]{
+ /* A LINE WHOSE ROWS DISAGREE IS A MISREAD NUMBER, NOT A SHARED LINE, and
+    sharing across one is the damage rather than the fix. Curtis's bus 20500
+    was written on line 55 and arrived on line 44, which on the paper belongs
+    to 18506 and reads A21; had 20500's own wording come back blank it would
+    have inherited A21 and been filed as an inspection, with a review note
+    saying it was "read from line 44, shared with the other buses on it".
+    Two different reasons on one printed line is the signature of that, and
+    the paper is the only thing that can say which row has the right number —
+    so the line is left alone and `printedLineConflicts` reports it. */
+ const conflicted=new Set(printedLineConflicts(rows).map(row=>row.pageNumber+"|"+row.lineNumber));
  const byLine=new Map<string,ScannedDownSheetRow[]>();
  for(const row of rows){
   const key=printedLineKey(row);
-  if(key)byLine.set(key,[...(byLine.get(key)||[]),row]);
+  if(key&&!conflicted.has(key))byLine.set(key,[...(byLine.get(key)||[]),row]);
  }
  const shared=new Map<string,Partial<Record<typeof LINE_SHARED_FIELDS[number],string>>>();
  for(const [key,group] of byLine){
@@ -174,7 +185,14 @@ export function reviewScannedRows(rows:ScannedDownSheetRow[],fleet:ScanFleetBus[
      row is capped below the review threshold whatever the model claimed: it was
      handwritten and unnumbered, and those are the rows that come back wrong. */
   const confidence=isMarginRow(row)?Math.min(Number(row.confidence)||0,0.6):row.confidence;
-  const reason=correctScannedText(row.reason,vocabulary);
+  /* A BUS KEEPS ITS OWN WORDS OFF A SHARED LINE. The IDOT line writes each
+     bus's state in brackets after its number — 15504(FAILED-READY),
+     17544(PART IN STOCK) — and the scan prompt's "repeat the line's wording on
+     every row" threw all of it away, leaving nine buses that each read "IDOT".
+     That is the whole content of the line; IDOT is just its heading. Run after
+     the sibling fill, so a row that inherited the full line narrows to its own
+     bus, and a no-op on every ordinary row, which names no bus at all. */
+  const reason=correctScannedText(perBusReason(row.reason,row.busNumber),vocabulary);
   /* The written words decide the catalog pick, and they decide it HERE so the
      review screen shows what will actually be filed. It used to show something
      else: a repair the scan chose from outside the category it named could not

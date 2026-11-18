@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./minimalist.css";
 import CrashGuard from "./_components/crash-guard";
+import HeaderThemeLive from "@/src/components/shared/header-theme-live";
+import ResumeLastPage from "./_components/resume-last-page";
+import LastPageLive from "./_components/last-page-live";
 export const metadata: Metadata = {
  title:"FLEETSTEP — Fleet Maintenance",
  description:"Interactive facility-wide fleet location and maintenance tracking board.",
@@ -13,7 +17,21 @@ export const metadata: Metadata = {
  icons:{icon:"/favicon.svg",apple:"/apple-touch-icon.png"},
  appleWebApp:{capable:true,statusBarStyle:"black-translucent",title:"FLEETSTEP"}
 };
-export const viewport: Viewport = {themeColor:"#06275c"};
+/* The app default, matching `DEFAULT_HEADER_COLOR`. It is only what the OS
+   paints before any JavaScript runs — HeaderThemeLive rewrites the meta
+   from the colour actually resolved for the page — but left on the old
+   #06275c that first strip of status bar was a different navy from the
+   header touching it. */
+export const viewport: Viewport = {themeColor:"#041d47"};
 /* Every page is inside the boundary, because every page can throw and none of
-   them can be reloaded from a home screen without it. */
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body><CrashGuard>{children}</CrashGuard></body></html>}
+   them can be reloaded from a home screen without it. HeaderThemeLive is
+   INSIDE it for the same reason and not beside it: it runs on every page, so
+   a throw there is a white screen on all eight rather than on one, and it is
+   the one component here with nothing of its own to lose by being caught.
+
+   ResumeLastPage is a <script> the server writes, ahead of the page: it reopens
+   the app on the page it was left on, and has to run before that page is
+   drawn. LastPageLive is the other half, an effect that remembers the page -
+   inside the boundary on purpose, so a page that throws while it is drawn is
+   never remembered. See src/lib/settings/last-page.ts. */
+export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body className="fleetstep-shell"><CrashGuard><HeaderThemeLive/><ResumeLastPage/><LastPageLive/>{children}</CrashGuard></body></html>}

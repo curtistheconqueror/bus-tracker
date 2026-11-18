@@ -2,15 +2,18 @@
 
 import StatusReportModal from "@/src/components/reports/status-report-modal";
 import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
-import {DOWN_SHEET_FILTERS,downSheetFilterCounts,downSheetFilterEntries,downSheetFilterLabel,type DownSheetFilterKey} from "@/src/lib/down-sheet/down-sheet-filters";
-import {downSheetShareFilename,downSheetShareHtml,downSheetShareText} from "@/src/lib/down-sheet/down-sheet-share";
+import {DOWN_SHEET_FILTERS,downSheetFilterCounts,downSheetFilterEntries,type DownSheetFilterKey} from "@/src/lib/down-sheet/down-sheet-filters";
+import {downSheetShareFilename,downSheetShareHtml,downSheetShareScope,downSheetShareScopeLabel,downSheetShareText} from "@/src/lib/down-sheet/down-sheet-share";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
-import {Fragment,useEffect,useMemo,useState,type CSSProperties} from "react";
+import {Fragment,useEffect,useMemo,useRef,useState,type CSSProperties} from "react";
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
 import "./down-sheet.css";
 import DownSheetEditor from "./_components/down-sheet-editor";
 import DownSheetScanner from "./_components/down-sheet-scanner";
+import ScanPaper from "@/src/components/scan/scan-paper";
+import {PAPER_DOOR,PAPER_PHOTOS_PARAM,PAPER_SCAN_PARAM} from "@/src/lib/scan/paper-kinds";
+import {paperHandIn,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
 import {readSweep,startSweep} from "@/src/lib/fleet/facility-sweep";
 import {applyDownEntryToFleet} from "@/src/lib/down-sheet/down-sheet-sync";
 import {matchingUnresolvedDefectId} from "@/src/lib/defects/duplicate-defects";
@@ -18,8 +21,10 @@ import {learnFinding,readFindingsMemory,writeFindingsMemory} from "@/src/lib/def
 import {clearDownSheetState,DOWN_SHEET_CLEAR_UNDO_KEY,readDownSheetClearSnapshot,restoreDownSheetState} from "@/src/lib/down-sheet/down-sheet-clear";
 import {defectSupportingDetails,isUnresolved,normalizeFinding,type StructuredDefect} from "@/src/lib/defects/repair-catalog";
 import {reconcileDownSheetMembership} from "@/src/lib/down-sheet/down-sheet-counter";
+import {addMintedEntries,mintSkippedMessage} from "@/src/lib/down-sheet/sheet-mint";
+import {clearAddedInApp,entryOriginLabel,markAddedInApp} from "@/src/lib/down-sheet/entry-origin";
 import {reconcileRoadCallsFromSheet} from "@/src/lib/fleet/road-calls";
-import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type RepairTimeEstimate} from "@/src/lib/down-sheet/repair-time-estimates";
+import {estimateFromHours,formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type RepairTimeEstimate} from "@/src/lib/down-sheet/repair-time-estimates";
 import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsProgress,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "@/src/lib/down-sheet/down-sheet-repair-items";
 import type {ScanImportRecord} from "@/src/lib/down-sheet/down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "@/src/lib/down-sheet/down-sheet-replace";
@@ -38,6 +43,8 @@ import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "@/src/components/down-sheet/my
 import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "./_components/deferred-board";
 import RecommendedBoard,{RECOMMENDED_BOARD_COLLAPSED_KEY} from "./_components/recommended-board";
 import SheetSectionBoard from "./_components/sheet-section-board";
+/* The route this page is, as SCAN SHEET and the hand-off name it. */
+const PAPER_HERE="/down-sheet";
 /* Per device and collapsed by default, the same as the three boards above
    them. Both are NEW names, so nothing already stored is renamed. */
 const SOFT_BOARD_COLLAPSED_KEY="pace-down-sheet-soft-collapsed-v1";
@@ -79,10 +86,31 @@ type DownEntry={
     closing ten buses at end of shift must never be made to fill in a form to
     flip a dropdown. */
  completedBy?:string;
+ /* Set wherever the APP put this row on the sheet — ADD DOWN BUS, the board's
+    own `down` flag, the map's ON DOWN SHEET tick, or the Defect Log — and
+    cleared by the next scan that names the bus. Absent on a row off a scanned
+    sheet and on every row that predates the field, because the label it drives
+    claims "this was not on the office's sheet" and that is not something the
+    app can know about an old record. See
+    `src/lib/down-sheet/entry-origin.ts`. Rides in the cloud row's `detail`
+    blob, so it reaches other devices without a schema migration. */
+ /* `true` rather than `boolean`: the only two legal states are present-and-true
+    and absent. `addedInApp:false` would be a key holding a falsy value, and the
+    cloud fingerprints a row by walking Object.keys — writing it would move the
+    fingerprint of a row whose content had not changed. Measured. */
+ addedInApp?:true;
  createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;history:RepairHistory[];
 };
 
 const MAX_ENTRIES=98;
+/* ONE SET OF RULES FOR BOTH MINT PATHS. `MAX_ENTRIES` is the ACTIVE capacity —
+   that is what it means at ADD DOWN BUS, at the scan import's refusal, at PUT
+   BACK, on the button and on the capacity tile. It was applied to the sheet's
+   TOTAL in the two mint paths alone, which deleted stored repair records on a
+   page load and dropped buses that were genuinely down. See
+   `src/lib/down-sheet/sheet-mint.ts`; module scope so neither path can hold a
+   different copy of it. */
+const MINT_RULES={activeLimit:MAX_ENTRIES,isActive:(entry:DownEntry)=>isActive(entry),busIdOf:(entry:DownEntry)=>String(entry?.busId??"")};
 const SETTINGS_KEY="pace-down-sheet-settings-v1";
 const SCAN_UNDO_KEY="pace-down-sheet-scan-undo-v1";
 /* The last thing done to a single row, kept so it can be taken back. Separate
@@ -156,14 +184,22 @@ function normalizeEntry(value:Partial<DownEntry>,index:number):DownEntry{
 
 function entriesFromFleet(fleet:FleetBus[]):DownEntry[]{
  const now=new Date().toISOString();
- return fleet.filter(bus=>bus.down===true).slice(0,MAX_ENTRIES).map(bus=>({
+ /* EVERY BUS FLAGGED DOWN IS A CANDIDATE. This cut the list at 98 before
+    anything looked at it, so a 99th down bus was gone before the capacity
+    check could even report it as skipped — silently, which is the one way
+    this must not happen. `addMintedEntries` applies the ACTIVE cap and hands
+    back what it could not fit. */
+ return fleet.filter(bus=>bus.down===true).map(bus=>({
+  /* Minted because the board says this bus is down, which is the app's own
+     say-so rather than the office's paper. Same label as a typed row. */
+  addedInApp:true as const,
   id:"repair-"+bus.id,
   busId:bus.id,
   busNumber:bus.n,
   category:bus.defects?.find(isUnresolved)?.category||"Miscellaneous",
   repair:bus.defects?.find(isUnresolved)?.issue||bus.pendingRepair?.trim()||STATUS_LABELS[bus.s]||"Repair required",
   customReason:bus.defects?.find(isUnresolved)?.details||"",
-  repairItems:(bus.defects||[]).filter(isUnresolved).map((defect,index)=>({...blankRepairItem(index),category:defect.category,repair:defect.issue,details:defectSupportingDetails(defect),estimateEnabled:true,timeEstimate:normalizeRepairTimeEstimate(undefined,defect.category,defect.issue)})),
+  repairItems:(bus.defects||[]).filter(isUnresolved).map((defect,index)=>({...blankRepairItem(index),category:defect.category,repair:defect.issue,details:defectSupportingDetails(defect),estimateEnabled:true,timeEstimate:estimateFromHours(defect.estimateHours,defect.category,defect.issue)})),
   assignmentType:"Mechanic",
   assignedTo:bus.mechanic||"",
   section:bus.roadcall?"Roadcall":"Pending",
@@ -212,6 +248,23 @@ export default function DownSheet(){
  useEffect(()=>{setAdvancedOpen(localStorage.getItem(ADVANCED_OPEN_KEY)==="1")},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,ADVANCED_OPEN_KEY,advancedOpen?"1":"0")},[advancedOpen,hydrated]);
  const [scannerOpen,setScannerOpen]=useState(false);
+ /* SCAN SHEET IS THE DOOR, NOT THE SCANNER. Pressing it opens the box that
+    takes the photos and works out which sheet they are (`paperOpen`); the
+    Down Sheet scanner (`scannerOpen`) opens only once that has handed it
+    photos, and a heat sheet or a sweep is sent to the Defect Log instead.
+    Until this the button opened the scanner directly, and a heat sheet
+    photographed here was read as a Down Sheet.
+
+    A hand-off is for ONE opening: left in place, the scanner's next opening
+    would start on yesterday's photos. Dropped when the scanner SHUTS,
+    however it came to be shut — on the change from open to shut, not whenever
+    it is shut, which is also true the moment the page opens and would race
+    the effect below that takes a hand-off off the address. */
+ const [paperOpen,setPaperOpen]=useState(false);
+ const [handed,setHanded]=useState<HandedPhotos|null>(null);
+ const scannerWasOpen=useRef(false);
+ useEffect(()=>{if(scannerWasOpen.current&&!scannerOpen)setHanded(null);scannerWasOpen.current=scannerOpen},[scannerOpen]);
+ const openPaperHere=(next:HandedPhotos)=>{setPaperOpen(false);setHanded(next);setScannerOpen(true)};
  const [defaultInitials,setDefaultInitials]=useState("");
  const [defaultShift,setDefaultShift]=useState<Shift>("1st");
  const [extraTiles,setExtraTiles]=useState<OptionalDownTile[]>([]);
@@ -277,6 +330,11 @@ export default function DownSheet(){
     what the device already holds. And its wording is still read from the Defect
     Log's display settings, so a foreman who renamed the panel keeps his name
     for it instead of being reset to the default by a move he did not make. */
+ /* Buses flagged down that the active cap had no room for. Shown rather than
+    dropped: three buses silently losing their row AND their map badge on a
+    sheet holding two active entries is exactly the failure the sheet exists
+    to prevent. */
+ const [mintSkipped,setMintSkipped]=useState("");
  const [mysteryCollapsed,setMysteryCollapsed]=useState(false);
  const [mysteryDisplay,setMysteryDisplay]=useState(DEFAULT_DEFECT_LOG_DISPLAY);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,MYSTERY_COLLAPSED_KEY,mysteryCollapsed?"1":"0")},[mysteryCollapsed,hydrated]);
@@ -297,7 +355,53 @@ export default function DownSheet(){
  useEffect(()=>{if(hydrated)writeSetting(localStorage,COUNTS_OPEN_KEY,countsOpen?"1":"0")},[countsOpen,hydrated]);
 
  // Restore the existing device-local fleet and down sheet once after hydration.
- useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),knownActive=new Set(restored.filter(isActive).map((entry:DownEntry)=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!knownActive.has(entry.busId));setEntries([...restored,...added].slice(0,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setSectionOrder(normalizeDownSheetSectionOrder(settings.sectionOrder));setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
+ /* A BUS THAT ALREADY HAS A ROW DOES NOT GET A SECOND ONE, AND A COMPLETED ROW
+    IS A ROW. This counted only the ACTIVE entries, so a bus still flagged
+    `down` whose only entry was Completed came back as a BRAND NEW Scheduled
+    row under a different id on the very next load — the repair re-opening
+    itself, and two rows for one bus on the sheet. Measured: seed one bus with
+    down:true and a single Completed entry, open the Down Sheet, and the stored
+    sheet holds `e1:Completed` plus `repair-a:Scheduled`.
+
+    This app does not delete repair records and it must not invent them either.
+    With all entries counted, a completed bus mints nothing, no active entry
+    exists for it, and `reconcileDownSheetMembership` below clears its flag —
+    which is the right answer: the work is done, so the bus comes off the
+    sheet.
+
+    WHY IT SURVIVED — and the first answer written here was wrong. It said the
+    storage-event handler below already did it this way, so whichever path ran
+    second decided the outcome. A `storage` event never fires in the document
+    that WROTE the key; CLAUDE.md says so itself about `pace-header-theme-v1`,
+    "which only ever fires in the OTHER tabs". On one phone with one tab that
+    handler never runs at all, so it cannot have been the second path.
+
+    The copy that actually disagreed is on the FACILITY MAP: `app/page.tsx`
+    runs `reconcileDownSheetMembership` on its own mount, and with a bus
+    flagged down whose only entry is Completed, loading just the map clears the
+    flag. So the duplicate row appeared or not depending on WHICH PAGE was
+    opened first — not on which guard in this file ran second. Three copies,
+    one of them cited wrongly, on a project whose stated rule is that a rule in
+    two places is the hazard. The rule is in `src/lib/down-sheet/sheet-mint.ts`
+    now and both paths here call it. */
+ useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),minted=addMintedEntries(restored,entriesFromFleet(nextFleet),MINT_RULES);setEntries(minted.entries);setMintSkipped(mintSkippedMessage(minted.skipped,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setSectionOrder(normalizeDownSheetSectionOrder(settings.sectionOrder));setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
+ /* A door on ANOTHER page sends a Vehicle Down Sheet here to be read. No
+    page has one today — the Defect Log's was taken off — and this is kept so
+    that putting SCAN SHEET on any other page is one button and no plumbing.
+    This and the load above both run as the page opens, and what they set
+    lands in one render, so the scanner mounts with the fleet and the current
+    sheet already in hand. That matters because it starts reading by itself,
+    and a read matched against an empty fleet would call every bus unknown.
+    The parameters come off the address once acted on, so a reload does not
+    throw the scanner up again, and the history entry keeps the state the
+    router left in it. */
+ useEffect(()=>{
+  const url=new URL(window.location.href),arrived=paperHandIn(url.search,PAPER_HERE);
+  if(!arrived)return;
+  setHanded(arrived);setScannerOpen(true);
+  url.searchParams.delete(PAPER_SCAN_PARAM);url.searchParams.delete(PAPER_PHOTOS_PARAM);
+  window.history.replaceState(window.history.state,"",url.pathname+url.search+url.hash);
+ },[]);
 
  // Active Down Sheet rows are the single source of truth for every tracker checkbox and DS badge.
  /* Road calls are reconciled here beside DS membership, and for the same
@@ -307,7 +411,7 @@ export default function DownSheet(){
     was hooking the scanner alone, which would have covered one of the three. */
  useEffect(()=>{if(!hydrated)return;setSaveProblem(writeDownSheetStorageResult(localStorage,entries).reason||"");const activeIds=entries.filter(isActive).map(entry=>entry.busId);setFleet(current=>{const membership=reconcileDownSheetMembership(current,activeIds);const roadCalled=reconcileRoadCallsFromSheet(membership,entries).fleet;if(roadCalled!==current)writeFleetStorage(localStorage,roadCalled);return roadCalled})},[entries,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify({...readStoredDownSettings(),showCompleted,defaultInitials,defaultShift,quickNotes:savedQuickNotes,sectionOrder,extraTiles,showQuickNotes,display:displaySettings}))},[showCompleted,defaultInitials,defaultShift,savedQuickNotes,sectionOrder,extraTiles,showQuickNotes,displaySettings,hydrated]);
- useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){const payload=readFleetPayload<FleetBus>(event.newValue);if(payload.valid){const nextFleet=payload.buses;setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find(item=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),known=new Set(merged.map(entry=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!known.has(entry.busId));return [...merged,...added].slice(0,MAX_ENTRIES)})}}if(event.key===DOWN_KEY&&event.newValue){const payload=readDownSheetPayload<DownEntry>(event.newValue);if(payload.valid)setEntries(payload.entries.map(normalizeEntry))}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)));if(event.key===SCAN_UNDO_KEY)setUndoScanAvailable(Boolean(event.newValue));if(event.key===ENTRY_UNDO_KEY)setRowAction(readRowAction(event.newValue));/* Settings are edited on the shared page now. This page writes its whole settings object back whenever a field changes, so it has to take the new values into its own state or its next write would put the stale copy over them. */if(event.key===SETTINGS_KEY){try{const saved=JSON.parse(event.newValue||"{}");setShowCompleted(saved.showCompleted===true);if(typeof saved.defaultInitials==="string")setDefaultInitials(saved.defaultInitials);if(saved.defaultShift==="1st"||saved.defaultShift==="2nd"||saved.defaultShift==="3rd")setDefaultShift(saved.defaultShift);setDisplaySettings(normalizeDownSheetDisplay(saved.display))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){const payload=readFleetPayload<FleetBus>(event.newValue);if(payload.valid){const nextFleet=payload.buses;setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find(item=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),minted=addMintedEntries(merged,entriesFromFleet(nextFleet),MINT_RULES);return minted.entries})}}if(event.key===DOWN_KEY&&event.newValue){const payload=readDownSheetPayload<DownEntry>(event.newValue);if(payload.valid)setEntries(payload.entries.map(normalizeEntry))}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)));if(event.key===SCAN_UNDO_KEY)setUndoScanAvailable(Boolean(event.newValue));if(event.key===ENTRY_UNDO_KEY)setRowAction(readRowAction(event.newValue));/* Settings are edited on the shared page now. This page writes its whole settings object back whenever a field changes, so it has to take the new values into its own state or its next write would put the stale copy over them. */if(event.key===SETTINGS_KEY){try{const saved=JSON.parse(event.newValue||"{}");setShowCompleted(saved.showCompleted===true);if(typeof saved.defaultInitials==="string")setDefaultInitials(saved.defaultInitials);if(saved.defaultShift==="1st"||saved.defaultShift==="2nd"||saved.defaultShift==="3rd")setDefaultShift(saved.defaultShift);setDisplaySettings(normalizeDownSheetDisplay(saved.display))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const active=useMemo(()=>entries.filter(isActive),[entries]);
  /* Where each bus actually is, which is the first thing the section rules ask.
@@ -424,24 +528,67 @@ export default function DownSheet(){
     narrowings, in the order the sheet is drawn. Rebuilding the list from the
     filter alone would send something nobody had looked at. */
  const shareRows=visible as unknown as Parameters<typeof downSheetShareText>[1];
- const shareLabel=quickFilter?downSheetFilterLabel(quickFilter):"";
- const copyFilteredList=async()=>{if(!quickFilter)return;try{await copyText(downSheetShareText(quickFilter,shareRows,locations));setShareStatus("copied")}catch{setShareStatus("copy-error")}};
+ /* SHARING THE SHEET ITSELF, which until now needed a quick filter first.
+    Curtis: "a separate function in the down sheet section where I can just
+    share the down sheet list with a person." The three actions already existed
+    and already sent what was on screen; they were only reachable once a filter
+    had been picked, so there was no way to send the sheet.
+
+    WHAT THIS SHARE COVERS IS DECIDED IN THE LIB, not here. The page reports
+    its own view state and `downSheetShareScope` turns that into the claim the
+    heading makes, so a route can ask the same question without a second copy
+    of the rule - and so the rule is testable away from a page this suite
+    cannot render. A cold read found the first version, which decided it
+    inline, making that claim falsely in four different ways.
+
+    `drawn` against `onSheet` is the part that does not go stale: the bands
+    drop IDOT-only rows on their own, and a list of flags would have missed
+    that one and will miss the next. */
+ const shareScope=downSheetShareScope({quickFilter,search,shiftFiltered:filter!=="All",
+  roadFiltered:Boolean(roadFilter),fixedToday,showCompleted,drawn:visible.length,onSheet:shown.length});
+ const shareLabel=downSheetShareScopeLabel(shareScope);
+ /* THE STATUS BELONGS TO THE ROWS IT WAS EARNED ON, and the bar no longer
+    unmounts to take it away. Pressing COPY LIST then typing in SEARCH left
+    "COPIED!" sitting under a heading describing a different set of buses,
+    with nothing in the page that would ever clear it.
+
+    KEYED ON WHICH BUSES, not how many: a review caught that the first
+    version used `visible.length`, so swapping one matching bus for another
+    in SEARCH - same count, same label - left the old status standing over
+    rows it was never about. The ids are device-local, which does not matter
+    here because this only ever compares one render against the next on the
+    same device. */
+ const shareStatusKey=shareLabel+"|"+visible.map(entry=>entry.id).join(",");
+ useEffect(()=>{setShareStatus("")},[shareStatusKey]);
+ /* What the one line under the scope says: a press wins over the hint while
+    it stands, and EVERY outcome gets a word here, COPY LIST included.
+
+    The button changing to COPIED! is the only thing a sighted person needs,
+    which is why `copied` was the one state with no branch - and it is also
+    why a screen reader heard nothing when a copy succeeded. The line is the
+    announcement; the duplication with the button is the price, measured at
+    360 and 390 and worth it. */
+ const shareNote=shareStatus==="copied"?{said:true,text:"COPIED!"}
+  :shareStatus==="shared"?{said:true,text:"SENT"}
+  :shareStatus==="saved"?{said:true,text:"SAVED TO THIS DEVICE"}
+  :shareStatus==="share-error"?{said:true,text:"COULD NOT SHARE — TRY COPY LIST"}
+  :shareStatus==="copy-error"?{said:true,text:"COULD NOT COPY ON THIS DEVICE — TRY SHARE TEXT"}
+  :{said:false,text:quickFilter?DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.hint||"":"Sends the buses on the screen right now, as text or as a page."};
+ const copyFilteredList=async()=>{try{await copyText(downSheetShareText(shareScope,shareRows,locations));setShareStatus("copied")}catch{setShareStatus("copy-error")}};
  /* Text first, and the clipboard when there is no share sheet — the same order
     the Defect Log settled on. A browser with no navigator.share must not leave
     somebody pressing a button that does nothing. */
  const shareFilteredList=async()=>{
-  if(!quickFilter)return;
-  const text=downSheetShareText(quickFilter,shareRows,locations);
+  const text=downSheetShareText(shareScope,shareRows,locations);
   if(typeof navigator.share!=="function"){await copyFilteredList();return}
   try{await navigator.share({title:"Down Sheet — "+shareLabel,text});setShareStatus("shared")}
   catch(error){if((error as Error).name!=="AbortError")setShareStatus("share-error")}
  };
  const shareFilteredPage=async()=>{
-  if(!quickFilter)return;
   const stamp=new Date().toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
-  const html=downSheetShareHtml(quickFilter,shareRows,locations,stamp);
+  const html=downSheetShareHtml(shareScope,shareRows,locations,stamp);
   try{
-   const outcome=await shareOrDownloadFile(new Blob([html],{type:"text/html"}),downSheetShareFilename(quickFilter),"Down Sheet — "+shareLabel);
+   const outcome=await shareOrDownloadFile(new Blob([html],{type:"text/html"}),downSheetShareFilename(shareScope),"Down Sheet — "+shareLabel);
    setShareStatus(outcome==="cancelled"?"":outcome==="shared"?"shared":"saved");
   }catch{setShareStatus("share-error")}
  };
@@ -461,7 +608,8 @@ export default function DownSheet(){
      works. The availability check stays, because telling somebody the sheet is
      full before they fill in a form is worth doing; it just no longer hands its
      answer to the draft. */
- const available=fleet.some(item=>!active.some(entry=>entry.busId===item.id));if(!available){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();setEditing({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:"",busNumber:"",category:"",repair:"",customReason:"",repairItems:[blankRepairItem()],assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:"unknown",priority:"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,"",""),createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]})};
+ const available=fleet.some(item=>!active.some(entry=>entry.busId===item.id));if(!available){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();/* ADDED IN THE APP, NOT OFF THE OFFICE SHEET. Curtis: "if we add it directly, it will show the badge... a little label or something that says added manually. That way, at least, we'll know that it was not on the downsheet originally." Cleared by the next scanned sheet, which replaces the row - at which point the bus IS on the master sheet. */
+  setEditing(markAddedInApp<DownEntry>({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:"",busNumber:"",category:"",repair:"",customReason:"",repairItems:[blankRepairItem()],assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:"unknown",priority:"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,"",""),createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]}))};
  const saveQuickNote=()=>{setSavedQuickNotes(quickNotes);try{const current=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");localStorage.setItem(SETTINGS_KEY,JSON.stringify({...current,showCompleted,defaultInitials,defaultShift,quickNotes,sectionOrder,display:displaySettings}))}catch{localStorage.setItem(SETTINGS_KEY,JSON.stringify({showCompleted,defaultInitials,defaultShift,quickNotes,sectionOrder,display:displaySettings}))}};
  /* The DEFERRED board hands its answer back here rather than writing, so a
     refused write is reported by this page like every other one and the board
@@ -530,6 +678,11 @@ export default function DownSheet(){
  const importScan=(records:ScanImportRecord[])=>{
   const now=new Date().toISOString(),incomingIds=new Set(records.map(record=>record.busId)),removed=scannedSheetRemovals(entries,incomingIds),baseFleet=prepareFleetForScannedReplacement(fleet,removed,now);
   const imported=records.map((record,index)=>{
+   /* THE PAPER NAMING THE BUS IS WHAT PROMOTES THE ROW. A scan writes ONTO
+      the active row rather than replacing it, so `{...prior}` carried
+      `addedInApp` through and a row tagged once stayed tagged for ever — the
+      office listing the bus is exactly the moment that stops being true.
+      Curtis: "now it's officially on the master downsheet from the office." */
    const prior=entries.find(entry=>isActive(entry)&&entry.busId===record.busId),assignmentType:AssignmentType=record.section==="Vendor Repair"?"Vendor":"Mechanic",workflow:Workflow=record.operationalStatus==="shop"?"In Progress":"Scheduled";
    /* Write to the record the bus already has, rather than minting a second one.
 
@@ -546,7 +699,7 @@ export default function DownSheet(){
       same category, symptom and details — so a genuinely different fault on the
       same bus still becomes its own record. */
    const defectId=prior?.defectId||matchingUnresolvedDefectId(fleet.find(bus=>bus.id===record.busId),record);
-   return normalizeEntry({...prior,id:prior?.id||`repair-scan-${Date.now()}-${index}`,...(defectId?{defectId}:{}),busId:record.busId,busNumber:record.busNumber,category:record.category,repair:record.repair,customReason:record.reason,assignmentType,assignedTo:record.assignedTo,section:record.section,shift:record.shift,workflow,operationalStatus:record.operationalStatus,timeEstimate:normalizeRepairTimeEstimate(undefined,record.category,record.repair),updatedAt:now,updatedBy:defaultInitials||"SCAN",history:[...(prior?.history||[]),{at:now,initials:defaultInitials||"SCAN",action:"Imported from sheet photo"}]},index);
+   return clearAddedInApp(normalizeEntry({...prior,id:prior?.id||`repair-scan-${Date.now()}-${index}`,...(defectId?{defectId}:{}),busId:record.busId,busNumber:record.busNumber,category:record.category,repair:record.repair,customReason:record.reason,assignmentType,assignedTo:record.assignedTo,section:record.section,shift:record.shift,workflow,operationalStatus:record.operationalStatus,timeEstimate:normalizeRepairTimeEstimate(undefined,record.category,record.repair),updatedAt:now,updatedBy:defaultInitials||"SCAN",history:[...(prior?.history||[]),{at:now,initials:defaultInitials||"SCAN",action:"Imported from sheet photo"}]},index));
   });
   const nextEntries=[...imported];
   if(nextEntries.filter(isActive).length>MAX_ENTRIES){alert("This import would exceed the 98-bus Down Sheet capacity. Deselect some rows and try again.");return}
@@ -742,9 +895,15 @@ export default function DownSheet(){
   setEntries(restored);setRowAction(null);
  };
 
- const appStyle={"--down-page-title-color":displaySettings.styles.pageTitle.color,"--down-page-title-size":displaySettings.styles.pageTitle.fontSize+"px","--down-summary-color":displaySettings.styles.summary.color,"--down-summary-size":displaySettings.styles.summary.fontSize+"px","--down-quick-notes-color":displaySettings.styles.quickNotes.color,"--down-quick-notes-size":displaySettings.styles.quickNotes.fontSize+"px","--down-sheet-title-color":displaySettings.styles.sheetTitle.color,"--down-sheet-title-size":displaySettings.styles.sheetTitle.fontSize+"px","--down-column-header-color":displaySettings.styles.columnHeaders.color,"--down-column-header-size":displaySettings.styles.columnHeaders.fontSize+"px","--down-reason-category-color":displaySettings.styles.reasonCategory.color,"--down-reason-category-size":displaySettings.styles.reasonCategory.fontSize+"px","--down-reason-details-color":displaySettings.styles.reasonDetails.color,"--down-reason-details-size":displaySettings.styles.reasonDetails.fontSize+"px"} as CSSProperties;
+ /* The page title sits on the HEADER, so while it is still the default it
+    is left out and the header's own computed text colour answers — pinned
+    white it reads 1.35:1 on a pale header somebody picked in Settings,
+    with the panel there promising that cannot happen. Changed by hand it
+    is emitted as before and that choice wins. */
+ const titleColor=displaySettings.styles.pageTitle.color.toLowerCase()===DEFAULT_DOWN_SHEET_DISPLAY.styles.pageTitle.color.toLowerCase()?{}:{"--down-page-title-color":displaySettings.styles.pageTitle.color};
+ const appStyle={...titleColor,"--down-page-title-size":displaySettings.styles.pageTitle.fontSize+"px","--down-summary-color":displaySettings.styles.summary.color,"--down-summary-size":displaySettings.styles.summary.fontSize+"px","--down-quick-notes-color":displaySettings.styles.quickNotes.color,"--down-quick-notes-size":displaySettings.styles.quickNotes.fontSize+"px","--down-sheet-title-color":displaySettings.styles.sheetTitle.color,"--down-sheet-title-size":displaySettings.styles.sheetTitle.fontSize+"px","--down-column-header-color":displaySettings.styles.columnHeaders.color,"--down-column-header-size":displaySettings.styles.columnHeaders.fontSize+"px","--down-reason-category-color":displaySettings.styles.reasonCategory.color,"--down-reason-category-size":displaySettings.styles.reasonCategory.fontSize+"px","--down-reason-details-color":displaySettings.styles.reasonDetails.color,"--down-reason-details-size":displaySettings.styles.reasonDetails.fontSize+"px"} as CSSProperties;
 
- return <main className="down-app" style={appStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
+ return <main className="down-app" style={appStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/>{mintSkipped&&<p className="down-mint-skipped" role="alert"><b>DOWN WITH NO ROW ON THE SHEET</b><small>{mintSkipped}</small><button type="button" onClick={()=>setMintSkipped("")} aria-label="Dismiss">×</button></p>}<WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="down-header">
    <div><AppName/><span>FLEET MAINTENANCE</span><h1>{displaySettings.labels.pageTitle}</h1><p>{displaySettings.labels.subtitle}</p></div>
    <TrackerNav active="/down-sheet"/>
@@ -775,12 +934,7 @@ export default function DownSheet(){
    <div className="down-advanced-body">
     <div className="down-advanced-group">
      <b className="down-advanced-label">VIEW</b>
-     <div className="shift-filter" aria-label="Filter down sheet by shift">
-      {/* "1ST" on its own said nothing — Curtis read the row and could not tell
-          what it was filtering. The word is on each button rather than only in
-          the SHOW label, because the button is what gets looked at. */}
-      <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value&&value!=="All"?"All":value)} key={value}>{value==="All"?"ALL SHIFTS":value.toUpperCase()+" SHIFT"}{value!=="All"&&<i>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</i>}</button>)}
-     </div>
+
      <label className="completed-toggle"><input type="checkbox" checked={showCompleted} onChange={event=>setShowCompleted(event.target.checked)}/><span/>SHOW COMPLETED</label>
     </div>
     <div className="down-advanced-group">
@@ -789,7 +943,7 @@ export default function DownSheet(){
          They were the loudest things on the page — a red CLEAR DOWNSHEET beside
          two amber buttons — sitting above the button that adds a bus. The undos
          still appear only when there is something to undo. */}
-     <button className="scan-sheet-button" type="button" onClick={()=>setScannerOpen(true)}>▣ SCAN SHEET</button>
+     <button className="scan-sheet-button" type="button" onClick={()=>setPaperOpen(true)} title="Photograph any shop sheet: the app works out which one it is and opens its scanner">▣ {PAPER_DOOR}</button>
      {undoScanAvailable&&<button className="undo-scan" type="button" onClick={undoScan}>UNDO IMPORT</button>}
      {undoClearAvailable&&<button className="undo-clear" type="button" onClick={undoClear}>UNDO CLEAR</button>}
      <button className="clear-downsheet" type="button" onClick={clearEntireDownSheet} disabled={!entries.length&&!fleet.some(bus=>bus.down)}>CLEAR DOWNSHEET</button>
@@ -808,6 +962,14 @@ export default function DownSheet(){
    <button className="down-status-report-action" type="button" onClick={()=>setReportOpen(true)}>STATUS REPORT</button>
   </section>
 
+  <section className="down-shifts" aria-label="Down Sheet shifts">
+     <div className="shift-filter" aria-label="Filter down sheet by shift">
+      {/* "1ST" on its own said nothing — Curtis read the row and could not tell
+          what it was filtering. The word is on each button rather than only in
+          the SHOW label, because the button is what gets looked at. */}
+      <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value&&value!=="All"?"All":value)} key={value}>{value==="All"?"ALL SHIFTS":value.toUpperCase()+" SHIFT"}{value!=="All"&&<i>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</i>}</button>)}
+     </div>
+  </section>
   <section className="down-view-controls" aria-label="Search and order Down Sheet">
    <label className="down-search"><b>SEARCH</b><input type="search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, repair, mechanic or vendor" aria-label="Search Down Sheet"/></label>
    {search&&<button className="clear-search" type="button" onClick={()=>setSearch("")}>CLEAR</button>}
@@ -944,19 +1106,32 @@ export default function DownSheet(){
       every button inside it width:100% below 760px, which reads correctly for
       one SHOW THE WHOLE SHEET button and would stack these four down the
       screen. */}
-  {quickFilter&&<section className="down-quick-filter-note" aria-label={shareLabel+" — share the filtered sheet"}>
-   <p role="status"><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small>{DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.hint}</small></p>
+  {/* NO LONGER BEHIND A QUICK FILTER. The same three actions, always on the
+      page, because the thing most often wanted is the sheet itself and that
+      was the one thing they could not send. The row only CHANGES scope with a
+      filter on; with none it sends what is drawn, and says which of the two
+      that is. SHOW THE WHOLE SHEET and the filter's hint stay filter-only:
+      neither means anything when no filter is set. */}
+  <section className={"down-quick-filter-note"+(quickFilter?"":" sheet-share")} aria-label={shareLabel+" — share the sheet"}>
+   {/* ONE LINE UNDER THE SCOPE, holding either the hint or what just
+       happened. The four status messages used to mount as SIBLINGS of this
+       <p>, where `.down-quick-filter-note>small` gives them flex-basis:100%
+       and so a row of their own: measured, SHARE TEXT succeeding grew the bar
+       101px -> 123px at 390 and 52px -> 74px at 1180 and pushed the sheet
+       down about 22px, every time, now that the bar is always on screen.
+       Reserving an empty slot instead would have cost those 22px on EVERY
+       visit to save them on a few; the hint is the thing worth yielding.
+       The live region is here and not on the scope line above it, which is
+       why that line is a plain <p>: this text changes on a deliberate press
+       or a filter change, never on a keystroke in SEARCH. */}
+   <p><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small role="status" className={shareNote.said?"said":undefined}>{shareNote.text}</small></p>
    <div className="down-quick-filter-actions">
     <button type="button" onClick={copyFilteredList}>{shareStatus==="copied"?"COPIED!":"COPY LIST"}</button>
     <button type="button" onClick={shareFilteredList}>SHARE TEXT</button>
     <button type="button" onClick={shareFilteredPage}>SHARE PAGE</button>
-    <button type="button" className="down-quick-filter-clear" onClick={()=>{setQuickFilter(null);setShareStatus("")}}>SHOW THE WHOLE SHEET</button>
+    {quickFilter&&<button type="button" className="down-quick-filter-clear" onClick={()=>{setQuickFilter(null);setShareStatus("")}}>SHOW THE WHOLE SHEET</button>}
    </div>
-   {shareStatus==="shared"&&<small role="status">SENT</small>}
-   {shareStatus==="saved"&&<small role="status">SAVED TO THIS DEVICE</small>}
-   {shareStatus==="share-error"&&<small role="status">COULD NOT SHARE — TRY COPY LIST</small>}
-   {shareStatus==="copy-error"&&<small role="status">COULD NOT COPY ON THIS DEVICE — TRY SHARE TEXT</small>}
-  </section>}
+  </section>
   {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
 
   {/* Off by default now. It sat permanently between the counts and the sheet
@@ -996,7 +1171,20 @@ export default function DownSheet(){
           — the thing the sheet is read for — off the side of a phone. Stacked,
           the column is the width of a bus number and the reason arrives on
           screen. */}
-      {isDownSheetRoadLocation(locations[entry.busId]||"")&&<i className="on-road-badge" title="This bus is out on the road right now, according to the Facility Map">ON ROAD</i>}</span></td>
+      {isDownSheetRoadLocation(locations[entry.busId]||"")&&<i className="on-road-badge" title="This bus is out on the road right now, according to the Facility Map">ON ROAD</i>}
+      {/* NOT OFF THE OFFICE'S SHEET. Curtis: "we'll know that it was not on
+          the downsheet originally." Carried by all four of the app's own
+          creation paths — ADD DOWN BUS, the board's `down` flag, the map's ON
+          DOWN SHEET tick, and the Defect Log — because once SOME app rows are
+          tagged, a row WITHOUT the tag claims the office printed it.
+
+          It clears when the paper names the bus: a scan writes onto the active
+          row and `clearAddedInApp` drops the flag there, which is the moment
+          Curtis described — "now it's officially on the master downsheet from
+          the office". That clearing was promised in four places before it
+          existed. Absent on every row that predates the field, because the app
+          cannot know. */}
+      {entryOriginLabel(entry)&&<i className="added-in-app-badge" title="This row was put on the sheet from inside the app, not read off the office's scanned sheet. It clears itself the next time a scanned sheet names this bus.">{entryOriginLabel(entry)}</i>}</span></td>
       <td><button className="reason-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit repair details for bus "+entry.busNumber}><b>{entry.repairItems&&entry.repairItems.length>1?repairProgressLabel(entry):entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
       <td><span className={"assignment "+entry.assignmentType.toLowerCase()}><small>{entry.assignmentType}</small>{entry.assignedTo||"Unassigned"}</span></td>
       <td><b className={"section-tag "+entry.section.toLowerCase().replaceAll(" ","-")}>{entry.section}</b></td>
@@ -1010,7 +1198,7 @@ export default function DownSheet(){
           the sheet. Curtis closed out a bus he did not mean to. Out here they
           take a deliberate scroll AND a confirm, and the first column shrinks
           by 164px, which is what makes the reason readable. */}
-      <td className="row-actions"><span className="row-actions-slots">{entry.workflow!=="Completed"&&<button className="fix-entry" type="button" onClick={()=>markEntryFixed(entry)} aria-label={"Mark bus "+(entry.busNumber||"entry")+" fixed"} title={"Mark bus "+(entry.busNumber||"this entry")+" fixed and close it out"}><span aria-hidden="true">&#10003;</span></button>}<button className="delete-entry" type="button" onClick={()=>deleteEntry(entry)} aria-label={"Delete bus "+(entry.busNumber||"entry")+" from the Down Sheet"} title={"Delete bus "+(entry.busNumber||"this entry")+" from the Down Sheet"}><span aria-hidden="true">×</span></button></span></td>
+      <td className="row-actions"><span className="row-actions-slots">{entry.workflow!=="Completed"&&<button className="fix-entry" type="button" onClick={()=>markEntryFixed(entry)} aria-label={"Mark fixed: bus "+(entry.busNumber||"entry")} title={"Mark bus "+(entry.busNumber||"this entry")+" fixed and close it out"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}<button className="delete-entry" type="button" onClick={()=>deleteEntry(entry)} aria-label={"Delete bus "+(entry.busNumber||"entry")+" from the Down Sheet"} title={"Delete bus "+(entry.busNumber||"this entry")+" from the Down Sheet"}><span aria-hidden="true">×</span></button></span></td>
      </tr></Fragment>})}
       </Fragment>;
      }):<tr><td className="empty-sheet" colSpan={10}><b>No buses match this view.</b><span>{search?"Clear the search or choose another filter.":"All shifts are shown by default. Use Add Down Bus to create the first repair entry."}</span></td></tr>}</tbody>
@@ -1026,7 +1214,8 @@ export default function DownSheet(){
       that is already there rather than refused. */}
   {editing&&<DownSheetEditor onOpenExisting={entryId=>{const found=entries.find(item=>item.id===entryId);if(found)setEditing({...found,repairItems:[...normalizeRepairItems(found.repairItems,{category:found.category,repair:found.repair,details:found.customReason,timeEstimate:found.timeEstimate}),blankRepairItem()]})}} entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
   
-  {scannerOpen&&<DownSheetScanner fleet={fleet} currentEntries={active} defaultShift={defaultShift} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}
+  {scannerOpen&&<DownSheetScanner fleet={fleet} currentEntries={active} defaultShift={defaultShift} handed={handed} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}
+  {paperOpen&&<ScanPaper here={PAPER_HERE} onClose={()=>setPaperOpen(false)} onHere={openPaperHere}/>}
   {sweepAsk&&<div className="down-shade" role="dialog" aria-modal="true" aria-labelledby="sweep-ask-title">
    <section className="sweep-ask-modal">
     <header className="repair-editor-head"><div><span>AFTER THE SCAN</span><h2 id="sweep-ask-title">{sweepAsk==="ask"?"FULL SWEEP?":"CHECK THE MAP"}</h2></div></header>

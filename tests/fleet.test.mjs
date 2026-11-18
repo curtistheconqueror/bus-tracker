@@ -109,7 +109,33 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.grow \.spot\.garage-special-slot\{background:var\(--garage-special\)/);
   assert.match(page, /scrollIntoView\(\{behavior:"smooth"/);
   assert.match(page, /original==="tow"\?"out"/);
-  assert.match(page, /statusVersion:3/);
+  /* THE VERSION STAMP MOVED, it did not go. The map wrote this key wholesale
+     with `JSON.stringify({statusVersion:3,...})`, which deleted every field it
+     did not name - including anything a later release adds. It hands the object
+     to `writeBoardSettings` now, which merges over the stored copy and stamps
+     the version, so the stamp is asserted where it is written. */
+  assert.match(page, /writeBoardSettings\(localStorage,\{/, "the map has to persist its board settings");
+  /* ORDER-INDEPENDENT. This forbade the literal `JSON.stringify({statusVersion:3`
+     and a reviewer moved the stamp to the END of the object: the map replaced
+     the whole record again, a device lost its stale field, its `futureField`
+     and its legacy `dark` on the first render, and 433 tests stayed green. A
+     blacklist of one spelling is not a gate - which is what this change's own
+     notes say about the one it replaced. So: `writeBoardSettings` is the ONLY
+     writer of this key outside map-settings.ts. */
+  /* THREE SHAPES, NOT ONE. This checked a double-quoted `writeSetting` call
+     only, so a single-quoted key, a backtick, or a plain
+     `localStorage.setItem("pace-board-settings-v1", …)` could sit beside
+     `writeBoardSettings` and replace the merged record without failing here.
+     The rule is "the map never writes this key itself"; the spelling is not
+     the rule. */
+  const raw=[
+   /writeSetting\(\s*(?:window\.)?(?:localStorage|storage)\s*,\s*(?:BOARD_SETTINGS_KEY|["'`]pace-board-settings-v1["'`])/,
+   /(?:window\.)?(?:localStorage|storage)\.setItem\(\s*(?:BOARD_SETTINGS_KEY|["'`]pace-board-settings-v1["'`])/,
+  ];
+  assert.ok(!raw.some(shape=>shape.test(page)),
+   "the map must not write pace-board-settings-v1 itself; writeBoardSettings merges, a raw write replaces");
+  const boardWriter=await readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8");
+  assert.match(boardWriter, /statusVersion:3/);
   assert.match(page, /<Icon s=\{bus\.s\}/);
   assert.match(page, /setSmartStatusEnabled\(false\)/);
   assert.doesNotMatch(page, /tow:\["TOW \/ STAGING"/);
@@ -146,13 +172,17 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /pace-touch-drop/);
   assert.match(page, /clearDragHighlights\(\)/);
   assert.match(page, /data-location=\{id\}/);
-  assert.match(page, /Math\.hypot\([^)]*\)>=7/);
+  /* Was `Math.hypot(...)>=7`, which pinned the shape of the bug: travel alone
+     armed a touch drag, so scrolling the map moved buses. The hold is the rule
+     now — app-shell.test.mjs holds the whole contract and the reasoning. */
+  assert.match(page, /const HOLD_MS=\d+,HOLD_SLOP=\d+,DRAG_SLOP=\d+;/);
+  assert.match(page, /\)>=DRAG_SLOP\)state\.moved=true/);
   assert.match(page, /data-empty-touch=\{singleTapEmptySpaces\?"single":"double"\}/);
   assert.match(page, /now-lastEmptyTouch\.current<700/);
   assert.match(panel, /ALLOW SINGLE-TAP EMPTY SPACES ON TOUCHSCREENS/);
   assert.match(css, /-webkit-touch-callout:none/);
   assert.match(page, /onContextMenu=\{event=>\{if\(pointerType\.current==="touch"\)event\.preventDefault\(\)\}\}/);
-  assert.match(css, /\.token\{touch-action:none/);
+  assert.match(css, /\.token\{touch-action:manipulation/);
   assert.match(page, /setLocatedBusIds\(\[resolution\.bus\.id\]\)/);
   assert.doesNotMatch(page, /resolved to Bus/);
   assert.match(css, /\.vertical-zone\.tow\{[^}]*border-right-color:transparent/);
@@ -1638,7 +1668,10 @@ test("release safety keeps interval units and learned parts attached to the righ
  const boardModelSource=await readFile(new URL("../src/lib/settings/map-settings.ts",import.meta.url),"utf8");
  assert.match(boardModelSource,/serviceIntervals:readSavedServiceIntervals\(ui\.serviceIntervalsUnit,ui\.serviceIntervals\)/,
   "a restored backup still reaches the intervals, through the board-settings reader");
- assert.match(page,/serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals/);
+ /* Written by `writeBoardSettings` now rather than by the map's own
+    `JSON.stringify`, so the unit is asserted there. The map's job is to hand
+    over the intervals, which the set check in tests/settings.test.mjs holds. */
+ assert.match(boardModelSource,/serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals:next\.serviceIntervals/);
  // Campaigns were absent from the backup until version 4. Everything that
  // page holds — completed rows, initials, timestamps, billable hours — sat
  // outside the one control that promises to save the whole board, and the
@@ -2475,4 +2508,192 @@ test("site-config describes this building exactly as the five tables already do"
  const {SITE_SECTIONS}=await import("../src/lib/fleet/site-config.ts");
  assert.equal(SITE_SECTIONS.length,Object.keys(SECTION_SLOTS).length);
  assert.equal(SITE_SECTIONS.flatMap(section=>section.areas).length,Object.keys(RELOCATION_AREAS).length);
+});
+
+test("a glance at a bus is a count and a few names, not a transcript", async () => {
+ /* Curtis, on the Facility Map's quick view, with screenshots: "it looks like
+    a mess and what I come to find out is that we really don't need all of the
+    details showing like this... there has to be a better way to do this."
+
+    It printed `bus.pendingRepair` whole — `defectSummary`, which is every
+    unresolved defect's FULL label joined with semicolons, free text and all.
+    Measured on a bus built from his 15519: 829 characters, in a card 628px
+    tall whose top sat 227px above the top of a 390x844 screen. */
+ const { defectGlance, defectShortLabel, defectSummary } =
+  await import("../src/lib/defects/repair-catalog.ts");
+ const open = (category, issue, details = "") =>
+  ({ id: category + issue, category, issue, details, operability: "service", state: "open" });
+ const twelve = [
+  open("Battery, Starting and Charging", "Battery drain"),
+  open("A/C and HVAC", "Cooling - No cooling", "No A/C"),
+  open("Suspension and Steering", "Ride-height issue", "When turning bus leans"),
+  open("A/C and HVAC", "Cooling - Other A/C repair", "FLEET REVIEW-ASSIGN TO ERIC IN MORNING"),
+  open("Operator/Driver Controls", "Gauges and Dash - Fuel gauge", "INOP / false reading"),
+  open("Inspection", "B-18", "B18"),
+  open("Suspension and Steering", "Dogtracking", "Mechanic and driver reported that the bus right rear is not lined up with front when driving. Dog tracking, but was reported as fishtailing."),
+  open("Lights, Mirrors and Alarms", "Outside rear view mirror - R/S", "Falls out of housing & cracked"),
+  open("Brakes", "ABS warning"),
+  open("Engine", "Oil leak", "We had to put quart of oil in it"),
+  open("Bus Accessories", "Stop Request - Stop request INOP (curbside)", "It is stuck"),
+  open("Miscellaneous", "Noise / vibration", "Grinding Noise from Rear of Bus"),
+ ];
+
+ const glance = defectGlance(twelve);
+ assert.equal(glance.open, 12);
+ assert.equal(glance.names.length, 3, "three names, then a count of the rest");
+ assert.equal(glance.more, 9);
+ assert.equal(glance.names.length + glance.more, glance.open,
+  "nothing may be silently dropped — the names and `more` must account for every open repair");
+
+ /* THE SIZE OF THE WIN, held as a number so nobody quietly puts the
+    transcript back. */
+ const rendered = glance.open + " OPEN" + glance.names.map(n => n.name).join("") + "+" + glance.more + " more";
+ /* The numbers, exactly, because three different figures for this one
+    measurement were in the source at once — 829 in a test, 1,005 in two
+    stylesheet comments, and 849 actual. Equalities now, so a drift fails. */
+ assert.equal(defectSummary(twelve).length, 849, "the old blob on this fixture");
+ assert.equal(rendered.length, 128, "and what replaced it");
+
+ /* NO FREE TEXT, NO FINDINGS, NO SYMPTOMS. The details are one double-tap away
+    on the bus itself, which is where somebody goes when the glance says to. */
+ for (const { name } of glance.names) {
+  assert.ok(!name.includes("fishtailing") && !name.includes("ERIC") && !name.includes("false reading"),
+   "a mechanic's note must not reach the glance: " + name);
+  assert.ok(name.split(" — ").length === 2, "a name is category and issue, nothing else: " + name);
+ }
+
+ /* THE GROUP PREFIX COMES OFF, because the category already says the area:
+    "A/C and HVAC — No cooling", not "A/C and HVAC — Cooling - No cooling". */
+ assert.equal(defectShortLabel(open("A/C and HVAC", "Cooling - No cooling")), "A/C and HVAC — No cooling");
+ /* MATCHED AGAINST THE GROUP TABLE, never by splitting on " - ". These three
+    carry a dash of their own and a blind split cuts each in the wrong place. */
+ assert.equal(defectShortLabel(open("Operator/Driver Controls", "Gauges and Dash - Fuel gauge")),
+  "Operator/Driver Controls — Fuel gauge");
+ assert.equal(defectShortLabel(open("Lights, Mirrors and Alarms", "Outside rear view mirror - R/S")),
+  "Lights, Mirrors and Alarms — Outside rear view mirror - R/S",
+  "not a group prefix, so the dash stays");
+ assert.equal(defectShortLabel(open("Suspension and Steering", "Ride-height issue")),
+  "Suspension and Steering — Ride-height issue");
+
+ /* A RENAMED REPAIR STILL READS, through the same `migrateRepairIdentity`
+    every stored defect goes through — a glance keyed on raw wording would go
+    blank after a catalog rename and nobody would notice. */
+ assert.equal(defectShortLabel(open("Air System", "Leak")).startsWith("Pneumatic System"), true,
+  "the glance resolves a renamed category like everything else does");
+
+ /* COMPLETED REPAIRS ARE NOT OPEN ONES. */
+ assert.deepEqual(defectGlance([{ ...open("Brakes", "ABS warning"), state: "completed" }]),
+  { open: 0, names: [], more: 0 });
+ assert.deepEqual(defectGlance([]), { open: 0, names: [], more: 0 });
+ /* Fewer than the limit means no "+0 more". */
+ assert.deepEqual(defectGlance([open("Brakes", "ABS warning")]),
+  { open: 1, names: [{ id: "BrakesABS warning", name: "Brakes — ABS warning" }], more: 0 });
+
+ /* WHERE THE ISSUE NAME CARRIES NOTHING, THE WORDS ARE THE DEFECT. "Manual
+    entry" and "Driver-reported defect" are placeholders — the second is what
+    `migrateRepairIdentity` mints for any record that lost its wording, which
+    is most of what arrives off a photographed sheet. A cold read found the
+    glance printing "Miscellaneous — Driver-reported defect" over 166
+    characters of driver report, where the card used to print the report. */
+ assert.equal(defectShortLabel(open("Miscellaneous", "Manual entry", "Rear door will not latch, slams open on left turns")),
+  "Rear door will not latch, slams open on left turns");
+ assert.equal(defectShortLabel(open("Miscellaneous", "Driver-reported defect", "Bus pulls hard right under braking")),
+  "Bus pulls hard right under braking");
+ assert.equal(defectShortLabel(open("Miscellaneous", "Driver-reported defect", "")),
+  "Miscellaneous — Driver-reported defect", "with no words there is nothing else to show");
+ const long = defectShortLabel(open("Miscellaneous", "Manual entry", "x".repeat(200)));
+ assert.ok(long.length <= 72 && long.endsWith("…"), "still a glance: " + long.length);
+ assert.equal(defectShortLabel(open("Brakes", "ABS warning", "ignored free text")), "Brakes — ABS warning",
+  "and an ordinary repair still shows no free text");
+
+ /* THE KEY IS THE DEFECT ID, not the name. This app has a merge-duplicates
+    flow because duplicates happen, and four identical ABS records rendered the
+    same React key three times. */
+ const duplicates = ["a", "b", "c", "d"].map(id => ({ ...open("Brakes", "ABS warning"), id }));
+ assert.deepEqual(defectGlance(duplicates).names.map(n => n.id), ["a", "b", "c"]);
+});
+
+test("the quick view is placed by arithmetic, and the arithmetic keeps it on screen", async () => {
+ /* THREE FAULTS IN A ROW, each measured on a phone and each fixed only after
+    a cold read found the fix for the one before it did not hold:
+
+    1. the horizontal clamp hard-coded a half-width of 100 against a 250 cap,
+       so a bus near the left edge put 25px of the card off that side;
+    2. `below` was `rect.top<150`, a guess at the height made before the card
+       existed, so a tall card ran off the top — 628px of card, 227px above a
+       390x844 viewport;
+    3. the repair for 2 pinned the card's BOTTOM to the viewport rather than
+       its top whenever the card was taller than the screen less its margins,
+       which put it off the top again on a 667-tall iPhone SE.
+
+    It is arithmetic in `src/lib/fleet/` now, so all three are things this test
+    drives at any viewport rather than things only a phone can answer. */
+ const { quickViewPosition, QUICK_MAX_WIDTH } =
+  await import("../src/lib/fleet/quick-view-position.ts");
+ /* The card's real edges, given that `top` is its BOTTOM and `left` its CENTRE
+    when it sits above the bus — the fact every one of those bugs came from. */
+ const edges = (anchor, card, view) => {
+  const at = quickViewPosition(anchor, card, view);
+  return { top: at.below ? at.top : at.top - card.height, left: at.left - card.width / 2,
+   right: at.left + card.width / 2, below: at.below };
+ };
+ const bus = { left: 120, right: 160, top: 413, bottom: 445 };
+
+ /* BLOCKER 3, the one that shipped: a card taller than the viewport must keep
+    its TOP on screen. Every one of these measured negative before. */
+ for (const [label, height, view] of [
+  ["iPhone 14, 12 defects + all badges", 512, { width: 390, height: 844 }],
+  ["iPhone 14, 14 defects + a long roadcall", 691, { width: 390, height: 844 }],
+  ["iPhone SE / 8 portrait", 691, { width: 390, height: 667 }],
+  ["iPhone 14 landscape", 586, { width: 844, height: 390 }],
+  ["iPhone SE landscape", 691, { width: 667, height: 375 }],
+ ]) {
+  const box = edges(bus, { width: 250, height }, view);
+  assert.ok(box.top >= 0, label + ": the card's top is at " + Math.round(box.top) + ", off the screen");
+  assert.ok(box.left >= 0 && box.right <= view.width,
+   label + ": " + Math.round(box.left) + ".." + Math.round(box.right) + " against " + view.width);
+ }
+
+ /* ABOVE WHEN IT FITS, BELOW WHEN THAT FITS. A short card on a tall screen
+    sits above the bus, which is where the arrow points. */
+ const roomy = quickViewPosition(bus, { width: 250, height: 200 }, { width: 390, height: 844 });
+ assert.equal(roomy.below, false);
+ assert.equal(roomy.top, 401, "12px above the bus");
+ const nearTop = quickViewPosition({ left: 120, right: 160, top: 40, bottom: 72 },
+  { width: 250, height: 200 }, { width: 390, height: 844 });
+ assert.equal(nearTop.below, true, "no room above, plenty below");
+ assert.equal(nearTop.top, 84);
+
+ /* THE CLAMP USES THE CARD'S OWN WIDTH, not the cap — `width:max-content`
+    means a short card is narrower than 250, and clamping by the cap
+    over-indents it until the arrow stops pointing at the bus. */
+ const narrowLeft = edges({ left: 0, right: 30, top: 600, bottom: 632 },
+  { width: 180, height: 200 }, { width: 390, height: 844 });
+ assert.equal(Math.round(narrowLeft.left), 10, "a narrow card hugs the edge margin, not the cap's");
+ const wideLeft = edges({ left: 0, right: 30, top: 600, bottom: 632 },
+  { width: QUICK_MAX_WIDTH, height: 200 }, { width: 390, height: 844 });
+ assert.equal(Math.round(wideLeft.left), 10);
+ const narrowRight = edges({ left: 360, right: 390, top: 600, bottom: 632 },
+  { width: 180, height: 200 }, { width: 390, height: 844 });
+ assert.equal(Math.round(narrowRight.right), 380);
+
+ /* ONE NUMBER FOR THE WIDTH CAP, shared with the stylesheet. */
+ const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+ assert.match(css, new RegExp("\\.quick-view\\{[^}]*max-width:" + QUICK_MAX_WIDTH + "px"),
+  "globals.css must cap .quick-view at the same " + QUICK_MAX_WIDTH + "px the arithmetic uses");
+
+ /* AND THE CARD IS PLACED ONLY FROM A MEASUREMENT. The second fault's repair
+    placed it from a guess and corrected it in a layout effect that ran on open
+    and nothing else — so `onFocus`, which the browser fires AFTER pointerup on
+    an ordinary tap, called `showQuick` a second time, wrote the guess back,
+    and nothing re-measured. The card was off the top on every tap. */
+ const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+ assert.match(page, /const showQuick=\(\)=>\{[\s\S]{0,260}?placed:false[\s\S]{0,80}?setQuick\(true\);/,
+  "opening the card may only request a measurement, never place it");
+ assert.equal(/top:rect\.top<150\?/.test(page), false, "the height guess must be gone");
+ assert.equal(/halfWidth/.test(page), false, "the hard-coded half-width must be gone");
+ assert.match(page, /visibility:position\.placed\?undefined:"hidden"/,
+  "the unmeasured frame must not be painted");
+ assert.match(page, /\},\[quick,position\.placed,bus\.defects,bus\.pendingRepair\]\);/,
+  "a fresh request to measure must re-run the effect, which is what onFocus needs");
 });

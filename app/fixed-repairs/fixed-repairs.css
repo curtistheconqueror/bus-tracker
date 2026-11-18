@@ -1,4 +1,4 @@
-:root{--fixed-navy:#06275c;--fixed-blue:#0b64bd;--fixed-green:#087347;--fixed-ink:#172b4d;--fixed-muted:#60728c;--fixed-border:#bac7da}*{box-sizing:border-box}html,body{margin:0;background:#e8eef6;color:var(--fixed-ink);font-family:Arial,Helvetica,sans-serif}.fixed-repairs-app{min-height:100vh;padding-bottom:24px}.fixed-header{position:relative;z-index:2;min-height:92px;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:13px 18px;background:linear-gradient(110deg,#041a3e,#0a4f96);color:#fff}.fixed-header>div>span{font-size:7px;font-weight:900;letter-spacing:1.5px}.fixed-header h1{margin:2px 0;font-size:28px}.fixed-header p{margin:0;font-size:9px;opacity:.82}.fixed-header nav{min-width:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}.fixed-header nav a{min-width:102px;min-height:42px;display:flex;align-items:center;justify-content:center;border:1px solid #ffffff55;border-radius:6px;color:#fff;padding:5px 8px;font-size:8px;font-weight:900;text-align:center;text-decoration:none}.fixed-header nav a.active{background:#fff;color:var(--fixed-navy)}.fixed-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;padding:10px 14px}.fixed-summary>div{min-height:68px;display:flex;align-items:center;justify-content:center;flex-direction:column;border:1px solid var(--fixed-border);border-radius:9px;background:#fff;box-shadow:0 2px 9px #16345a13}.fixed-summary strong{font-size:25px;color:var(--fixed-green)}.fixed-summary span{font-size:7px;font-weight:900;letter-spacing:.6px;color:var(--fixed-muted)}.fixed-summary .attention{border-color:#d59b47;background:#fff8e9}.fixed-summary .attention strong{color:#9c5a00}.fixed-undo{display:flex;align-items:center;gap:10px;margin:0 14px 10px;padding:9px 10px;border:1px solid #d3a441;border-radius:8px;background:#fff7df;color:#684500}.fixed-undo span{min-width:0;flex:1;font-size:9px;font-weight:900}.fixed-undo button{min-height:40px;border:0;border-radius:6px;background:#785000;color:#fff;padding:0 12px;font-size:8px;font-weight:900}.fixed-undo .dismiss-undo{width:40px;padding:0;background:transparent;color:#684500;font-size:20px}.fixed-controls{display:grid;grid-template-columns:minmax(220px,1fr) minmax(180px,260px) auto;gap:9px;align-items:end;margin:0 14px 10px;padding:9px;border:1px solid var(--fixed-border);border-radius:9px;background:#fff}.fixed-controls label{display:grid;gap:4px}.fixed-controls label span{font-size:7px;font-weight:900;color:var(--fixed-muted)}.fixed-controls input,.fixed-controls select{width:100%;height:42px;border:1px solid var(--fixed-border);border-radius:6px;background:#fff;color:var(--fixed-ink);padding:0 10px;font-size:12px}.fixed-controls button{height:42px;border:0;border-radius:6px;background:var(--fixed-navy);color:#fff;padding:0 14px;font-size:8px;font-weight:900}.fixed-feed{margin:0 14px;border:1px solid var(--fixed-border);border-radius:10px;background:#f7f9fc;overflow:hidden}/* height:auto, explicitly, because globals.css gives every bare <header> on
+:root{--fixed-navy:#06275c;--fixed-blue:#0b64bd;--fixed-green:#087347;--fixed-ink:#172b4d;--fixed-muted:#60728c;--fixed-border:#bac7da}*{box-sizing:border-box}html,body{margin:0;background:#e8eef6;color:var(--fixed-ink);font-family:Arial,Helvetica,sans-serif}.fixed-repairs-app{min-height:100vh;padding-bottom:24px}.fixed-header{position:relative;z-index:2;min-height:92px;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:13px 18px;background:linear-gradient(110deg,#041a3e,#0a4f96);color:var(--app-header-text,#fff)}.fixed-header>div>span{font-size:7px;font-weight:900;letter-spacing:1.5px}.fixed-header h1{margin:2px 0;font-size:28px}.fixed-header p{margin:0;font-size:9px;opacity:.82}.fixed-header nav{flex:1 1 auto;height:auto;min-height:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px}.fixed-header nav a{min-width:102px;min-height:42px;display:flex;align-items:center;justify-content:center;border:1px solid #ffffff55;border-radius:6px;color:#fff;padding:5px 8px;font-size:8px;font-weight:900;text-align:center;text-decoration:none}.fixed-header nav a.active{background:#fff;color:var(--fixed-navy)}.fixed-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;padding:10px 14px}.fixed-summary>div{min-height:68px;display:flex;align-items:center;justify-content:center;flex-direction:column;border:1px solid var(--fixed-border);border-radius:9px;background:#fff;box-shadow:0 2px 9px #16345a13}.fixed-summary strong{font-size:25px;color:var(--fixed-green)}.fixed-summary span{font-size:7px;font-weight:900;letter-spacing:.6px;color:var(--fixed-muted)}.fixed-summary .attention{border-color:#d59b47;background:#fff8e9}.fixed-summary .attention strong{color:#9c5a00}.fixed-undo{display:flex;align-items:center;gap:10px;margin:0 14px 10px;padding:9px 10px;border:1px solid #d3a441;border-radius:8px;background:#fff7df;color:#684500}.fixed-undo span{min-width:0;flex:1;font-size:9px;font-weight:900}.fixed-undo button{min-height:40px;border:0;border-radius:6px;background:#785000;color:#fff;padding:0 12px;font-size:8px;font-weight:900}.fixed-undo .dismiss-undo{width:40px;padding:0;background:transparent;color:#684500;font-size:20px}.fixed-controls{display:grid;grid-template-columns:minmax(200px,1fr) minmax(150px,210px) minmax(150px,210px) auto;gap:9px;align-items:end;margin:0 14px 10px;padding:9px;border:1px solid var(--fixed-border);border-radius:9px;background:#fff}.fixed-controls label{display:grid;gap:4px}.fixed-controls label span{font-size:7px;font-weight:900;color:var(--fixed-muted)}.fixed-controls input,.fixed-controls select{width:100%;height:42px;border:1px solid var(--fixed-border);border-radius:6px;background:#fff;color:var(--fixed-ink);padding:0 10px;font-size:12px}.fixed-controls button{height:42px;border:0;border-radius:6px;background:var(--fixed-navy);color:#fff;padding:0 14px;font-size:8px;font-weight:900}.fixed-feed{margin:0 14px;border:1px solid var(--fixed-border);border-radius:10px;background:#f7f9fc;overflow:hidden}/* height:auto, explicitly, because globals.css gives every bare <header> on
    the site a fixed height:38px. min-height alone only clamps that up as a
    floor — the box stays a FIXED length, not an auto one, so a second flex
    line from SHOW MORE / SHOW ALL wrapping overflowed silently below the box
@@ -41,9 +41,37 @@
 .fixed-repairs-app .fixed-editor>header{height:auto}
 .fixed-repairs-app .fixed-card>footer{position:static;left:auto;bottom:auto;transform:none;width:auto;border-radius:0;background:#fff;color:var(--fixed-ink);box-shadow:none;white-space:normal;z-index:auto;font-size:inherit;letter-spacing:normal}
 .fixed-repairs-app .fixed-editor>footer{position:static;left:auto;bottom:auto;transform:none;width:auto;border-radius:0;color:var(--fixed-ink);box-shadow:none;white-space:normal;z-index:auto;letter-spacing:normal}
-.fixed-repairs-app .fixed-card-actions{width:min(100%,430px);display:grid;grid-template-columns:minmax(130px,1.5fr) minmax(90px,1fr) minmax(76px,.8fr)}
+/* FOUR CHILDREN, FOUR COLUMNS, which is the same lesson the controls row above
+   carries: this was declared at three for EDIT / UNDO FIX / DELETE, and adding
+   PTR left DELETE hanging on a second line at the LEFT under a row aligned
+   right. Measured at 1180, 820, 430, 390 and 360 before the column was added.
+
+   PTR gets the narrowest share because it is the shortest label, and a floor of
+   56px so it stays a target rather than a sliver. */
+.fixed-repairs-app .fixed-card-actions{width:min(100%,560px);display:grid;
+ grid-template-columns:minmax(120px,1.5fr) minmax(56px,.55fr) minmax(84px,1fr) minmax(72px,.8fr)}
+/* THREE COLUMNS WHEN THERE ARE THREE BUTTONS. UNDO FIX is not offered on a
+   repair logged straight onto this page — those were never open anywhere, so
+   there is nothing to undo — and the row has to look right both ways.
+
+   Two wrong answers were measured before this one. Left to flow, DELETE took
+   column three and the row stopped 119px short of the right edge while the card
+   above it reached the edge. Pinned to column four, it left a 140px empty
+   column in the middle, which reads as a button that failed to render. The row
+   says how many it is drawing instead, so neither happens. */
+.fixed-repairs-app .fixed-card-actions.without-undo{
+ grid-template-columns:minmax(120px,1.5fr) minmax(56px,.55fr) minmax(72px,.8fr)}
 .fixed-repairs-app .fixed-card-actions button{width:100%}
-.fixed-controls{grid-template-columns:minmax(220px,1fr) minmax(180px,260px) auto auto}
+/* FIVE CHILDREN, FIVE COLUMNS. The row carries search, category, the window,
+   EXPORT and UNDO; declared at four, the fifth wrapped to a second line with
+   `align-items:end` leaving it hanging under the others.
+
+   AND THIS RULE IS THE ONE THAT RENDERS. It is a later top-level rule of equal
+   specificity to the base declaration further up this file, so it wins at every
+   width — the base's own column list never paints above the 760px block. A cold
+   read found a test asserting the base's count as if a media query gated this
+   one; the count that matters is here. */
+.fixed-controls{grid-template-columns:minmax(200px,1fr) minmax(150px,210px) minmax(150px,210px) auto auto}
 .fixed-controls .fixed-undo-control{border:1px solid #afbed1;background:#eef3f8;color:#354b68}
 .fixed-controls .fixed-undo-control:not(:disabled){border-color:#7e94b0;background:#dfe8f3;color:#173b69}
 .fixed-controls .fixed-undo-control:disabled{opacity:.48;cursor:not-allowed}
@@ -57,8 +85,21 @@
  .fixed-controls>button{width:100%;min-width:0;padding:0 6px}
  .fixed-repairs-app .fixed-card>footer{align-items:stretch;flex-direction:column;gap:7px;padding:8px}
  .fixed-repairs-app .fixed-card>footer>b{width:max-content;max-width:100%;margin:0;border-radius:999px;background:#fff1cf;padding:5px 8px}
- .fixed-repairs-app .fixed-card-actions{width:100%;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr) minmax(0,.8fr);gap:6px}
+ /* TWO BY TWO ON A PHONE, and that is a change to the three buttons that were
+    already here. Four in one row at 360 puts DELETE in a 60px box beside a
+    41px PTR — four crowded targets with the destructive one on the end, which
+    is how somebody deletes a repair reaching for UNDO FIX with a glove on.
+    Measured: 2x2 gives every one of them 165px at 390 and 151px at 360, at the
+    same 48px height. (This said 150 and 138 for one commit, against a test in
+    the same change that carried the real numbers — a cold read caught the two
+    disagreeing, which is the only reason either is right now. Four across at
+    360 is DELETE at 72px and PTR at 56px with the row overflowing its footer to
+    x=-9, so the conclusion held and the numbers did not.) */
+ .fixed-repairs-app .fixed-card-actions{width:100%;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
  .fixed-repairs-app .fixed-card-actions button:first-child{grid-column:auto}
+ /* Two columns either way on a phone — the three-button row is then EDIT|PTR
+    with DELETE under it, which is the flow order and reads fine. */
+ .fixed-repairs-app .fixed-card-actions.without-undo{grid-template-columns:repeat(2,minmax(0,1fr))}
  .fixed-repairs-app .fixed-card>footer button{min-height:48px;padding:0 4px;font-size:clamp(7px,2.25vw,9px);line-height:1.15}
  .fixed-repairs-app .fixed-editor>footer{position:sticky;left:auto;bottom:0;transform:none;width:auto}
 }
@@ -71,7 +112,7 @@
 
 /* Fixed Repairs shares Defect Log appearance preferences through the same settings key. */
 .fixed-repairs-app{background:var(--fixed-page,#e8eef6);color:var(--fixed-ink,#172b4d);font-family:var(--fixed-font,Arial,Helvetica,sans-serif);font-size:calc(1em * var(--fixed-scale,1))}
-.fixed-header{background:var(--fixed-header,#061d45);color:var(--fixed-header-text,#fff)}
+.fixed-header{background:var(--app-header-fill,var(--fixed-header,#061d45));color:var(--app-header-text,var(--fixed-header-text,#fff))}
 .fixed-header nav a{color:var(--fixed-header-text,#fff)}
 /* THE THEMED HALF OF THIS PAGE, and the four rules below are here because the
    base stylesheet paints a light-theme card and the theme section only ever
@@ -144,6 +185,26 @@
 .fixed-repairs-app .parts-used-toggle b,.fixed-repairs-app .parts-remember-scope b{font-size:9px;letter-spacing:.5px;color:var(--fixed-navy)}
 .fixed-repairs-app .parts-used-toggle small,.fixed-repairs-app .parts-remember-scope small{font-size:8px;color:var(--fixed-muted)}
 .fixed-repairs-app .parts-used-fields{display:grid;gap:8px}
+/* MORE THAN ONE PART PER REPAIR. The record held one `partNumber`/`partName`
+   pair; Curtis hit the wall from the floor - "I just saved a fix like a bus and
+   I was trying to find a way to add a second part" - so the pair became a list,
+   drawn by src/components/defects/parts-used-list.tsx for both this form and
+   the other one.
+
+   A SEPARATOR ONLY BETWEEN ROWS, so a one-part repair looks exactly as it did
+   and a two-part repair reads as two things. `+ .parts-row` cannot fire on a
+   lone row, which is the whole reason it is written that way rather than as a
+   border on every row.
+
+   REMOVE IS NOT DRAWN ON A LONE ROW at all - the component decides that, since
+   unticking PARTS USED is the gesture that means no parts were used. */
+.fixed-repairs-app .parts-list{display:grid;gap:10px}
+.fixed-repairs-app .parts-row{display:grid;gap:8px}
+.fixed-repairs-app .parts-row+.parts-row{border-top:1px dashed var(--fixed-border);padding-top:10px}
+.fixed-repairs-app .parts-row .remove-part{min-height:36px;justify-self:start;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--fixed-border);border-radius:6px;background:#fff;color:var(--fixed-ink);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+.fixed-repairs-app .parts-row .remove-part span{font-size:13px;line-height:1}
+.fixed-repairs-app .parts-list .add-part{min-height:36px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px dashed var(--fixed-blue);border-radius:6px;background:color-mix(in srgb,var(--fixed-blue) 7%,#fff);color:var(--fixed-blue);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.7px;cursor:pointer}
+.fixed-repairs-app .parts-list .add-part span{font-size:14px;line-height:1}
 .fixed-repairs-app .parts-remembered{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;border:1px dashed var(--fixed-blue);border-radius:6px;background:color-mix(in srgb,var(--fixed-blue) 8%,#fff);padding:8px 10px}
 .fixed-repairs-app .parts-remembered span{display:grid;gap:2px;min-width:0;font-size:12px;font-weight:700;color:var(--fixed-ink);overflow-wrap:anywhere}
 .fixed-repairs-app .parts-remembered b{font-size:8px;font-weight:900;letter-spacing:.7px;color:var(--fixed-blue)}
@@ -151,6 +212,9 @@
 .fixed-repairs-app .parts-remembered button{min-height:36px;flex:0 0 auto;border:1px solid var(--fixed-border);border-radius:6px;background:#fff;color:var(--fixed-ink);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
 @media(max-width:760px){
  .fixed-repairs-app .parts-used-fields input{font-size:16px}
+ /* Both new controls reach a thumb target on the device this form is used on. */
+ .fixed-repairs-app .parts-row .remove-part{min-height:44px;width:100%;justify-content:center}
+ .fixed-repairs-app .parts-list .add-part{min-height:44px;width:100%}
  .fixed-repairs-app .parts-remembered{flex-wrap:wrap}
  .fixed-repairs-app .parts-remembered button{min-height:44px;width:100%}
 }
@@ -228,3 +292,102 @@
 .fixed-new-bus .fixed-type-bus>input::placeholder{font-size:13px;font-weight:700;letter-spacing:0;color:var(--fixed-muted,#8b97ab)}
 .fixed-bus-feedback{font-size:10px;font-weight:800;color:var(--fixed-green,#0d7a45)}
 @media(max-width:760px){.fixed-feed>header .log-repair-button{width:100%;min-height:46px;font-size:13px}.fixed-new-bus{margin:0 10px}.fixed-new-bus .fixed-type-bus>input{font-size:24px;min-height:56px}}
+
+/* ONE PADDING WITH THE OTHER SEVEN, ON THE NARROW LAYOUT, WHICH IS WHERE THIS
+   PAGE WAS THE ODD ONE. Under 760 it used `12px 10px 10px` (line 52) where
+   the other seven use 12px. Wide, it was already on the crowd's `13px 18px`
+   from the base rule at the top of this file.
+
+   ONE RULE, NOT TWO. This shipped as a pair — an unconditional
+   `padding:13px 18px` with the narrow override under it — and the wide half
+   was a NO-OP, re-stating the base rule it sits below. Proven by deleting
+   every `.fixed-repairs-app>.fixed-header` padding rule through the CSSOM and
+   re-measuring: at 1180 nothing moved, at 390 the padding fell back to
+   `11px 10px`. It was written from a wrong reading of line 36's
+   `padding:11px 10px`, which looks like a wide rule and is inside this file's
+   `@media(max-width:760px)` block — where it was already outranked by line 52
+   anyway, so it has never applied at any width.
+
+   It lives in this file rather than globals.css because what it corrects is
+   `.fixed-repairs-app>.fixed-header` at (0,2,0) in a stylesheet that loads
+   after globals: a shared rule there is simply outranked, whatever it says. */
+@media(max-width:760px){.fixed-repairs-app>.fixed-header{padding:12px}}
+
+/* WHAT THE LIST IS AND WHAT IT IS NOT. Drawn only when something is narrowing
+   it, so a page nobody has filtered carries no bar at all — and `aria-live` on
+   it because the numbers change under a drop-down somebody is still looking at.
+
+   The window's own words lead, because that is the part a reader of the SHARE
+   will see as the heading, and the bar is where somebody checks that the two
+   agree before sending it. */
+.fixed-scope{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin:0 14px 9px;padding:8px 11px;border:1px solid var(--fixed-border);border-radius:8px;background:#fff}
+.fixed-scope b{font-size:9px;font-weight:900;letter-spacing:.6px;color:var(--fixed-blue)}
+.fixed-scope span{font-size:9px;font-weight:900;color:var(--fixed-ink)}
+.fixed-scope small{font-size:7px;font-weight:900;letter-spacing:.5px;color:var(--fixed-muted)}
+/* THE ONE LINE IN THIS BAR THAT IS NOT A COUNT. The others say what a control
+   cost; this says a control is not in force at all, so it takes the whole width
+   and the amber the Defect Log's own window bar uses, rather than sitting at
+   7px grey among the arithmetic where nobody would read it. */
+.fixed-scope .fixed-scope-warn{flex-basis:100%;border-top:1px solid #e0c08f;margin-top:2px;padding-top:6px;font-size:9px;letter-spacing:.4px;color:#8a5a06}
+
+/* PATH TO REPAIR, on this page's own colours. The panel declares `--ptr-*` with
+   light-surface defaults beside itself in
+   `src/components/defects/path-to-repair-panel.css`; this is Fixed Repairs
+   saying what they are here, the same way `defect-log.css` maps them onto its
+   page theme. Scoped under the app root so it outranks the component's own
+   defaults by specificity rather than by import order, which nothing controls.
+
+   The accent is this page's GREEN rather than the Defect Log's blue, because
+   that is what every finished thing on this screen is drawn in — the card's
+   left border, the number badge, SAVE FIX DETAILS. A navy panel here would read
+   as a piece of another app, which is the complaint the header colours already
+   answered once. */
+.fixed-repairs-app .ptr-shade{
+ --ptr-text:var(--fixed-ink,#172b4d);
+ --ptr-muted:var(--fixed-muted,#60728c);
+ --ptr-border:var(--fixed-border,#bac7da);
+ /* `var(--fixed-surface)`, NOT `#fff`, and the literal was a high-severity bug
+    for one commit. `--fixed-ink` above IS themed — the appearance panel sets it
+    from the theme's `text` — so a hard-coded white card carried Dark's
+    `#f3f6fa`, Midnight's `#e4eeff` and Tactical's `#f0ecd7` on it. Measured:
+    the writeup at 1.19:1 on Tactical, 1.08:1 on Dark, 1.17:1 on Midnight, and
+    the SHOP TIME box somebody types into the same. Invisible, not merely low.
+
+    Which is the bug the block twenty lines above this one was written to fix
+    across the whole page — "TWELVE elements under AA on each of Dark, Midnight
+    and Tactical, and the worst was 1.13:1". Half a mapping reintroduced it: a
+    themed ink on an unthemed surface is the same mistake either way round. */
+ --ptr-surface:var(--fixed-surface,#fff);
+ /* THE ACCENT STAYS GREEN ON PURPOSE, and `#fff` on it is therefore provable
+    rather than guessed. `--fixed-green` is a `:root` constant this page never
+    themes, which is why `+ LOG A REPAIR` is green with white text on all four
+    themes — the panel head follows that precedent rather than `--fixed-accent`,
+    because a PATH TO REPAIR screen reached from the finished-work list is part
+    of the same green. If it ever maps to `--fixed-accent`, the ink has to be
+    computed the way `--log-accent-text` is; a literal would be a guess the
+    moment somebody picks a pale accent. */
+ --ptr-accent:var(--fixed-green,#087347);
+ --ptr-accent-text:#fff;
+}
+/* Mid-grey rather than green or red: it is neither the finished thing nor a
+   destructive one, and it must not compete with the first button on the card.
+   The same colour the Defect Log's own PTR button uses. */
+.fixed-card-actions .ptr-fixed-repair{background:#3f4a63}
+.fixed-card-actions .ptr-fixed-repair:focus-visible{filter:brightness(1.15)}
+
+/* COPY, SHARE, SHARE PAGE. The same three controls the Defect Log draws, at the
+   same 44px the rest of this app gives a thumb, and the status line takes the
+   whole width on a phone so a filename never squeezes the buttons. */
+.fixed-share{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:0 14px 10px}
+.fixed-share button{min-height:44px;border:1px solid var(--fixed-border);border-radius:7px;background:#fff;color:var(--fixed-ink);padding:0 14px;font-size:9px;font-weight:900;cursor:pointer;touch-action:manipulation}
+.fixed-share button:hover,.fixed-share button:focus-visible{border-color:var(--fixed-blue);color:var(--fixed-blue);outline:none}
+.fixed-share small{min-width:0;font-size:7px;font-weight:900;letter-spacing:.5px;color:var(--fixed-muted);overflow-wrap:anywhere}
+/* The row that admits the share carries more than the page draws. Its own line
+   on every width, because it is read against the feed header above it. */
+.fixed-share .fixed-share-scope{flex-basis:100%;color:#7a5a00}
+@media(max-width:760px){
+ .fixed-scope{margin:0 8px 8px}
+ .fixed-share{margin:0 8px 9px}
+ .fixed-share button{flex:1 1 0;min-width:0;padding:0 8px}
+ .fixed-share small{flex-basis:100%}
+}

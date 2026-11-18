@@ -12,6 +12,20 @@ passed lint, build and 399 tests on merge candidate
 `86e84e51bae874e9c55c079ff2b1c891f065ce37` (code head above into `a7e1aa3`).
 Any newer code requires reconciliation and current-head checks.
 
+**THAT CI RUN AND ITS 399 TESTS DESCRIBE AN OLDER CANDIDATE, not this head.**
+`main` was merged into this branch on 2026-11-18 at `19f0e90` — 160 commits,
+three published releases (Sites 192-194) and application release 197 — because
+the branch is published and is not rebased. One file conflicted,
+`tests/helpers/modules.mjs`, where this branch and `main` had each appended
+export lines at the same end: resolved as the union of both, with every module
+path checked to exist. Measured on the merged tree, in a container rather than
+in CI: the production build succeeds, **509 of 509 tests pass** and ESLint is
+clean. CI must re-run on the actual merge SHA before anything is packaged, and
+the test count above moves with every change that adds one.
+
+Nothing about the gates below changed. This merge is maintenance so the branch
+can land when Curtis clears them; it is not a claim that any gate is met.
+
 Curtis authorized publication of the verified ready scope on 2026-10-21 and
 temporarily accepted the unresolved Major URL-token risk for his initial
 single-user read-only connection. Keep the
@@ -37,18 +51,6 @@ for this pending release is application 191 / Sites 187, source `b33775685b61aca
 
 ## Current live baseline
 
-Application release 191 is live as Sites platform version 187 from
-`b33775685b61acafdf4325807c82e92281c9fc2c`, deployed 2026-10-20 at
-19:35:00.450217 UTC to the existing public
-[Fleet Tracker site](https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site).
+Sites Version 194 / application release 197 deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Installed copies reopen the remembered page after safe document/hydration readiness; Doors picker receives its display-only emoji. PR50 CodeRabbit final review covered this exact SHA with no actionable comments; CI451 (44229747699) passed. Production build and 470 tests passed; ESLint zero errors and one preexisting warning. Browser loopback regression proved delayed-script/stalled-destination recovery; live HTTP200 and exact corrected inline script verified on Map, Defect Log, Down Sheet and Settings. Live Defect Log rendering checked. Physical iOS/Home Screen and real garage network behavior remain unverified. The initial service-worker document request remains unbounded; readiness taking more than the 2.5-second script budget falls back to map for that run. Sites192 and193 were saved candidates, never deployed. Rollback: Sites191 at a9f610d42123cd6cfaaf32b61d8c78048d585c82.
 
-FOCUS now has COPY, SHARE and SHARE PAGE for a complete selected-bus snapshot.
-See [release evidence](RELEASES.md) and the preserved
-[191 handoff and acceptance checklist](archive/PUBLISH_RELEASE_191.md).
-
-Rollback: application 189/190 / Sites 186 from
-`c9c03d661177c04706f7beb33f2e4c24bf728e58` (`sites-v186`).
-
-Fresh browser interaction, native phone sharing, VoiceOver, Safari/Home Screen
-and offline-device checks remain for Curtis. Six server routes and 33 deployed
-asset comparisons passed. No production data was changed.
+PR39 MCP remains separately held and unmerged, excluded from this release. Historical queue: docs/archive/PUBLISH_RELEASE_197.md.

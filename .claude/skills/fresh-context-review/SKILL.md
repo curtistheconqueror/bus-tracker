@@ -84,25 +84,86 @@ tells you nothing about old code that does not know it exists.
 fix it. If the honest answer is "they'd ask why this is safe," the comment is
 the deliverable.
 
-## When to spend a subagent on it
+## The cold read before every code push
 
-Doing this in the same context has real limits — you are still the person who
-wrote it. A subagent given only the diff and no rationale is closer to the real
-thing, and worth it when the change:
+**One subagent on the diff, before any push that carries a code change.** Not
+when the change looks risky — every time. It is the standing replacement for
+the review bot this project used until its trial expired, and it has to hold
+that line on its own.
 
-- touches stored records or anything a migration would have to undo,
-- crosses more than two files,
-- adds an invariant, or
-- is about to be described in a handoff.
+**Hand it the diff and the question. Never your reasoning.** A reviewer given
+your conclusion hands it back agreed with, which is the whole failure the
+posture exists to avoid.
+
+**Review the whole change against `main`, not `HEAD~1`.** Two of the defects
+below are invisible in a single-commit diff: the Shop Talk refused-write bug
+was a mismatch between two files written in the SAME commit and only fixed two
+commits later, and the false MASTER EXPORT claim was a string in one file
+contradicted by another the change never touched. A per-commit diff meets the
+letter of the rule and misses that class entirely.
+
+**Every finding gets answered, on the record** — fixed in a named commit, or
+declined with the reason written where the next person finds it. A review pass
+nobody has to answer satisfies the rule exactly as written and is not a gate.
+Declining is a real outcome, not a failure: see below.
+
+**It is additional.** The three gates and the five steps above stay with the
+session. `docs/NEXT_SESSION.md` says never let a subagent be the sole witness
+to anything going into a commit message or a handoff, and that still holds —
+this reviewer is a second reader, never the only one.
 
 Keep it to one. `CLAUDE.md` caps subagents at ten for a reason; a review that
 fans out eighty agents costs millions of tokens to learn what one careful pass
 finds.
 
+### What deserves more than a diff read
+
+These four were the old triggers for spending a subagent at all. Under an
+every-push rule they are no longer about *whether* to review — they mark the
+changes where the reviewer should be given the surrounding files too, not just
+the diff:
+
+- it touches stored records, or anything a migration would have to undo,
+- it crosses more than two files,
+- it adds an invariant, or
+- it is about to be described in a handoff.
+
+### Why this is a gate, in numbers
+
+Across **two** pull requests the review bot raised **nine** findings on Claude's
+own work. **Seven were real defects**, none caught by a green suite:
+
+- Shop Talk cleared the textarea over a REFUSED write, so a blocked
+  `localStorage` showed "NOT SAVED" having already destroyed the hazard
+  somebody had just typed. The incident form beside it did it correctly, with
+  a comment explaining why, written in the same commit.
+- That same screen claimed MASTER EXPORT carried its notes. `fleet-backup.ts`
+  names its keys explicitly and does not include it.
+- The No Heat filter read free text, so a mechanic writing *"Floor heat switch
+  checked and working"* put that bus on the winter list. The first fix closed
+  only the group match; the five named branches had the same hole.
+- The shift tests asserted UTC literals against a function reading local hours:
+  green in CI, failing under `TZ=America/Chicago`, this garage's own timezone.
+- DAILY STATS fell under AA on hover and focus, three lines below a comment
+  naming that exact ratio as too low.
+- A loosened test regex accepted the two values it existed to forbid.
+- **`CLAUDE.md` asserted a nav badge that did not exist** — a requirement
+  written by the same change that added the surface and did not build it. That
+  one is the closest precedent to anything you are about to write into these
+  files, which is why it is listed rather than left out.
+
+**The other two were declined, and that is the point of writing nine.** One
+asked to anonymise Curtis's name in a comment about his own fall; one demanded
+a nav badge the documentation had wrongly promised. The reviewer withdrew both
+once answered. A reviewer that is right seven times in nine is worth a gate and
+is still not an authority — *verify, then fix or decline with the reason on the
+record*, which is what those two threads show.
+
 ## What this is not
 
 It is not re-running the tests. Tests confirm what you thought to check, and
-all three cases above passed a green suite. It is not reading the code again
+every case on this page — the three shapes and the seven findings alike —
+passed a green suite. It is not reading the code again
 with the same assumptions loaded — that is how the assumption survives. The
 whole value is in the change of posture, so if you cannot actually drop the
-context, at least run the four mechanical steps, which do not depend on it.
+context, at least run the five mechanical steps, which do not depend on it.

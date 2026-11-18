@@ -414,3 +414,41 @@ test("the AI operator keeps hold of the bus, and answers a question instead of o
  const vague=planOperatorCommand("how many buses are sitting",fleet,areas,first.context);
  assert.notEqual(vague.kind,"message","a fleet-wide question is not hijacked by the remembered bus");
 });
+
+test("the hand-typed spoken shorthand reaches one repair each, or it is not there", async () => {
+ /* Curtis asked for a short way to say the run box entry. Everything else the
+    operator matches on is DERIVED from the catalog, so this one list is the
+    only place a wording can rot: a rename, a retirement, or a second repair
+    whose name contains the same phrase all turn a shorthand into a guess.
+
+    The module drops a row in each of those cases rather than guessing. This
+    asserts the two halves of that from outside: every row still reaches the
+    repair it names, and every phrase still names exactly one wording in the
+    whole catalog. A second run-box repair fails here, which is the point —
+    somebody then chooses the words instead of the list order choosing for
+    them. */
+ const {SPOKEN_SHORTHAND,planOperatorCommand}=await import("../src/lib/operator/operator-engine.ts");
+ const {REPAIR_OPTIONS}=await import("../src/lib/defects/repair-catalog.ts");
+ assert.ok(SPOKEN_SHORTHAND.length>0,"the list is the thing under test");
+ const fold=value=>String(value).toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
+ const everyWording=Object.values(REPAIR_OPTIONS).flat();
+ const fleet=[{id:"b1",n:"17559",l:"garage-1",s:"defect",defects:[],pendingRepair:""}];
+ for(const row of SPOKEN_SHORTHAND){
+  assert.ok((REPAIR_OPTIONS[row.category]||[]).includes(row.issue),
+   row.category+" / "+row.issue+" is no longer in the catalog, so \""+row.say+"\" points at nothing");
+  const reach=everyWording.filter(issue=>fold(issue).includes(fold(row.say)));
+  assert.deepEqual(reach,[row.issue],
+   "\""+row.say+"\" must name exactly one catalog wording — it reaches "+reach.length);
+  const planned=planOperatorCommand("bus 17559 defect "+row.say,fleet,[]);
+  assert.equal(planned.kind,"plan","\""+row.say+"\" did not reach a repair at all");
+  assert.equal(planned.plan.kind,"defect");
+  assert.equal(planned.plan.defect.category,row.category);
+  assert.equal(planned.plan.defect.issue,row.issue);
+  /* And the full wording still wins when it is spoken, because the list is
+     sorted longest key first. A shorthand that shadowed the real name would
+     be a regression nobody would notice from the screen. */
+  const bare=row.issue.split(" - ").slice(1).join(" - ")||row.issue;
+  const full=planOperatorCommand("bus 17559 defect "+bare,fleet,[]);
+  assert.equal(full.plan?.defect?.issue,row.issue,"the full wording must still resolve");
+ }
+});

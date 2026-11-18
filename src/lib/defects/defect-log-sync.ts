@@ -1,6 +1,6 @@
 import {defectSupportingDetails,defectSummary,hasWorkState,isUnresolved,mergeReportAttempts,normalizeDefects,ROAD_CALL_KEY,type DefectState,type StructuredDefect} from "./repair-catalog.ts";
 import {applyRoadCall,clearRoadCall,type RoadCallEvent} from "../fleet/road-calls.ts";
-import {normalizeRepairTimeEstimate} from "../down-sheet/repair-time-estimates.ts";
+import {estimateFromHours,normalizeRepairTimeEstimate} from "../down-sheet/repair-time-estimates.ts";
 import {downSheetDefectIds} from "../down-sheet/down-sheet-sync.ts";
 import {roadServiceStatus,statusForLocation,type FleetStatus} from "../fleet/smart-status.ts";
 import {stampOperationalChange} from "../shared/operational-time.ts";
@@ -22,6 +22,9 @@ export type DefectLogFleetBus={
 
 export type DefectLogDownEntry={
  id:string;defectId?:string;busId:string;busNumber:string;category:string;repair:string;customReason:string;
+ /* Set on a row this app created, absent on a row off the office's scanned
+    sheet. `src/lib/down-sheet/entry-origin.ts` owns what it means. */
+ addedInApp?:true;
  /* Carried through because a modern entry writes one record per card, so the
     cards are what say which defects the sheet has. Optional: an entry stored
     before cards existed has none. */
@@ -118,6 +121,35 @@ function repairStatus(bus:DefectLogFleetBus,defects:StructuredDefect[],state:Def
  const located=statusForLocation(bus.l,bus.s,repairAware);
  if(located!==bus.s||bus.l.startsWith("east-")||bus.l.startsWith("west-")||bus.l.startsWith("road-")||bus.l.startsWith("garage-")||bus.l.startsWith("bay-")||bus.l.startsWith("body-"))return located;
  return bus.s==="service"||bus.s==="defect"?roadServiceStatus(repairAware):bus.s;
+}
+
+/* THE STATUS A BUS IS LEFT WITH WHEN RECORDS A SCAN FILED COME OFF IT, OR GO
+   BACK ON.
+
+   Filing a scan goes through `saveDefectLogRecord`, which moves the bus's
+   status: a bus in service with its first open defect becomes DEFECT. Taking
+   the scan back out rebuilt the defects and left that status standing — a cold
+   read measured a bus on the road reading DEFECT with nothing on it, and a heat
+   sheet does that to sixty buses in one press.
+
+   So the status is worked out again, by the one rule a save uses, and ONLY
+   WHILE THE STATUS IS STILL THE ONE THAT RULE GIVES for what the bus carries
+   now. Anything else is a call somebody made since — in progress in the shop,
+   held out by a foreman — and `takeDefectOffBus` above says why that is left
+   alone: a record leaving is not new information about whether a bus can run.
+
+   The clock is stamped only when the status actually moves, the way a save
+   stamps it.
+
+   It cannot give back a status the filing itself flattened. A bus marked OUT
+   with nothing downing it became DEFECT when the scan filed on it, exactly as
+   it would for a defect logged by hand, and nothing recorded what it had
+   been. */
+export function statusAfterDefectChange<T extends DefectLogFleetBus>(bus:T,before:StructuredDefect[],after:StructuredDefect[],now=new Date().toISOString()):T{
+ const next={...bus,defects:after,pendingRepair:defectSummary(after)} as T;
+ if(repairStatus(bus,before,"open")!==bus.s)return next;
+ const s=repairStatus(bus,after,"open");
+ return s===bus.s?next:stampOperationalChange(bus,{...next,s},now) as T;
 }
 
 export function activeDefectLogCount(fleet:DefectLogFleetBus[]){
@@ -249,6 +281,13 @@ export function saveDefectLogRecord(
    came straight back on the next read and the untick looked like it had not
    worked.
 
+   `parts` is the third, found by a reviewer rather than by me: `withDefectParts`
+   deletes it when a repair comes back down to one part, so a record that had
+   held two kept both after a REMOVE, and after unticking PARTS USED entirely -
+   `normalizeDefectParts` read them straight back off the stored array. Exactly
+   the shape of the two below, in a change whose own comment pointed at this
+   line and did not follow it.
+
    workStates was fixed when it was found; downSheetRecommendation had the same
    bug and was found the same way, by driving the button in a browser and
    reading the record back. Turning RECOMMEND FOR DOWN SHEET off did nothing
@@ -260,7 +299,7 @@ export function saveDefectLogRecord(
    never a partial patch, so reading these straight off the incoming copy is
    what the callers already mean. A future caller that passes a patch would
    have to carry both fields with it. */
-const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,downSheetRecommendation:incoming.downSheetRecommendation,...attemptsPatch(existing,incoming),createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log",...(leaving?{movedFromBusNumber:leaving.n,movedAt:now}:{})},supportingDetails=defectSupportingDetails(defect);
+const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,downSheetRecommendation:incoming.downSheetRecommendation,parts:incoming.parts,...attemptsPatch(existing,incoming),createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log",...(leaving?{movedFromBusNumber:leaving.n,movedAt:now}:{})},supportingDetails=defectSupportingDetails(defect);
  const defects=existing?current.map(item=>item.id===defect.id?defect:item):[...current,defect];
  const existingDown=downEntries.find(entry=>entry.defectId===defect.id);
  let nextDown=downEntries;
@@ -269,7 +308,7 @@ const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workS
   /* busId as well as busNumber. The update branch renamed the entry's bus and
      left its id pointing at the old one, so a moved repair showed the new
      number on a sheet row still filed under the bus it left. */
-  const linked:DefectLogDownEntry=existingDown?{...existingDown,busId:bus.id,busNumber:bus.n,category:defect.category,repair:defect.issue,customReason:supportingDetails,workflow,operationalStatus:defect.operability==="down"?"out":state==="in-progress"?"shop":"defect",updatedAt:now,updatedBy:defect.reportedBy||existingDown.updatedBy,completedAt:"",history:[...(existingDown.history||[]),historyItem]}:{id:"repair-"+defect.id,defectId:defect.id,busId:bus.id,busNumber:bus.n,category:defect.category,repair:defect.issue,customReason:supportingDetails,assignmentType:"Mechanic",assignedTo:bus.mechanic||"",section:bus.roadcall?"Roadcall":"Pending",shift:shiftFromFleet(bus.shift),workflow,operationalStatus:defect.operability==="down"?"out":state==="in-progress"?"shop":"defect",priority:defect.operability==="down"?"High":"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,defect.category,defect.issue),createdAt:defect.createdAt||now,updatedAt:now,updatedBy:defect.reportedBy||"",completedAt:"",history:[historyItem]};
+  const linked:DefectLogDownEntry=existingDown?{...existingDown,busId:bus.id,busNumber:bus.n,category:defect.category,repair:defect.issue,customReason:supportingDetails,workflow,operationalStatus:defect.operability==="down"?"out":state==="in-progress"?"shop":"defect",updatedAt:now,updatedBy:defect.reportedBy||existingDown.updatedBy,completedAt:"",history:[...(existingDown.history||[]),historyItem]}:{/* ADDED VIA APP. A row created by ticking DOWN SHEET in the Defect Log, by the DEFERRED board, by RECOMMENDED or by the evening review has never been on the office's scanned paper. Stamped only on the NEW branch: the update branch above is writing onto a row that already exists and whose origin is already recorded, and overwriting that would relabel a row read off the office's sheet as the app's own. Cleared by the next scan that names the bus - see src/lib/down-sheet/entry-origin.ts. */addedInApp:true as const,id:"repair-"+defect.id,defectId:defect.id,busId:bus.id,busNumber:bus.n,category:defect.category,repair:defect.issue,customReason:supportingDetails,assignmentType:"Mechanic",assignedTo:bus.mechanic||"",section:bus.roadcall?"Roadcall":"Pending",shift:shiftFromFleet(bus.shift),workflow,operationalStatus:defect.operability==="down"?"out":state==="in-progress"?"shop":"defect",priority:defect.operability==="down"?"High":"Routine",timeEstimate:estimateFromHours(defect.estimateHours,defect.category,defect.issue),createdAt:defect.createdAt||now,updatedAt:now,updatedBy:defect.reportedBy||"",completedAt:"",history:[historyItem]};
   nextDown=existingDown?downEntries.map(entry=>entry.id===existingDown.id?linked:entry):[linked,...downEntries];
  }else if(existingDown&&existingDown.workflow!=="Completed"){
   nextDown=downEntries.map(entry=>entry.id===existingDown.id?{...entry,workflow:"Completed",completedAt:now,updatedAt:now,updatedBy:defect.reportedBy||entry.updatedBy,history:[...(entry.history||[]),{at:now,initials:defect.reportedBy||"",action:state==="completed"?"Repair completed from Defect Log":"Removed from active Down Sheet"}]}:entry);

@@ -1,0 +1,93 @@
+/* Shared mobile shell. Route-specific editors, page colours and all operational
+   controls remain owned by their existing stylesheets. The body scope beats
+   route header/nav rules without leaking into dialog headers and footers. */
+.fleetstep-shell .card-view-selector{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.fleetstep-shell .card-view-selector>span{font-size:10px;font-weight:800;margin-right:4px}
+.fleetstep-shell .card-view-selector button{min-height:44px;border:1px solid #bdcadc;border-radius:6px;padding:0 12px;background:#fff;color:#193457;font-size:11px;font-weight:800;cursor:pointer}
+.fleetstep-shell .card-view-selector button[aria-pressed="true"]{background:#193457;color:#fff;border-color:#193457}
+.fleetstep-shell .card-view-notice{font-size:12px;margin:0;grid-column:1/-1}
+.fleetstep-shell .log-compact-open{width:100%;min-width:0;min-height:88px;display:grid;grid-template-columns:58px minmax(0,1fr) auto 10px;align-items:center;gap:9px;padding:12px;border:0;background:var(--log-surface,#fff);color:var(--log-text,#193457);text-align:left;cursor:pointer;font-family:inherit}
+.fleetstep-shell .compact-bus{display:grid;gap:4px;text-align:center;color:var(--log-accent,#193457)}
+.fleetstep-shell .compact-bus>span{font-size:19px;line-height:1}
+.fleetstep-shell .compact-bus strong{font-size:17px;overflow-wrap:anywhere}
+.fleetstep-shell .compact-issue{display:grid;gap:6px;min-width:0}
+.fleetstep-shell .compact-issue>strong{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.35;overflow-wrap:anywhere}
+.fleetstep-shell .compact-issue>small{font-size:10px;line-height:1.3;color:var(--log-muted,#52637a);overflow-wrap:anywhere}
+.fleetstep-shell .log-compact-open>.state{font-size:9px;max-width:78px;white-space:normal;text-align:center;line-height:1.35}
+.fleetstep-shell .defect-log-app[data-card-view="compact"] .log-card-group:not(.expanded){display:block;padding:0;overflow:hidden;border:1px solid var(--log-card-border,var(--log-border,#cad4e2));border-left:4px solid var(--log-accent,#193457);box-shadow:0 2px 6px #1934570a}
+.fleetstep-shell .defect-log-app[data-card-view="compact"] .log-card-group:not(.expanded)>.log-focus-button,
+.fleetstep-shell .defect-log-app[data-card-view="compact"] .log-card-group:not(.expanded)>.log-bus-column,
+.fleetstep-shell .defect-log-app[data-card-view="compact"] .log-card-group:not(.expanded)>.log-location-inline,
+.fleetstep-shell .defect-log-app[data-card-view="compact"] .log-card-group:not(.expanded)>.log-group-header{display:none}
+.fleetstep-shell .log-compact-open:focus-visible,.fleetstep-shell .card-view-selector button:focus-visible{outline:3px solid #16834e;outline-offset:-3px}
+.fleetstep-shell .down-shifts{margin:12px 18px}
+@media(max-width:800px){
+ .fleetstep-shell main:is(.app,.down-app,.defect-log-app,.fixed-repairs-app,.lists-app,.incidents-app,.talk-app,.settings-app){border-width:0;padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+ /* Old map padding is !important at <=800px; override that legacy declaration
+    once for the new single bottom dock, not for each child control. */
+ .fleetstep-shell main.app{padding-bottom:calc(96px + env(safe-area-inset-bottom))!important}
+ .fleetstep-shell main>header:is(.down-header,.log-header,.fixed-header,.lists-header,.incidents-header,.talk-header,.settings-header),
+ .fleetstep-shell main.app>header{height:auto;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 10px;padding:10px 12px 12px;box-shadow:none}
+ .fleetstep-shell main>header:is(.down-header,.log-header,.fixed-header,.lists-header,.incidents-header,.talk-header,.settings-header)>div:first-child{display:contents}
+ .fleetstep-shell main>header .app-name,.fleetstep-shell main.app>header>.app-name{grid-column:1;grid-row:1;justify-self:start;font-size:20px;min-height:44px;letter-spacing:1px;margin:0;padding:0;background:transparent}
+ .fleetstep-shell main>header>div:first-child>span,.fleetstep-shell main.app>header>.app-kicker{display:none}
+ .fleetstep-shell main>header h1,.fleetstep-shell main.app>header>h1{grid-column:1/-1;grid-row:2;font-size:20px;margin:2px 0 0;line-height:1.2;text-align:left}
+ .fleetstep-shell main>header p,.fleetstep-shell main.app>header>.app-subtitle{grid-column:1/-1;grid-row:3;margin:1px 0 5px;font-size:11px;line-height:1.4;letter-spacing:0;text-align:left;max-width:none}
+ .fleetstep-shell main>header>[data-tracker-nav]{grid-column:2;grid-row:1;justify-self:end;width:auto;max-width:175px;margin:0}
+ .fleetstep-shell .log-header-actions,.fleetstep-shell .down-header-actions{grid-column:1/-1;grid-row:4;display:grid;grid-template-columns:90px minmax(0,1fr);gap:8px;width:100%;margin-top:4px}
+ .fleetstep-shell .header-advanced-toggle,.fleetstep-shell .down-advanced-toggle{min-height:44px;padding:7px 10px;background:transparent;border:1px solid currentColor;box-shadow:none;border-radius:7px}
+ .fleetstep-shell .header-advanced-toggle small,.fleetstep-shell .down-advanced-toggle small{display:none}
+ .fleetstep-shell .header-advanced-toggle b,.fleetstep-shell .down-advanced-toggle b{font-size:11px;letter-spacing:.4px}
+ .fleetstep-shell main>header>.app-refresh{grid-column:1/-1;grid-row:4;justify-self:end;width:auto;min-width:100px;min-height:44px;margin:0}
+ .fleetstep-shell .log-header-actions>.app-refresh,.fleetstep-shell .down-header-actions>.app-refresh{width:100%;min-height:44px;padding:0 8px;font-size:10px}
+ .fleetstep-shell .down-controls,.fleetstep-shell .down-view-controls,.fleetstep-shell .down-shifts{margin:10px 12px}
+ .fleetstep-shell .down-shifts .shift-filter{display:flex;gap:5px;flex-wrap:wrap;width:100%}
+ .fleetstep-shell .down-shifts .shift-filter>span{display:none}
+ .fleetstep-shell .down-shifts .shift-filter>button{flex:1;min-width:60px;min-height:44px;height:auto;padding:5px 7px;font-size:10px;border-radius:7px}
+ .fleetstep-shell .down-primary-action,.fleetstep-shell .log-primary-action{min-height:48px;border-color:#137448;background:#137448;color:#fff;border-radius:8px;box-shadow:none}
+ .fleetstep-shell .down-view-controls,.fleetstep-shell .log-controls{border-radius:9px;box-shadow:none}
+ .fleetstep-shell .log-controls{display:flex;flex-wrap:wrap;margin:10px 12px;padding:10px;gap:10px}
+ .fleetstep-shell .log-controls>.log-primary-action{order:0;width:100%;font-size:13px}
+ .fleetstep-shell .log-controls>.log-search-wrap{order:1;width:100%;min-width:0}
+ .fleetstep-shell .log-controls>.log-filters{order:2;display:flex;flex-wrap:wrap;width:100%;gap:5px}
+ .fleetstep-shell .log-controls>.log-filters button{flex:1;min-height:44px;padding:6px;font-size:10px;border-radius:7px}
+ .fleetstep-shell .log-controls>.card-view-selector{order:3;width:100%}
+ .fleetstep-shell .log-controls>.card-view-notice{order:3}
+ .fleetstep-shell .log-controls .log-search{min-width:0;width:100%}
+ .fleetstep-shell .log-controls .log-search input{font-size:16px;min-width:0;min-height:44px}
+ .fleetstep-shell .log-feed{margin:10px 12px;border-radius:9px;box-shadow:none}
+ .fleetstep-shell .feed-title{padding:12px;gap:8px}
+ .fleetstep-shell .feed-title>span{gap:5px}
+ .fleetstep-shell .defect-log-app[data-card-view="compact"] .log-list{gap:9px;padding:9px}
+ .fleetstep-shell .log-compact-open{grid-template-columns:48px minmax(0,1fr) auto 8px;gap:7px;padding:10px}
+ .fleetstep-shell .log-compact-open>.state{max-width:66px;font-size:8px}
+ .fleetstep-shell .compact-bus strong{font-size:15px}
+ .fleetstep-shell .compact-issue>strong{font-size:12px}
+ /* The map controls are local tools now, not a second bottom navigation. */
+ .fleetstep-shell .app>.phone-command-dock{position:static;left:auto;right:auto;bottom:auto;transform:none;width:auto;height:auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:8px 10px;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;z-index:auto}
+ .fleetstep-shell .app>.phone-command-dock button{min-height:44px;background:#fff;color:#193457;border:1px solid #bdcadc;box-shadow:none;border-radius:7px}
+ .fleetstep-shell .app>.phone-command-dock button.active{background:#193457;color:#fff;border-color:#193457}
+ .fleetstep-shell .app>.map-status-toolbar{height:auto;min-height:0;display:block;padding:0 10px 9px;background:transparent;border:0;box-shadow:none}
+ .fleetstep-shell .app>.map-status-toolbar>.legend{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:0;padding:0;width:100%}
+ .fleetstep-shell .app>.map-status-toolbar>.legend>strong{grid-column:1/-1;font-size:10px;padding:3px 0}
+ .fleetstep-shell .app>.map-status-toolbar>.legend button{display:grid;grid-template-columns:20px minmax(0,1fr);grid-template-rows:auto 1fr;height:auto;min-height:68px;align-items:start;gap:4px;padding:5px;border:1px solid var(--theme-border,#cad4e2);background:var(--panel-bg,#fff);border-radius:7px;box-shadow:none}
+ .fleetstep-shell .app>.map-status-toolbar>.legend button span{grid-column:1/-1;grid-row:2;line-height:1.25;font-size:8px;text-align:left;overflow-wrap:normal;word-break:normal}
+ .fleetstep-shell .app>.map-status-toolbar>.legend button[aria-pressed="true"]{border-color:#137448;background:color-mix(in srgb,var(--panel-bg,#fff) 85%,#137448);box-shadow:inset 0 0 0 2px #137448}
+ .fleetstep-shell .app>.map-status-toolbar>.legend button b{grid-column:2;grid-row:1;justify-self:end;font-size:14px}
+ .fleetstep-shell .app>.map-status-toolbar>.tools{display:none}
+ .fleetstep-shell .app>.facility{margin-top:0}
+ /* The old command footer is !important and stays visible through 800px.
+    Replace it here, otherwise the same controls cover the shared page dock. */
+ .fleetstep-shell .app>.command-bar{display:none!important}
+ .fleetstep-shell .phone-command-sheet{display:block;position:fixed;left:8px;right:8px;bottom:calc(72px + env(safe-area-inset-bottom));z-index:59;max-height:min(68dvh,520px);overflow-y:auto;overscroll-behavior:contain;border:1px solid #a9b9ce;border-radius:12px;background:var(--command-bg,#193457);color:var(--command-text,#fff);box-shadow:0 -10px 35px #00102044}
+ .fleetstep-shell .phone-command-sheet>header{height:auto;min-height:48px;display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:inherit;color:inherit;font-size:11px}
+ .fleetstep-shell .phone-command-sheet>header button{min-height:44px;min-width:60px;background:transparent;color:inherit;border:1px solid currentColor;border-radius:6px}
+ .fleetstep-shell .phone-find-controls,.fleetstep-shell .phone-filter-controls,.fleetstep-shell .phone-more-controls{display:grid;gap:8px;padding:10px}
+ .fleetstep-shell .phone-find-controls form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+ .fleetstep-shell .phone-command-sheet :is(input,button){min-height:44px;border-radius:7px}
+ .fleetstep-shell .phone-command-sheet input{min-width:0;width:100%;font-size:16px;padding:8px}
+ .fleetstep-shell .phone-command-sheet>div button{width:100%;border:1px solid #a9b9ce;background:#fff;color:#193457;padding:8px 10px;font-size:11px;font-weight:800}
+ .fleetstep-shell .phone-command-scrim{display:block;position:fixed;inset:0;border:0;background:#06152c99}
+ .fleetstep-shell .phone-command-scrim{z-index:58}
+ .fleetstep-shell .sweep-banner{bottom:calc(74px + env(safe-area-inset-bottom))}
+}

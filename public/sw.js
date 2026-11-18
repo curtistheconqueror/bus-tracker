@@ -9,7 +9,7 @@
    cache-first and keep their NAMES across releases, unlike the hashed chunks.
    A new icon or a changed manifest under an unbumped name is a file the phone
    already holds and will never ask for again. */
-const CACHE_NAME = "pace-bus-tracker-shell-v6";
+const CACHE_NAME = "pace-bus-tracker-shell-v7";
 /* The icons are here so a phone that first opens the app in a bay with no
    signal still has them, and because the fetch handler below serves anything
    in this list cache-first. */
@@ -18,9 +18,37 @@ const CORE_FILES = ["/manifest.webmanifest", "/favicon.svg", "/apple-touch-icon.
    phone that had never opened it while online got nothing when it lost signal
    in a bay — which is the one situation this whole file exists for. Settings
    is a page now too, and one somebody may well open for the first time in a
-   bay to turn a theme on. */
-const CORE_PAGES = ["/", "/down-sheet", "/defect-log", "/fixed-repairs", "/lists", "/settings"];
+   bay to turn a theme on.
 
+   INCIDENTS and SHOP TALK are here for a sharper version of the same reason.
+   Somebody reaching for the incident form has just been hurt, and somebody
+   posting a hazard is standing next to it — neither is going to walk out to
+   the yard for signal first, and a blank page at that moment is the report
+   never getting written. */
+const CORE_PAGES = ["/", "/down-sheet", "/defect-log", "/fixed-repairs", "/lists", "/incidents", "/shop-talk", "/settings"];
+
+/* THE PAGE LOOP IS ALL-OR-NOTHING ON PURPOSE, and the asset loop below is not.
+   That asymmetry reads like an oversight and is the thing holding this file up.
+
+   A rejected page fetch rejects this whole function, which rejects the install:
+   skipWaiting never runs, the worker never activates, and the browser tries
+   again on the next load, because register() runs on every map load. So the
+   worker only ever activates holding a COMPLETE shell. Soften it -- catch per
+   page and carry on -- and a worker activates holding whatever it managed, the
+   install never re-runs (installs re-run on a script byte change, nothing
+   else), and `activate` keeps every cache under CACHE_NAME rather than
+   clearing it. The gap is then permanent for every page the person never
+   happens to open while online, which is precisely the phone this file was
+   written for. The navigate handler is network-first and does cache each page
+   as it is visited, so the hole heals for pages somebody walks to online --
+   and never for the ones they do not, which is the whole job.
+
+   Assets are different and are allSettled for a reason: a missing chunk is
+   re-fetched by the page that needs it, and losing one is not losing a page.
+
+   This was softened once, in the belief that one bad fetch costing seven good
+   pages was a bug. It is the price of atomicity, and atomicity is what makes
+   an offline shell trustworthy. Reverted. */
 async function cacheAppShell() {
   const cache = await caches.open(CACHE_NAME);
   const assets = new Set(CORE_FILES);

@@ -26,10 +26,23 @@ button,input,select,textarea{font:inherit}
    the panel needs the rule for both or it comes out narrow in one of them.
    Measured: grid-column alone gave 192px and nine stacked controls at
    1280px; flex alone gave a 41px column on a phone. */
-.log-advanced{width:auto;min-width:0;margin:0 14px 10px;overflow:hidden;border:1px solid var(--log-border,#bac7d9);border-radius:9px;background:var(--log-surface,#fff);box-shadow:0 4px 16px #17355712}
-.log-advanced-body{display:grid;gap:9px;padding:9px;background:var(--log-soft,#edf2f8)}
+/* ADVANCED ACTIONS IS A DRAWER OFF THE HEADER, AND NOW LOOKS LIKE ONE.
+   Its button lives on the dark header; this panel used to open white on the
+   light page, so the two read as unrelated things and the panel looked like
+   it belonged to whatever was under it. Curtis: "it opens up a white list
+   ... the colors do not match and it kind of looks like it is unrelated."
+   The square top corners and margin-top:0 below were always here - the
+   drawer was built to butt against the header and was only ever missing the
+   colour. --log-header is the one background guaranteed dark on all four
+   themes, since it is what the white header text sits on, so this travels
+   where a mix toward --log-text would invert itself on the dark themes. */
+.log-advanced{width:auto;min-width:0;margin:0 14px 10px;overflow:hidden;border:1px solid color-mix(in srgb,var(--log-header-text,#fff) 34%,var(--log-header,#061d45));border-radius:9px;background:var(--log-header,#061d45);box-shadow:0 10px 22px #0416304d}
+.log-advanced-body{display:grid;gap:9px;padding:9px;background:transparent}
 .log-advanced-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:6px;border:1px solid var(--log-border,#c4cedd);border-radius:7px;background:var(--log-surface,#fff);padding:8px}
-.log-advanced-label{grid-column:1/-1;font-size:7px;font-weight:900;letter-spacing:.6px;color:var(--log-muted,#60728c)}
+/* These sit INSIDE .log-advanced-group, which is an opaque surface card, not
+   on the navy shell. Measured, after a first attempt coloured them for the
+   navy and would have put light grey on white. */
+.log-advanced-label{grid-column:1/-1;font-size:8px;font-weight:900;letter-spacing:.6px;color:var(--log-muted,#60728c)}
 /* The wrappers hand their children straight to the grid so every control is one
    cell wide, whatever it arrived wrapped in. */
 .log-advanced-group>.log-filters,.log-advanced-group>.feed-actions{display:contents}
@@ -37,9 +50,9 @@ button,input,select,textarea{font:inherit}
 .log-advanced-group>.quick-filter-control{display:flex}
 @media(max-width:760px){.log-advanced-group{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .defect-log-app{min-height:100vh;padding-bottom:18px;background:linear-gradient(180deg,#e9eef6,#f8fafc);color:var(--log-ink);font-family:Arial,Helvetica,sans-serif;overflow-anchor:none}
-.log-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:linear-gradient(110deg,#031839,#07376d);color:#fff;box-shadow:0 3px 14px #00152d55}
-.log-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:#74a8df}.log-header h1{margin:2px 0 1px;font-size:25px;line-height:1}.log-header p{margin:4px 0 0;font-size:9px;color:#c4d7ee}
-.log-header nav{display:flex;overflow:hidden;border:1px solid #5c79a2;border-radius:6px}.log-header nav a{min-width:108px;padding:10px 12px;color:#dbe9fb;font-size:8px;font-weight:900;text-align:center;text-decoration:none}.log-header nav a.active{background:#fff;color:#0b407e}.log-header nav a+a{border-left:1px solid #5c79a2}
+.log-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:linear-gradient(110deg,#031839,#07376d);color:var(--app-header-text,#fff);box-shadow:0 3px 14px #00152d55}
+.log-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:color-mix(in srgb,var(--app-header-text,var(--log-header-text,#fff)) 84%,transparent)}.log-header h1{margin:2px 0 1px;font-size:25px;line-height:1}.log-header p{margin:4px 0 0;font-size:9px;color:color-mix(in srgb,var(--app-header-text,var(--log-header-text,#fff)) 90%,transparent)}
+.log-header nav{flex:1 1 auto;height:auto;min-height:0;display:flex;flex-wrap:wrap;overflow:hidden;border:1px solid color-mix(in srgb,var(--app-header-text,var(--log-header-text,#fff)) 36%,transparent);border-radius:6px}.log-header nav a{min-width:108px;padding:10px 12px;color:#dbe9fb;font-size:8px;font-weight:900;text-align:center;text-decoration:none}.log-header nav a.active{background:#fff;color:#0b407e}.log-header nav a+a{border-left:1px solid #5c79a2}
 .log-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:10px 14px}.log-summary>div{width:100%;min-width:0;display:flex;min-height:62px;flex-direction:column;align-items:center;justify-content:center;border:1px solid #bdc9da;border-radius:8px;background:#fff;box-shadow:0 2px 8px #1b365511}.log-summary strong{font-size:24px;color:#174e8d}.log-summary span{margin-top:3px;font-size:7px;font-weight:900;letter-spacing:.5px;color:#60728c}.log-summary .primary{border-color:#4a91d7;background:#edf6ff}.log-summary .downing strong{color:#b5252c}.log-summary .fixed-today strong{color:#087347}
 .log-controls{display:flex;align-items:center;gap:9px;margin:0 14px 10px;padding:8px;border:1px solid #bac7d9;border-radius:8px;background:#fff}.log-filters{display:flex;gap:5px}.log-filters button,.log-settings-button{height:34px;border:1px solid #b7c4d7;border-radius:5px;background:#f3f6fa;color:#344a69;padding:0 10px;font-size:8px;font-weight:900;cursor:pointer}.log-filters button.active{border-color:#0b64bd;background:#0b64bd;color:#fff}.log-search-wrap{min-width:190px;display:flex;flex:1;flex-direction:column;gap:3px}.log-search{width:100%;display:flex;align-items:center;border:1px solid #b7c4d7;border-radius:5px;background:#fff;overflow:hidden}.log-search span{padding:0 8px;font-size:7px;font-weight:900;color:#60728c}.log-search input{width:100%;height:32px;border:0;outline:none;color:#172b4d;font-size:10px}/* Says what the search is holding back, and undoes it in one press. The board
    being filtered with nothing on screen saying so is what sent people tapping
@@ -62,6 +75,12 @@ button,input,select,textarea{font:inherit}
 .log-window-filtered{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:4px;border:1px solid #e0c08f;border-radius:6px;background:#fdf5e8;padding:6px 8px}
 .log-window-filtered span{min-width:0;color:#6b4a12;font-size:8px;font-weight:900;letter-spacing:.3px}
 .log-window-filtered b{color:#8a5a06;font-size:11px}
+/* THE SAME BAR, LOUDER, for the case where the window is not in force at all.
+   The amber one above reports a narrowing that worked; this reports a choice
+   the board ignored, which is a different thing to a reader and has to look
+   like one or it reads as the same reassuring note. */
+.log-window-filtered.log-window-broken{border-color:#d99a9a;background:#fdeeee}
+.log-window-filtered.log-window-broken span{color:#8d2b2b;font-size:9px}
 @media(max-width:760px){.log-window-filtered{padding:8px 9px}.log-window-filtered span{font-size:10px}.log-window-filtered b{font-size:13px}.log-feed-window select{font-size:16px}}
 .clear-log-search{height:24px;flex-shrink:0;margin-right:5px;border:1px solid #c3cfe0;border-radius:4px;background:#f1f5fa;color:#60728c;padding:0 7px;font-size:7px;font-weight:900;letter-spacing:.3px;cursor:pointer}.clear-log-search:hover{border-color:#0b64bd;color:#0b64bd}.log-search-feedback{padding:0 3px;color:#9a5b00;font-size:7px;font-weight:900;line-height:1.3}.log-settings-button{width:38px;padding:0;background:#142f59;color:#fff;font-size:16px}
 
@@ -79,14 +98,14 @@ button,input,select,textarea{font:inherit}
 
 /* Defect Log appearance settings */
 .defect-log-app{--log-soft:color-mix(in srgb,var(--log-surface) 88%,var(--log-page));--log-border:color-mix(in srgb,var(--log-text) 22%,var(--log-surface));--log-card-border:color-mix(in srgb,var(--log-text) 42%,var(--log-surface));background:var(--log-page);color:var(--log-text);font-family:var(--log-font)}
-.log-header{background:var(--log-header);color:var(--log-header-text)}.log-header>div>span,.log-header p,.log-header nav a{color:color-mix(in srgb,var(--log-header-text) 78%,var(--log-header))}.log-header nav a.active{background:var(--log-surface);color:var(--log-accent)}
+.log-header{background:var(--app-header-fill,var(--log-header));color:var(--log-header-text)}.log-header>div>span,.log-header p,.log-header nav a{color:color-mix(in srgb,var(--log-header-text) 78%,var(--log-header))}.log-header nav a.active{background:var(--log-surface);color:var(--log-accent)}
 .log-summary>div,.log-controls,.log-feed,.log-search{border-color:var(--log-border);background:var(--log-surface)}
 /* The bus group is themed with the panels but keeps its own, heavier outline.
    It used to sit in the list above, which set every panel to --log-border and
    came after the rule that gives the card its colour - so the card silently
    took the general border no matter what was set on it. */
 .log-card{border-color:var(--log-card-border);background:var(--log-surface)}.log-summary strong,.feed-title b,.log-bus strong,.log-repair>b,.log-meta em,.empty-log b{color:var(--log-accent)}.log-summary span,.feed-title small,.log-search span,.log-bus small,.log-bus em,.log-repair>small,.log-meta small,.log-meta time,.empty-log{color:var(--log-muted)}
-.log-list,.feed-title,.log-filters button{background:var(--log-soft)}.log-card-main:hover,.log-card-main:focus-visible{background:color-mix(in srgb,var(--log-accent) 10%,var(--log-surface))}.log-repair>strong,.log-repair>small b,.log-search input{color:var(--log-text)}.log-filters button{border-color:var(--log-border);color:var(--log-text)}.log-filters button.active,.log-settings-button{border-color:var(--log-accent);background:var(--log-accent);color:var(--log-header-text)}
+.log-list,.feed-title,.log-filters button{background:var(--log-soft)}.log-card-main:hover,.log-card-main:focus-visible{background:color-mix(in srgb,var(--log-accent) 10%,var(--log-surface))}.log-repair>strong,.log-repair>small b,.log-search input{color:var(--log-text)}.log-filters button{border-color:var(--log-border);color:var(--log-text)}.log-filters button.active,.log-settings-button{border-color:var(--log-accent);background:var(--log-accent);color:var(--log-accent-text,#fff)}
 .log-editor,.log-settings{background:var(--log-surface);color:var(--log-text)}.log-editor-head,.log-settings-head{background:var(--log-header);color:var(--log-header-text)}.log-form label,.log-settings label{color:var(--log-muted)}
 /* THE TWO PICKERS NAME THEMSELVES, and they are the only labels here that do.
    Curtis, on a mechanic opening this for the first time: "So this is easy to
@@ -118,12 +137,12 @@ button,input,select,textarea{font:inherit}
 @media(max-width:760px){.log-controls>.quick-filter-control{order:2}.log-controls .log-search{order:3}.quick-filter-drawer{z-index:17;top:118px;right:8px;bottom:72px;width:calc(100vw - 16px)}.quick-filter-bus{grid-template-columns:52px minmax(0,1fr)}.quick-filter-bus>i{grid-column:1/-1;max-width:none;text-align:left}}
 
 /* Quick Filter results expand in place and share as plain text. */
-.quick-filter-drawer>.quick-filter-share-actions{flex:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:7px;border-bottom:1px solid var(--log-border);background:color-mix(in srgb,var(--log-accent) 5%,var(--log-surface));overflow:visible}.quick-filter-share-actions button{min-height:36px;border:1px solid var(--log-accent);border-radius:6px;background:var(--log-accent);color:var(--log-header-text);font-size:8px;font-weight:900;cursor:pointer;touch-action:manipulation}.quick-filter-share-actions button+button{background:var(--log-surface);color:var(--log-accent)}.quick-filter-share-actions>small{grid-column:1/-1;color:var(--log-muted);font-size:7px;font-weight:900;text-align:center}.quick-filter-drawer>.quick-filter-results{flex:1;display:grid;align-content:start;gap:6px;padding:7px;overflow-y:auto;overscroll-behavior:contain}.quick-filter-bus-card{border:1px solid var(--log-border);border-left:4px solid var(--log-accent);border-radius:7px;background:var(--log-surface);overflow:hidden}.quick-filter-bus-card .quick-filter-bus{width:100%;border:0;border-left:0;border-radius:0}.quick-filter-bus-card.expanded .quick-filter-bus{background:color-mix(in srgb,var(--log-accent) 10%,var(--log-surface))}.quick-filter-defects{display:grid;gap:5px;border-top:1px solid var(--log-border);background:color-mix(in srgb,var(--log-page) 45%,var(--log-surface));padding:6px}.quick-filter-defects>section{display:grid;grid-template-columns:23px minmax(0,1fr) auto;gap:7px;align-items:start;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);padding:8px}.quick-filter-defects>section>span{display:flex;width:23px;height:23px;align-items:center;justify-content:center;border-radius:50%;background:var(--log-accent);color:var(--log-header-text);font-size:8px;font-weight:900}.quick-filter-defects>section>div{display:flex;min-width:0;flex-direction:column;gap:3px}.quick-filter-defects>section>div>b{color:var(--log-accent);font-size:7px}.quick-filter-defects>section>div>strong{color:var(--log-text);font-size:9px;line-height:1.3}.quick-filter-defects>section>div>small{color:var(--log-muted);font-size:7px;line-height:1.3}.quick-filter-defects>section>i{white-space:nowrap;font-size:6px}.quick-filter-defects>p{padding:10px;color:var(--log-muted);font-size:8px;line-height:1.4;text-align:center}
+.quick-filter-drawer>.quick-filter-share-actions{flex:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:7px;border-bottom:1px solid var(--log-border);background:color-mix(in srgb,var(--log-accent) 5%,var(--log-surface));overflow:visible}.quick-filter-share-actions button{min-height:36px;border:1px solid var(--log-accent);border-radius:6px;background:var(--log-accent);color:var(--log-accent-text,#fff);font-size:8px;font-weight:900;cursor:pointer;touch-action:manipulation}.quick-filter-share-actions button+button{background:var(--log-surface);color:var(--log-accent)}.quick-filter-share-actions>small{grid-column:1/-1;color:var(--log-muted);font-size:7px;font-weight:900;text-align:center}.quick-filter-drawer>.quick-filter-results{flex:1;display:grid;align-content:start;gap:6px;padding:7px;overflow-y:auto;overscroll-behavior:contain}.quick-filter-bus-card{border:1px solid var(--log-border);border-left:4px solid var(--log-accent);border-radius:7px;background:var(--log-surface);overflow:hidden}.quick-filter-bus-card .quick-filter-bus{width:100%;border:0;border-left:0;border-radius:0}.quick-filter-bus-card.expanded .quick-filter-bus{background:color-mix(in srgb,var(--log-accent) 10%,var(--log-surface))}.quick-filter-defects{display:grid;gap:5px;border-top:1px solid var(--log-border);background:color-mix(in srgb,var(--log-page) 45%,var(--log-surface));padding:6px}.quick-filter-defects>section{display:grid;grid-template-columns:23px minmax(0,1fr) auto;gap:7px;align-items:start;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);padding:8px}.quick-filter-defects>section>span{display:flex;width:23px;height:23px;align-items:center;justify-content:center;border-radius:50%;background:var(--log-accent);color:var(--log-accent-text,#fff);font-size:8px;font-weight:900}.quick-filter-defects>section>div{display:flex;min-width:0;flex-direction:column;gap:3px}.quick-filter-defects>section>div>b{color:var(--log-accent);font-size:7px}.quick-filter-defects>section>div>strong{color:var(--log-text);font-size:9px;line-height:1.3}.quick-filter-defects>section>div>small{color:var(--log-muted);font-size:7px;line-height:1.3}.quick-filter-defects>section>i{white-space:nowrap;font-size:6px}.quick-filter-defects>p{padding:10px;color:var(--log-muted);font-size:8px;line-height:1.4;text-align:center}
 @media(max-width:760px){.quick-filter-share-actions button{min-height:44px;font-size:10px}.quick-filter-defects>section{grid-template-columns:23px minmax(0,1fr)}.quick-filter-defects>section>i{grid-column:2;justify-self:start}.quick-filter-bus{grid-template-columns:52px minmax(0,1fr) auto}.quick-filter-bus>i{grid-column:auto;align-self:center;text-align:right}}
 
 /* Readable inactive page tabs */
 .log-header nav a{background:color-mix(in srgb,var(--log-header) 74%,#2877c8);color:var(--log-header-text);text-shadow:0 1px 2px #00182f;border-color:color-mix(in srgb,var(--log-header-text) 48%,var(--log-header))}
-.log-header nav a:hover,.log-header nav a:focus-visible{background:color-mix(in srgb,var(--log-header) 55%,#3d91df);color:#fff;outline:none}
+.log-header nav a:hover,.log-header nav a:focus-visible{background:color-mix(in srgb,var(--log-header) 55%,#3d91df);color:var(--app-header-text,var(--log-header-text,#fff));outline:none}
 .log-header nav a.active{background:var(--log-surface);color:var(--log-accent);text-shadow:none}
 /* Version 85 Shop Notes and editable text */
 .log-header h1{color:var(--log-page-title-color,var(--log-header-text));font-size:var(--log-page-title-size,25px)}
@@ -196,7 +215,7 @@ button,input,select,textarea{font:inherit}
    desktop — no background, no colour, just text. flex-basis pushes it onto its
    own line in the wrapping-row layouts the wider breakpoints use, which is the
    same place the phone grid puts it. */
-.road-call-note{flex-basis:100%;display:inline-flex;align-items:center;align-self:flex-start;width:fit-content;min-height:22px;border:1px solid color-mix(in srgb,var(--downsheet-badge-text,#fff) 78%,transparent);border-radius:11px;background:var(--downsheet-badge,#7c3aed);color:var(--downsheet-badge-text,#fff);padding:0 10px;font-size:9px;font-weight:900;letter-spacing:.4px;line-height:1;white-space:nowrap}.group-toggle{color:var(--log-accent)!important;font-size:9px!important;font-style:normal;font-weight:900;letter-spacing:.5px}.grouped-defect-list{border-top:1px solid var(--log-border);background:color-mix(in srgb,var(--log-page) 45%,var(--log-surface));padding:7px}.grouped-defect-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 4px 8px;background:none;color:var(--log-text,#172b4d)}.grouped-defect-head span{display:flex;flex-direction:column;gap:2px}.grouped-defect-head b{color:var(--log-text);font-size:10px}.grouped-defect-head small{color:var(--log-muted);font-size:7px;font-weight:900}.grouped-defect-head button{min-height:31px;border:0;border-radius:5px;background:#08733f;color:#fff;padding:0 11px;font-size:8px;font-weight:900;cursor:pointer}.grouped-defect-head button:hover,.grouped-defect-head button:focus-visible{background:#0a8b4c}.grouped-defect-row{display:flex;align-items:stretch;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);overflow:hidden}.grouped-defect-row+.grouped-defect-row{margin-top:6px}.grouped-defect-main{flex:1;display:grid;min-width:0;grid-template-columns:27px minmax(0,1fr) 112px;gap:8px;align-items:center;border:0;background:transparent;padding:9px;text-align:left;cursor:pointer}.grouped-defect-main:hover,.grouped-defect-main:focus-visible{background:color-mix(in srgb,var(--log-accent) 8%,var(--log-surface));outline:none}.grouped-defect-number{display:flex;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%;background:var(--log-accent);color:var(--log-header-text);font-size:8px;font-weight:900}.grouped-defect-row .shop-notes-column{flex-basis:185px}.grouped-defect-row>.log-actions{width:82px}
+.road-call-note{flex-basis:100%;display:inline-flex;align-items:center;align-self:flex-start;width:fit-content;min-height:22px;border:1px solid color-mix(in srgb,var(--downsheet-badge-text,#fff) 78%,transparent);border-radius:11px;background:var(--downsheet-badge,#7c3aed);color:var(--downsheet-badge-text,#fff);padding:0 10px;font-size:9px;font-weight:900;letter-spacing:.4px;line-height:1;white-space:nowrap}.group-toggle{color:var(--log-accent)!important;font-size:9px!important;font-style:normal;font-weight:900;letter-spacing:.5px}.grouped-defect-list{border-top:1px solid var(--log-border);background:color-mix(in srgb,var(--log-page) 45%,var(--log-surface));padding:7px}.grouped-defect-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 4px 8px;background:none;color:var(--log-text,#172b4d)}.grouped-defect-head span{display:flex;flex-direction:column;gap:2px}.grouped-defect-head b{color:var(--log-text);font-size:10px}.grouped-defect-head small{color:var(--log-muted);font-size:7px;font-weight:900}.grouped-defect-head button{min-height:31px;border:0;border-radius:5px;background:#08733f;color:#fff;padding:0 11px;font-size:8px;font-weight:900;cursor:pointer}.grouped-defect-head button:hover,.grouped-defect-head button:focus-visible{background:#0a8b4c}.grouped-defect-row{display:flex;align-items:stretch;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);overflow:hidden}.grouped-defect-row+.grouped-defect-row{margin-top:6px}.grouped-defect-main{flex:1;display:grid;min-width:0;grid-template-columns:27px minmax(0,1fr) 112px;gap:8px;align-items:center;border:0;background:transparent;padding:9px;text-align:left;cursor:pointer}.grouped-defect-main:hover,.grouped-defect-main:focus-visible{background:color-mix(in srgb,var(--log-accent) 8%,var(--log-surface));outline:none}.grouped-defect-number{display:flex;width:24px;height:24px;align-items:center;justify-content:center;border-radius:50%;background:var(--log-accent);color:var(--log-accent-text,#fff);font-size:8px;font-weight:900}.grouped-defect-row .shop-notes-column{flex-basis:185px}.grouped-defect-row>.log-actions{width:82px}
 /* Strong bus-group separation is the default visual hierarchy across desktop,
    iPad, and phone. It changes only presentation: the established left rail
    continues to carry repair state while space, weight, and shading mark where
@@ -244,7 +263,31 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    It used to be three across with SAVE spanning the full row on a phone,
    which made the biggest, easiest target the one you press least. */
 .save-log-middle-actions{width:min(620px,100%);justify-self:center;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.save-log-middle,.close-log-middle{min-width:0;min-height:50px;border-radius:8px;padding:0 18px;font-size:11px;font-weight:900;letter-spacing:.45px;cursor:pointer;touch-action:manipulation}.save-log-middle{border:0;background:#08733f;color:#fff;box-shadow:0 3px 10px #064d2b38}.close-log-middle{border:1px solid var(--log-border);background:var(--log-surface);color:var(--log-text)}
-.advanced-defect-details{border:1px solid color-mix(in srgb,var(--log-accent) 55%,var(--log-border));border-radius:8px;background:color-mix(in srgb,var(--log-accent) 7%,var(--log-surface));overflow:hidden}.advanced-defect-details summary{min-height:46px;display:flex;align-items:center;gap:10px;color:var(--log-accent);padding:6px 12px;list-style:none;cursor:pointer;touch-action:manipulation}.advanced-defect-details summary::-webkit-details-marker{display:none}.advanced-defect-details summary>span{min-width:0;display:flex;flex:1;flex-direction:column;gap:2px}.advanced-defect-details summary b{font-size:10px;font-weight:900;letter-spacing:.65px}.advanced-defect-details summary small{color:var(--log-muted);font-size:7px;font-weight:800;letter-spacing:0;line-height:1.2}.advanced-defect-details summary em{flex:none;color:var(--log-accent);font-size:7px;font-style:normal;font-weight:900;letter-spacing:.45px}.advanced-defect-details summary:after{content:"+";flex:none;font-size:18px;font-weight:900;line-height:1}.advanced-defect-details[open] summary:after{content:"−"}.advanced-defect-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 13px;border-top:1px solid var(--log-border);padding:12px}
+/* ADVANCED DETAILS WAS A 2px LINE, AND `overflow:hidden` WAS DOING IT.
+
+   Measured in the project's own verification browser at 390 and 1180: the
+   `<details>` box computed to **2px** - its two borders and no content - while
+   the `<summary>` inside it was a correct 48px, clipped away to nothing. The
+   whole section (DIAGNOSIS / TEST / VERIFICATION, WHAT WAS FOUND, PARTS USED,
+   ESTIMATED TIME OF REPAIR, the hours) could not be opened by a tap or a click
+   at all. A KEYBOARD still opened it - focus the summary, press Enter - which
+   is why nothing ever errored and no test caught it: the element was there, it
+   was `open`-able, and only its box was gone.
+
+   Bisected live rather than reasoned about: with `overflow:hidden` the details
+   is 2px; with `overflow:clip` or `overflow:visible` it is 50px at 390 and 48px
+   at 1180. The summary's `display:flex` is NOT the cause - a bare
+   `<details>` with a flex `<summary>` on the same page measures 48px - and
+   neither is `height`, which nothing sets.
+
+   `overflow:clip` rather than removing it: the rule is here to keep the inner
+   grid inside the 8px rounded frame, and clip still does that. Measured with
+   the section open: the grid does not overflow the frame at either width.
+
+   This is older than the change it was found in - nothing on this branch ever
+   touched this rule - and it is a Chromium measurement; whether the same engine
+   behaviour reaches an iPhone is not established here. */
+.advanced-defect-details{border:1px solid color-mix(in srgb,var(--log-accent) 55%,var(--log-border));border-radius:8px;background:color-mix(in srgb,var(--log-accent) 7%,var(--log-surface));overflow:clip}.advanced-defect-details summary{min-height:46px;display:flex;align-items:center;gap:10px;color:var(--log-accent);padding:6px 12px;list-style:none;cursor:pointer;touch-action:manipulation}.advanced-defect-details summary::-webkit-details-marker{display:none}.advanced-defect-details summary>span{min-width:0;display:flex;flex:1;flex-direction:column;gap:2px}.advanced-defect-details summary b{font-size:10px;font-weight:900;letter-spacing:.65px}.advanced-defect-details summary small{color:var(--log-muted);font-size:7px;font-weight:800;letter-spacing:0;line-height:1.2}.advanced-defect-details summary em{flex:none;color:var(--log-accent);font-size:7px;font-style:normal;font-weight:900;letter-spacing:.45px}.advanced-defect-details summary:after{content:"+";flex:none;font-size:18px;font-weight:900;line-height:1}.advanced-defect-details[open] summary:after{content:"−"}.advanced-defect-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 13px;border-top:1px solid var(--log-border);padding:12px}
 .advanced-defect-details:not([open]) .advanced-defect-grid{display:none}
 
 /* Three explicit actions in both editor rows and the fourth workflow tab. */
@@ -270,9 +313,34 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .work-state-picker>div label span{display:grid;gap:1px;min-width:0}
 .work-state-picker>div label b{font-size:9px;font-weight:900;letter-spacing:.3px}
 .work-state-picker>div label small{color:var(--log-muted,#62748d);font-size:7px;font-weight:800;line-height:1.3;overflow-wrap:anywhere}
-.log-form .work-state-picker label.work-state-finding{display:grid;gap:3px;font-size:7px;font-weight:900;letter-spacing:.5px;color:var(--log-muted,#62748d)}
-.work-state-picker .work-state-finding input{min-height:44px;width:100%;border:1px solid var(--log-border,#b7c4d7);border-radius:7px;padding:0 10px;font-size:13px;font-weight:800;color:var(--log-text,#12233b)}
-.work-state-picker>small{display:block;color:var(--log-muted,#62748d);font-size:8px;line-height:1.45}
+
+/* ESTIMATED TIME OF REPAIR. A whole row, because the line under it names what
+   the number came from when nobody has typed one — the hours already billed on
+   this job, the shop's ledger, or the catalog — and that sentence does not fit
+   half a form.
+
+   The BOX is not a whole row. It holds two characters, and an input eight times
+   wider than anything that can go in it reads as a different kind of field. The
+   48px height is the phone target at EVERY width: `.log-form input` is 38px and
+   reaches 44px only inside the 760px block, and this is the one control on the
+   form somebody types at while standing at the bus.
+
+   16px IS NOT A STYLE CHOICE. Safari auto-zooms any input under 16px on focus,
+   which is why every field on this form is 16px inside the phone block. This
+   rule outranks that block — (0,2,1) against (0,1,1) — so it shipped at 15px
+   and would have zoomed the whole editor on the one control the paragraph
+   above calls the most important. Found by a cold read computing the style
+   rather than reading this comment. */
+/* The finding box and its chips as one cell. No size of its own: it is an
+   ordinary text input and `.log-form input` already decides what one looks
+   like at each width — 38px/10px here, 44px/16px inside the phone block. The
+   first version gave it 44px/16px at EVERY width, which put a 16px input
+   beside a 10px textarea on the shop computer, unannounced and for no reason
+   that applied above 760px. */
+.advanced-finding-block{display:grid;gap:6px}
+.log-form label.repair-estimate-field{gap:5px}
+.log-form .repair-estimate-field input{max-width:148px;min-height:48px;font-size:16px;font-weight:800}
+.log-form .repair-estimate-field small{color:var(--log-muted,#62748d);font-size:8px;font-weight:800;line-height:1.45;overflow-wrap:anywhere}
 /* Three across even on a phone. Stacked they pushed the picker below the fold
    of the editor, and a control nobody scrolls to is a control nobody uses. The
    hint drops out at this width and the tick's own stamp takes its place, which
@@ -359,7 +427,28 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-card-group>.log-group-header{padding-right:64px}
 
 /* Focus view itself: a windowed dialog on large screens, full screen on phones. */
+/* PINNED TO THE TOP ON A BIG SCREEN, and that is the rest of F11.
+
+   `.log-shade` centres its dialog and `.log-focus` is auto-height up to 92vh.
+   So on any bus whose list is shorter than that cap - 2 to 7 defects, which is
+   the ordinary case - hiding a row made the panel shorter and the whole dialog
+   re-centred: measured +61px on HIDE and -61px on PUT BACK at 1180 with three
+   defects, moving every remaining row and the control under the cursor.
+
+   The always-mounted slot was the other half of this and it works: the share
+   bar measures 103px before and after. But the slot cannot hold a CENTRED
+   dialog still, because the thing moving is the dialog's own box. I called the
+   61px a fixture artefact after measuring it with eight defects, where the
+   panel is already at its cap and cannot shrink. A reviewer measured it again
+   with three and was right: the common case is the one that moves.
+
+   Top-aligned above the phone breakpoint, where the dialog is windowed. Below
+   it the panel is already full-screen (`align-items:stretch`, height:100%) and
+   there is nothing to re-centre. */
 .log-focus-shade{padding:24px}
+@media(min-width:761px){
+ .log-focus-shade{align-items:flex-start}
+}
 .log-focus{display:flex;width:100%;max-width:760px;max-height:92vh;flex-direction:column;border:1px solid var(--log-border);border-radius:12px;background:var(--log-surface);overflow:hidden}
 .log-focus-head{display:flex;align-items:center;gap:14px;padding:16px 18px;border-bottom:2px solid var(--log-accent);background:var(--log-page)}
 /* SHARING ONE BUS. Three controls in a row under the head, drawn from the same
@@ -372,8 +461,14 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    line at 360px. The status line spans all three so it never widens a column
    and shifts the buttons under a thumb already on its way down. */
 .log-focus-share{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:8px 18px;border-bottom:1px solid var(--log-border);background:color-mix(in srgb,var(--log-accent) 5%,var(--log-surface))}
-.log-focus-share button{min-height:36px;border:1px solid var(--log-accent);border-radius:6px;background:var(--log-accent);color:var(--log-header-text);font-size:8px;font-weight:900;cursor:pointer;touch-action:manipulation}
+.log-focus-share button{min-height:36px;border:1px solid var(--log-accent);border-radius:6px;background:var(--log-accent);color:var(--log-accent-text,#fff);font-size:8px;font-weight:900;cursor:pointer;touch-action:manipulation}
 .log-focus-share button+button{background:var(--log-surface);color:var(--log-accent)}
+/* NOTHING LEFT TO SEND. The three outputs refuse an empty share rather than
+   putting "No defects on this bus." on the clipboard for a bus with three, so
+   the buttons have to look refused - a live-looking button that does nothing is
+   worse than a dead one. `opacity` alone would not be enough on the outlined
+   two, so the border goes with it. */
+.log-focus-share button:disabled{opacity:.45;border-color:var(--log-border);cursor:not-allowed}
 .log-focus-share>small{grid-column:1/-1;color:var(--log-muted);font-size:7px;font-weight:900;text-align:center}
 /* The live region is always in the markup so a screen reader can hear it
    change; empty it must take no room, or every share row would carry a blank
@@ -387,8 +482,27 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    row and adds no gap while staying in the tree the entire time. */
 .log-focus-share>.log-focus-share-status:empty{position:absolute;width:1px;height:1px;padding:0;margin:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 /* What the share will send, when the board is hiding some of it. Coloured as a
-   notice rather than as a status: it is true before anything is pressed. */
-.log-focus-share>.log-focus-share-scope{color:var(--log-accent)}
+   notice rather than as a status: it is true before anything is pressed.
+
+   A DESCENDANT SELECTOR, NOT A CHILD ONE, and that is a fix rather than a
+   preference. This read `.log-focus-share>.log-focus-share-scope` from the
+   build where the note WAS a direct child of the bar. Putting it inside the
+   always-mounted slot took it out of reach of this rule AND of
+   `.log-focus-share>small` beside it, so the note drew at the browser's
+   default `small` size in inherited ink inside a bar built for 7px - measured
+   13px against the 7px of the line above it. The lesson this project keeps
+   paying for: a `>` is a claim about the markup, and moving an element is how
+   the claim stops being true, silently.
+
+   It takes the row's spare width so the note wraps instead of squeezing PUT
+   BACK below a thumb target. */
+.log-focus-share .log-focus-share-scope{flex:1;min-width:0;color:var(--log-accent);font-size:7px;font-weight:900;letter-spacing:.2px;text-align:left}
+/* THE HIDE ANNOUNCEMENT IS NEVER DRAWN. It exists for a screen reader: a row
+   leaving the list is silent, and the control that was pressed left with it.
+   Visually hidden always rather than when empty - the visible answer is the row
+   going, and a second line of 7px text here would compete with the one saying
+   what will be sent. Out of flow, so it adds no grid row and no gap. */
+.log-focus-share .log-focus-share-live{position:absolute;width:1px;height:1px;padding:0;margin:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .log-focus-bus{display:flex;flex-direction:column}
 .log-focus-bus small{font-size:10px;font-weight:900;letter-spacing:.9px;color:var(--log-muted)}
 .log-focus-bus strong{font-size:34px;line-height:1.05;color:var(--log-accent)}
@@ -400,7 +514,58 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .close-log-focus{margin-left:auto;width:48px;height:48px;flex:0 0 auto;border:1px solid var(--log-border);border-radius:10px;background:var(--log-surface);color:var(--log-text);font-family:inherit;font-size:24px;line-height:1;cursor:pointer}
 .add-log-focus-defect+.close-log-focus{margin-left:0}
 .log-focus-body{flex:1;display:grid;gap:12px;align-content:start;padding:14px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.log-focus-record{border:1px solid var(--log-border);border-left:6px solid var(--log-accent);border-radius:10px;background:var(--log-surface);padding:14px 16px}
+/* SWIPE LEFT TO DROP A DEFECT FROM THE SHARE. Curtis: "I would like to swipe
+   left to get rid of a defect and have a quick undo button to bring it back."
+
+   `position:relative` is for the HIDE control in the corner; the row is padded
+   on the right so a long category name cannot run under it.
+
+   `touch-action:pan-y` IS LOAD-BEARING, and this comment said the opposite.
+   It claimed none was needed because "the browser already lets a horizontal
+   drag pass through a vertical scroller untouched". It does not: with
+   `touch-action:auto` the browser claims the gesture on the first move and
+   sends `pointercancel`, so on a phone the swipe never fired at all -
+   reproduced with a real touch drag at 390px as
+   `pointerdown > pointermove > pointercancel`, three rows still there. It
+   worked with a mouse, which is why it looked right on the shop computer.
+   `pan-y` keeps VERTICAL panning with the browser and hands horizontal
+   movement to the component; `none` would take the scroll away entirely, which
+   is what the test bans.
+
+   The transform comes from the component as an inline style while a finger is
+   down, so there is no transition on it to fight the finger; it snaps back on
+   release, which is the one moment a transition would help and the one place
+   React has already removed the style. */
+.log-focus-record{position:relative;touch-action:pan-y;border:1px solid var(--log-border);border-left:6px solid var(--log-accent);border-radius:10px;background:var(--log-surface);padding:14px 52px 14px 16px}
+/* AND A SELECTION ALREADY ON THE ROW EATS THE NEXT SWIPE. Long-press a defect's
+   text on a phone and the browser hands the following drag to the selection
+   handles, so the swipe does nothing until somebody taps the text away - the
+   same class of failure as the `touch-action` one above, and just as invisible
+   from a desktop.
+
+   SCOPED TO TOUCH, because the cost is not symmetric. Selecting the text of a
+   defect with a mouse to paste it somewhere is an ordinary thing to do on the
+   shop computer, and a mouse NEVER starts a swipe (`swipe-away-row.tsx` returns
+   on `pointerType==="mouse"`), so there is nothing to protect there. This is
+   the one query that matches where the gesture actually lives. */
+@media(hover:none) and (pointer:coarse){
+ .log-focus-record{-webkit-user-select:none;user-select:none}
+}
+.log-focus-record .focus-hide-defect{position:absolute;top:8px;right:8px;min-width:36px;min-height:36px;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border:1px solid var(--log-border);border-radius:7px;background:var(--log-surface);color:var(--log-muted);padding:3px 5px;font-family:inherit;line-height:1;cursor:pointer}
+.log-focus-record .focus-hide-defect span{font-size:14px}
+.log-focus-record .focus-hide-defect b{font-size:7px;font-weight:900;letter-spacing:.4px}
+.log-focus-record .focus-hide-defect:hover,.log-focus-record .focus-hide-defect:focus-visible{border-color:var(--log-accent);color:var(--log-accent);outline:none}
+/* ONE SLOT, ALWAYS THERE, because both of these appear and disappear. They
+   mounted and unmounted inside the share bar ABOVE the rows, so every HIDE,
+   swipe and PUT BACK moved the whole list: measured at +70px on a phone and
+   +115px on the shop computer, with the bar growing 61px to 131px. The row you
+   were about to swipe next was no longer under your thumb. The slot keeps its
+   height whether it holds anything or not. */
+.log-focus-share .log-focus-share-slot{grid-column:1/-1;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+/* THE WAY BACK, beside what the share is about to carry rather than behind a
+   menu - the rule the Down Sheet's own PUT BACK follows. */
+.log-focus-share .focus-put-back{min-height:36px;flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--log-accent);border-radius:6px;background:color-mix(in srgb,var(--log-accent) 8%,var(--log-surface));color:var(--log-accent);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+.log-focus-share .focus-put-back span{font-size:12px;line-height:1}
 .log-focus-record.in-progress{border-left-color:#c99400}.log-focus-record.deferred{border-left-color:#0e7490}.log-focus-record.completed{border-left-color:#0a7d47}
 .log-focus-record-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
 .log-focus-record-head b{font-size:14px;letter-spacing:.4px;color:var(--log-accent)}
@@ -424,7 +589,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-focus-record-foot time{font-size:11px;font-weight:800;color:var(--log-muted)}
 .log-focus-record-actions{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;width:100%}
 .log-focus-record-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
-.log-focus-record-foot button{min-height:44px;border:0;border-radius:8px;color:var(--log-header-text);padding:0 6px;font-family:inherit;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap}
+.log-focus-record-foot button{min-height:44px;border:0;border-radius:8px;color:var(--log-accent-text,#fff);padding:0 6px;font-family:inherit;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap}
 /* At 320px, body/card padding and borders leave 79.67px per action before
    a possible scrollbar. Let labels wrap, rather than overflow or shrink, and
    let one grid row stretch all three buttons to the same 44px-or-taller size. */
@@ -445,6 +610,16 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  .log-focus-share>small{font-size:9px}
  .add-log-focus-defect{padding:0 11px;font-size:11px}
  .log-focus-body{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+ /* Both controls reach a thumb target on the device the swipe exists for. */
+ .log-focus-record .focus-hide-defect{min-width:44px;min-height:44px}
+ .log-focus-record{padding-right:60px}
+ /* 44px, not full width. `width:100%` was left over from the build where this
+     was a direct grid child spanning the bar; inside the slot it is a flex item
+     beside the note, so 100% made the two fight for the row and squeezed the
+     sentence saying what will be sent down to a word per line. It keeps the
+     thumb target and gives the note the rest. */
+ .log-focus-share .focus-put-back{min-height:44px;padding:0 14px;justify-content:center}
+ .log-focus-share .log-focus-share-scope{font-size:9px}
  .log-focus-bus strong{font-size:30px}
  .log-focus-defect{font-size:20px}
  .log-focus-record-actions{gap:7px}
@@ -463,6 +638,26 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .defect-log-app .parts-used-toggle b,.defect-log-app .parts-remember-scope b{font-size:9px;letter-spacing:.5px}
 .defect-log-app .parts-used-toggle small,.defect-log-app .parts-remember-scope small{font-size:8px;color:var(--log-muted)}
 .defect-log-app .parts-used-fields{display:grid;gap:8px}
+/* MORE THAN ONE PART PER REPAIR. The record held one `partNumber`/`partName`
+   pair; Curtis hit the wall from the floor - "I just saved a fix like a bus and
+   I was trying to find a way to add a second part" - so the pair became a list,
+   drawn by src/components/defects/parts-used-list.tsx for both this form and
+   the other one.
+
+   A SEPARATOR ONLY BETWEEN ROWS, so a one-part repair looks exactly as it did
+   and a two-part repair reads as two things. `+ .parts-row` cannot fire on a
+   lone row, which is the whole reason it is written that way rather than as a
+   border on every row.
+
+   REMOVE IS NOT DRAWN ON A LONE ROW at all - the component decides that, since
+   unticking PARTS USED is the gesture that means no parts were used. */
+.defect-log-app .parts-list{display:grid;gap:10px}
+.defect-log-app .parts-row{display:grid;gap:8px}
+.defect-log-app .parts-row+.parts-row{border-top:1px dashed var(--log-border);padding-top:10px}
+.defect-log-app .parts-row .remove-part{min-height:36px;justify-self:start;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);color:var(--log-text);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+.defect-log-app .parts-row .remove-part span{font-size:13px;line-height:1}
+.defect-log-app .parts-list .add-part{min-height:36px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px dashed var(--log-accent);border-radius:6px;background:color-mix(in srgb,var(--log-accent) 7%,var(--log-surface));color:var(--log-accent);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.7px;cursor:pointer}
+.defect-log-app .parts-list .add-part span{font-size:14px;line-height:1}
 .defect-log-app .parts-remembered{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;border:1px dashed var(--log-accent);border-radius:6px;background:color-mix(in srgb,var(--log-accent) 8%,var(--log-surface));padding:8px 10px}
 .defect-log-app .parts-remembered span{display:grid;gap:2px;min-width:0;font-size:12px;font-weight:700;color:var(--log-text);overflow-wrap:anywhere}
 .defect-log-app .parts-remembered b{font-size:8px;font-weight:900;letter-spacing:.7px;color:var(--log-accent)}
@@ -470,6 +665,9 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .defect-log-app .parts-remembered button{min-height:36px;flex:0 0 auto;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);color:var(--log-text);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
 @media(max-width:760px){
  .defect-log-app .parts-used-fields input{font-size:16px}
+ /* Both new controls reach a thumb target on the device this form is used on. */
+ .defect-log-app .parts-row .remove-part{min-height:44px;width:100%;justify-content:center}
+ .defect-log-app .parts-list .add-part{min-height:44px;width:100%}
  .defect-log-app .parts-remembered{flex-wrap:wrap}
  .defect-log-app .parts-remembered button{min-height:44px;width:100%}
 }
@@ -536,7 +734,13 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 
 /* Causes learned under this symptom. Chips rather than a dropdown: on a phone a
    select hides its options behind a tap, and the whole point is that the
-   mechanic sees what has been found here before without going looking. */
+   mechanic sees what has been found here before without going looking.
+
+   They moved into ADVANCED DETAILS with the finding box, which ESTIMATED TIME
+   OF REPAIR replaced on the main form. Fixed Repairs keeps its own copy of
+   these rules in its own stylesheet; the Down Sheet's row editor draws the same
+   chips with only a `button` override of its own, so its chip row has no border
+   or radius — that predates this and is not fixed here. */
 .learned-findings{display:grid;gap:5px}
 .learned-findings>small{color:var(--log-muted,#62748d);font-size:7px;font-weight:900;letter-spacing:.4px;overflow-wrap:anywhere}
 .learned-findings>div{display:flex;flex-wrap:wrap;gap:6px}
@@ -662,6 +866,49 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    the scan colour across the app; it stays here for the same reason. */
 .sweep-scan-button{border:1px solid #6b31b6!important;background:#f2eaff!important;color:#3d1c6e!important}
 .feed-title .sweep-scan-button:disabled,.log-advanced .sweep-scan-button:disabled{opacity:.55}
+/* ── SCAN HEAT SHEET: the heat check sheet's own door, beside the sweep's ──
+   Warm where the sweep is purple, so the two scan buttons are told apart by
+   colour before either label is read: the wrong scanner on the wrong paper is
+   the mistake SCAN BATCHES exists to undo. */
+.heat-scan-button{border:1px solid #b3530a!important;background:#fff1e3!important;color:#7a3505!important}
+.feed-title .heat-scan-button:disabled,.log-advanced .heat-scan-button:disabled{opacity:.55}
+/* It is the fifth control in a two-column grid, so it sat alone in half a row
+   with its label broken over two lines — measured at 390: 159px wide and 50px
+   tall beside neighbours at 44. Given the whole row, the name fits on one. */
+@media(max-width:760px){.log-advanced-group>.feed-actions>.heat-scan-button,.feed-actions>.heat-scan-button{grid-column:1/-1}}
+/* The line a scanner shows when SCAN SHEET opened it, and the warning when
+   SCAN SHEET held pages of the batch back. */
+.sweep-handed{margin:0;padding:8px 11px;border-left:4px solid #08733f;background:#e6f6ec;color:#0c3b22;font-size:9px;font-weight:900;letter-spacing:.3px;line-height:1.4}
+.sweep-handed.held-back{border-left-color:#c98a00;background:#fff3d6;color:#6b4a00}
+/* The review is groups, not one long list: what will be filed, what the board
+   already knew, where paper and board disagree, and what to check by eye. The
+   group heading is a div on purpose — globals.css paints every bare <header>
+   navy with the app header's ink. */
+.heat-group{flex:none;border:1px solid var(--log-border,#b9c7da);border-radius:8px;background:#fff;overflow:hidden}
+.heat-group-head{display:flex;flex-direction:column;gap:3px;padding:9px 12px;background:#eef2f8}
+.heat-group-head b{font-size:10px;letter-spacing:.3px;color:#073d7c}
+.heat-group-head small{font-size:9px;line-height:1.4;color:#44566f}
+.heat-group.warn{border-color:#c9b46a}.heat-group.warn .heat-group-head{background:#f6e9b3}.heat-group.warn .heat-group-head b{color:#5d4a00}.heat-group.warn .heat-group-head small{color:#5f5320}
+.heat-rows{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px;padding:9px;max-height:44vh;overflow:auto}
+.heat-row{display:grid;grid-template-columns:22px 62px minmax(0,1fr);gap:8px;align-items:center;min-height:44px;padding:6px 9px;border:1px solid var(--log-border,#c7d1e1);border-radius:6px;background:#fff;cursor:pointer}
+.heat-row.held{border-color:#df9b43;background:#fff8ea}
+.heat-row input{width:18px;height:18px;margin:0}
+.heat-row>b{font-size:15px;color:#073d7c}
+.heat-row>span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.heat-row small{font-size:9px;color:#5a6d89;overflow-wrap:anywhere}
+.heat-row em{font-size:8px;font-style:normal;font-weight:900;color:#8a4d00}
+.heat-row i{font-size:9px;font-style:normal;line-height:1.35;color:#6f4300;overflow-wrap:anywhere}
+.heat-chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;padding:9px;max-height:30vh;overflow:auto}
+.heat-chips>span{display:flex;flex-direction:column;gap:2px;min-width:0;padding:6px 9px;border:1px solid var(--log-border,#c7d1e1);border-radius:6px;background:#fff}
+/* An OK that will NOT be logged, and so stays on the walking list. */
+.heat-chips>span.unlogged{border-color:#df9b43;background:#fff8ea}.heat-chips>span.unlogged small{color:#6f4300}
+.heat-chips b{font-size:13px;color:#073d7c}.heat-chips small{font-size:9px;line-height:1.35;color:#44566f;overflow-wrap:anywhere}
+/* The one button in the scanner that changes the board. The Defect Log gives
+   every footer button the same white face, so FILE and CANCEL were twins — and
+   this one can file sixty records. */
+.heat-modal .log-editor-actions .save-repair{border-color:#b3530a;background:#b3530a;color:#fff}
+.heat-struck{flex:none;margin:0;padding:9px 12px;border-left:4px solid #6b7c96;background:#eef2f8;color:#2d3d56;font-size:9px;line-height:1.45}
+@media(max-width:760px){.heat-rows,.heat-chips{grid-template-columns:1fr;max-height:none}.heat-row{min-height:52px;grid-template-columns:26px 66px minmax(0,1fr)}.heat-row input{width:22px;height:22px}.heat-row>b{font-size:17px}.heat-row small,.heat-chips small,.heat-group-head small,.heat-struck{font-size:11px}.heat-group-head b{font-size:12px}.heat-row em,.heat-row i{font-size:10px}.heat-chips b{font-size:15px}}
 .sweep-modal{width:min(1180px,98vw);max-height:96vh;display:flex;flex-direction:column;border-radius:11px;background:var(--log-surface,#f8fafc);box-shadow:0 25px 85px #000b;overflow:hidden}
 .sweep-body{display:flex;flex-direction:column;gap:12px;min-height:260px;padding:16px 18px;overflow:auto}
 .sweep-intro{display:grid;gap:4px;padding:11px 13px;border-left:4px solid #6b31b6;background:#f2eaff;color:#2b2350}.sweep-intro b{font-size:11px}.sweep-intro span{font-size:9px;line-height:1.4}
@@ -670,7 +917,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .sweep-previews{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px}.sweep-previews:empty{display:none}.sweep-previews figure{margin:0;border:1px solid var(--log-border,#b8c4d6);border-radius:7px;background:#fff;overflow:hidden}.sweep-previews img{display:block;width:100%;height:150px;object-fit:cover}.sweep-previews figcaption{display:flex;align-items:center;justify-content:space-between;padding:7px;font-size:8px;font-weight:900}.sweep-previews figcaption button{border:0;background:transparent;color:#a1262e;font-size:7px;font-weight:900;cursor:pointer}
 .sweep-read{align-self:center;min-width:180px;background:#6b31b6}.sweep-read:disabled{opacity:.45;cursor:not-allowed}
 /* NOTES FOR THIS SCAN: the same box the Down Sheet scanner has. */
-.sweep-notes{display:flex;flex-direction:column;gap:5px}.sweep-notes>span{display:flex;align-items:baseline;justify-content:space-between}.sweep-notes b{font-size:9px;font-weight:900;letter-spacing:.4px;color:#3d1c6e}.sweep-notes small{font-size:8px;color:#75849b}.sweep-notes textarea{width:100%;min-height:64px;border:1px solid #c9b7e6;border-radius:7px;background:#fff;padding:8px 10px;color:#1d3457;font:inherit;font-size:11px;line-height:1.4;resize:vertical}.sweep-notes textarea::placeholder{color:#9aa6b8}
+.sweep-notes{display:flex;flex-direction:column;gap:5px}.sweep-notes>span{display:flex;align-items:baseline;justify-content:space-between}.sweep-notes b{font-size:9px;font-weight:900;letter-spacing:.4px;color:#3d1c6e}.sweep-notes small{font-size:8px;color:#75849b}.sweep-notes textarea{width:100%;min-height:64px;border:1px solid #c9b7e6;border-radius:7px;background:#fff;padding:8px 10px;color:#1d3457;font:inherit;font-size:11px;line-height:1.4;resize:vertical}.sweep-notes textarea::placeholder{color:#9aa6b8}.sweep-notes textarea:disabled{opacity:.55;cursor:not-allowed}.sweep-notes-keep input:disabled{cursor:not-allowed}.sweep-notes-keep:has(input:disabled){opacity:.55;cursor:not-allowed}
 .sweep-notes-keep{display:flex;align-items:center;gap:8px;font-size:9px;font-weight:800;color:#3d1c6e;cursor:pointer}.sweep-notes-keep input{width:16px;height:16px}
 @media(max-width:760px){.sweep-notes textarea{font-size:16px;min-height:80px}.sweep-notes-keep{min-height:44px;font-size:11px}.sweep-notes-keep input{width:20px;height:20px}}
 .sweep-review-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid var(--log-border,#c7d1e1);border-radius:7px;background:#fff}.sweep-review-head div{display:flex;flex-direction:column;gap:2px}.sweep-review-head b{font-size:11px;color:#183b6d}.sweep-review-head span{font-size:8px;color:#65758e}.sweep-review-head button{border:1px solid #aebcd1;border-radius:5px;background:#f4f7fb;padding:7px 10px;color:#314a6d;font-size:8px;font-weight:900;cursor:pointer}
@@ -781,13 +1028,32 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    bar that carries the three numbers worth a glance, so the page opens on the
    filters and the log button instead of a status report. */
 .daily-stats{margin:0 14px 8px}
-.daily-stats-toggle{width:100%;display:flex;align-items:center;gap:10px;min-height:44px;border:1px solid var(--log-border,#bac7d9);border-radius:8px;background:var(--log-surface,#fff);padding:8px 12px;color:var(--log-text,#172b4d);font-family:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
-.daily-stats-toggle:hover,.daily-stats-toggle:focus-visible{background:color-mix(in srgb,var(--log-accent,#0b64bd) 7%,var(--log-surface,#fff));outline:none}
-.daily-stats-toggle>b{flex:none;font-size:12px;font-weight:900;letter-spacing:.4px;color:var(--log-accent,#0b64bd)}
+/* THE TWO PANEL OPENERS ARE ONE CONTROL IN TWO PLACES. This one and
+   .header-advanced-toggle both read "name, what is inside, OPEN/CLOSE chip",
+   so a foreman learns the shape once. They differ only in where they sit:
+   this on the page, that on the header, each wearing its own surface. Both
+   were thin enough to scan past on a phone, which is what started this. */
+/* THE BACKGROUND STAYS --log-surface, and that is a measurement rather than
+   a preference. Tinting it 7% toward the accent took DAILY STATS from
+   4.63:1 to 4.12:1 on the tactical theme - under AA for 14px 900-weight,
+   which gets no large-text exemption - because that theme has the least
+   headroom of the four (#bca75f on #393e30). Prominence comes from the
+   accent edge, the height and the type instead, none of which costs a
+   contrast point. */
+.daily-stats-toggle{width:100%;display:flex;align-items:center;gap:10px;min-height:52px;border:1px solid color-mix(in srgb,var(--log-accent,#0b64bd) 34%,var(--log-border,#bac7d9));border-left:4px solid var(--log-accent,#0b64bd);border-radius:8px;background:var(--log-surface,#fff);padding:9px 13px;color:var(--log-text,#172b4d);font-family:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
+/* THE FEEDBACK IS THE RING, NOT THE FILL, for the reason above. This rule
+   kept the 7% tint it always had, which put the label at 4.12:1 on the
+   tactical theme for as long as the control was hovered or FOCUSED - and
+   focus is a reading state, not a passing one: a keyboard user sits in it.
+   Moving the feedback to the border and a ring leaves the label on plain
+   --log-surface at 4.63:1 in every state, and replaces an outline:none
+   that had removed the focus ring without putting anything back. */
+.daily-stats-toggle:hover,.daily-stats-toggle:focus-visible{background:var(--log-surface,#fff);border-color:var(--log-accent,#0b64bd);box-shadow:0 0 0 3px color-mix(in srgb,var(--log-accent,#0b64bd) 30%,var(--log-surface,#fff));outline:none}
+.daily-stats-toggle>b{flex:none;font-size:14px;font-weight:900;letter-spacing:.4px;color:var(--log-accent,#0b64bd)}
 .daily-stats-toggle>small{flex:1;min-width:0;font-size:10px;font-weight:800;color:var(--log-muted,#6e7e94);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.daily-stats-toggle>i{flex:none;font-style:normal;font-size:10px;font-weight:900;letter-spacing:.5px;color:var(--log-accent,#0b64bd)}
+.daily-stats-toggle>i{flex:none;border:1px solid color-mix(in srgb,var(--log-accent,#0b64bd) 52%,var(--log-surface,#fff));border-radius:6px;padding:5px 9px;font-style:normal;font-size:9px;font-weight:900;letter-spacing:.5px;color:var(--log-accent,#0b64bd)}
 .daily-stats.open .log-summary{padding-top:8px}
-@media(max-width:760px){.daily-stats{margin:0 8px 8px}.daily-stats-toggle{min-height:48px}.daily-stats-toggle>b{font-size:13px}.daily-stats-toggle>small{font-size:11px}}
+@media(max-width:760px){.daily-stats{margin:0 8px 8px}.daily-stats-toggle{min-height:56px}.daily-stats-toggle>b{font-size:14px}.daily-stats-toggle>small{font-size:11px}}
 
 /* LOG DEFECT, first thing under the header. Full width on a phone so the page
    answers "what is this for" before anything has to be scrolled. */
@@ -828,12 +1094,12 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    the light-surface toggle it replaced, which was invisible against the
    header. */
 .log-header-actions{flex:none;display:flex;min-width:0;flex-direction:column;align-items:stretch;gap:7px}
-.header-advanced-toggle{width:100%;min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #ffffff5c;border-radius:6px;background:#ffffff1f;color:#fff;padding:6px 12px;font:inherit;cursor:pointer}
-.header-advanced-toggle:hover,.header-advanced-toggle:focus-visible{background:#ffffff33;border-color:#fff9;outline:none}
+.header-advanced-toggle{width:100%;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid color-mix(in srgb,var(--app-header-text,var(--log-header-text,#fff)) 54%,transparent);border-radius:8px;background:transparent;color:var(--app-header-text,var(--log-header-text,#fff));padding:9px 13px;font:inherit;cursor:pointer}
+.header-advanced-toggle:hover,.header-advanced-toggle:focus-visible{background:transparent;border-color:var(--app-header-text,var(--log-header-text,#fff));outline:none}
 .header-advanced-toggle>span{display:flex;min-width:0;flex-direction:column;gap:2px;text-align:left}
-.header-advanced-toggle b{color:#fff;font-size:10px;font-weight:900;letter-spacing:.5px}
-.header-advanced-toggle small{color:#c4d7ee;font-size:7px;font-weight:900}
-.header-advanced-toggle>i{flex:none;border:1px solid #ffffff7a;border-radius:6px;color:#fff;padding:5px 9px;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.5px}
+.header-advanced-toggle b{color:var(--app-header-text,var(--log-header-text,#fff));font-size:14px;font-weight:900;letter-spacing:.4px}
+.header-advanced-toggle small{color:color-mix(in srgb,var(--app-header-text,var(--log-header-text,#fff)) 82%,transparent);font-size:9px;font-weight:900}
+.header-advanced-toggle>i{flex:none;border:1px solid color-mix(in srgb,var(--app-header-text,var(--log-header-text,#fff)) 68%,transparent);border-radius:6px;color:var(--app-header-text,var(--log-header-text,#fff));padding:5px 9px;font-style:normal;font-size:9px;font-weight:900;letter-spacing:.5px}
 /* The drawer opens directly under the header, so it loses the rounded top it
    had as a card in the middle of the page. */
 .log-advanced{border-top-left-radius:0;border-top-right-radius:0;margin-top:0}
@@ -841,7 +1107,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    against whatever was above them, which read as one jammed stack; they are
    the two things used on every visit and they get their own air. */
 .log-controls{margin-top:12px}
-@media(max-width:760px){.log-header-actions{width:100%}.header-advanced-toggle{min-height:44px}.log-controls{margin-top:14px;row-gap:11px}}
+@media(max-width:760px){.log-header-actions{width:100%}.header-advanced-toggle{min-height:56px}.log-controls{margin-top:14px;row-gap:11px}}
 
 /* END DEFERRAL, beside MOVE / LOCATION on a held bus.
 
@@ -967,6 +1233,56 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .count-return:hover,.count-return:focus-visible{background:#f6e4b8;outline:none}
 .duplicate-return-tally{display:inline-block;margin-left:4px;border-radius:4px;background:#8a5200;color:#fff;padding:1px 5px;font-style:normal;font-weight:900}
 .work-state-badge.report-return{border-color:#d49617;background:#fff4cf;color:#8a5200}
+
+/* WHAT THE PRESS DID, said where the press was. Both banner buttons used to
+   change nothing a person could see: one swapped a draft under a component
+   that ignored it, the other moved an italic number or, inside the two-minute
+   guard, did nothing at all. This is the line that says which happened. It
+   takes the full width of the wrapped banner so it cannot be mistaken for a
+   third button. */
+.duplicate-return-note{flex:1 0 100%;margin-top:2px;border-radius:5px;padding:5px 8px;font-size:8px;font-weight:900;letter-spacing:.3px}
+.duplicate-return-note.counted{background:#8a5200;color:#fff}
+.duplicate-return-note.refused{border:1px solid #8a5200;background:transparent;color:#8a5200}
+
+/* REPORTED AGAIN: ONE BUTTON, THREE STATES, and never a second element in the
+   cell. The first version armed into a span holding a label, a COUNT IT and a
+   cancel x — about 130px of min-content in a rail cell measured at 64-97px.
+   The x overflowed and MARK FIXED, later in DOM order, painted over it, so
+   tapping cancel at 360 and 430 MARKED THE REPAIR COMPLETE; at 820 and above
+   `.grouped-defect-row{overflow:hidden}` clipped it out of reach entirely and
+   the armed state had no exit but counting. Arming now changes this button's
+   own words and nothing else, so there is nothing to overflow.
+
+   It is also LAST in the rail. The first version was first and pushed MARK
+   FIXED along by a slot at every width — an addition Curtis asked for, and a
+   move he did not. */
+.report-again{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;border-top:1px solid var(--log-border)!important;color:var(--log-muted)}
+.report-again:hover,.report-again:focus-visible{background:color-mix(in srgb,var(--log-accent) 12%,transparent);outline:none}
+.report-again>span{font-size:14px;line-height:1}
+/* The three ACTIVE states paint their own background, so the pair is
+   self-consistent and the theme underneath cannot break either half. That is
+   the same reason the REPORTED badge above can hold a fixed amber: it brings
+   its own fill. The RESTING button cannot, so it takes the theme's own muted
+   ink like .remove-log beside it — an amber resting fill was declared here and
+   was dead anyway, losing to `.log-actions>button{background:transparent}` at
+   (0,1,1), which left #8a5200 text sitting directly on the theme surface:
+   1.73:1 on Tactical, measured. */
+.report-again.armed{background:#8a5200;color:#fff}
+.report-again.counted{background:#0d7a45;color:#fff}
+.report-again.refused{background:#fff;color:#8a5200;box-shadow:inset 0 0 0 1px #8a5200}
+/* THE DATE FOLLOWS THE THEME. Its first rule was `.last-reported`, which lost
+   to `.log-meta time{color:var(--log-muted)}` on specificity and was inert —
+   so a cold read called it out, and winning that fight with a fixed #8a5200
+   is what BROKE it: 2.50 / 2.52 / 1.73:1 on dark, midnight and tactical,
+   against the 8.04 / 7.29 / 5.28 it had while it was "inert". The badge above
+   it already carries the colour for this idea. This line only needs to not
+   read as one more grey timestamp, so it takes the weight and leaves the ink
+   to the theme. */
+.log-meta time.last-reported{font-weight:900;letter-spacing:.3px}
+@media(max-width:760px){
+ .report-again{flex-direction:row;gap:4px;border-top:0!important}
+ .duplicate-return-note{font-size:10px;padding:7px 10px}
+}
 
 /* ADVANCED STATS — the last block in the focus body, and the only place it
    appears. Curtis: "make it viewable only in focus, like the bottom of however
@@ -1244,48 +1560,30 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    be a second opinion waiting to drift. Slate rather than purple or green —
    the DS badge owns purple and MARK FIXED owns green, and a third action in
    either colour reads as a variant of one of them. */
-/* ABOVE THE FOCUS VIEW, and this is not cosmetic. Both shades are `.log-shade`,
-   which sets one z-index for all of them, and the focus shade renders LATER in
-   the tree - so with equal z-indexes it painted on top of the PTR panel and
-   swallowed every tap on it. The panel looked perfectly normal while being
-   completely dead; found by clicking SAVE in a browser, not by reading. One
-   higher than `.log-shade`, named rather than nudged. */
-.ptr-shade{z-index:2147483001}
+/* THE PANEL'S COLOURS, mapped onto the ones this page already has.
+
+   `src/components/defects/path-to-repair-panel.css` owns the panel's shape and
+   declares `--ptr-*` with light-surface defaults; this is the Defect Log saying
+   what they are here, so the panel follows Terminal, Black, Midnight and
+   Tactical with the rest of the page instead of staying navy on an olive
+   board. Scoped under `.defect-log-app` so it outranks the component's own
+   defaults by specificity rather than by import order, which nothing here
+   controls.
+
+   ABOVE THE FOCUS VIEW, and that is not cosmetic: the panel's own z-index is
+   one above `.log-shade`'s, named rather than nudged, because it opens on top
+   of the focus view it was reached from and that view is deliberately left open
+   underneath. */
+.defect-log-app .ptr-shade{
+ --ptr-text:var(--log-text,#172b4d);
+ --ptr-muted:var(--log-muted,#60728c);
+ --ptr-border:var(--log-border,#c4cedd);
+ --ptr-surface:var(--log-surface,#fff);
+ --ptr-accent:var(--log-accent,#0b64bd);
+ --ptr-accent-text:var(--log-accent-text,#fff);
+}
 .ptr-log-focus-defect{background:#3f4a63}
 .ptr-log-focus-defect:focus-visible{filter:brightness(1.15)}
-
-/* The panel is shaped off .log-focus deliberately: it opens on top of the
-   focus view and a different frame would read as a different part of the app.
-   `.log-shade` already supplies the backdrop, the centring, and the bottom
-   alignment it switches to on a phone. */
-.ptr-panel{display:flex;width:100%;max-width:620px;max-height:88vh;flex-direction:column;
- border:1px solid var(--log-border);border-radius:12px;background:var(--log-surface);overflow:hidden}
-.ptr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
- padding:13px 15px;border-bottom:1px solid var(--log-border);background:var(--log-accent);color:var(--log-header-text)}
-.ptr-head>span{display:flex;min-width:0;flex-direction:column;gap:3px}
-.ptr-head small{font-size:9px;font-weight:900;letter-spacing:1.4px;opacity:.85}
-.ptr-head b{font-size:16px;font-weight:900;line-height:1.2}
-.ptr-head i{font-size:12px;font-style:normal;font-weight:700;opacity:.9;line-height:1.3}
-.ptr-close{flex:none;min-width:44px;min-height:44px;border:0;border-radius:8px;background:#ffffff26;
- color:inherit;font-size:20px;font-weight:900;cursor:pointer}
-.ptr-body{display:flex;flex-direction:column;gap:11px;padding:15px;overflow-y:auto}
-/* The written steps, read on a phone in a garage: a real reading size, and
-   `pre-wrap` because the line breaks somebody typed ARE the steps. */
-.ptr-steps{margin:0;white-space:pre-wrap;color:var(--log-text);font-size:14px;line-height:1.55}
-.ptr-edit{display:flex;flex-direction:column;gap:6px;color:var(--log-muted);font-size:9px;font-weight:900;letter-spacing:.6px}
-.ptr-edit textarea{width:100%;min-height:150px;border:1px solid var(--log-border);border-radius:8px;
- background:var(--log-surface);color:var(--log-text);padding:10px;font-size:14px;line-height:1.5;resize:vertical}
-.ptr-count{align-self:flex-end;color:var(--log-muted);font-size:9px;font-weight:900}
-.ptr-problem{margin:0;border:1px solid #c02b2b;border-radius:8px;background:#c02b2b14;color:#c02b2b;
- padding:9px 11px;font-size:11px;font-weight:900}
-.ptr-empty{display:flex;margin:0;flex-direction:column;gap:5px;color:var(--log-muted);font-size:12px;line-height:1.5}
-.ptr-empty b{color:var(--log-text);font-size:14px}
-.ptr-actions{display:flex;flex-wrap:wrap;gap:8px}
-.ptr-actions button{min-height:44px;flex:1;border:0;border-radius:8px;background:var(--log-accent);
- color:var(--log-header-text);padding:0 16px;font-family:inherit;font-size:11px;font-weight:900;cursor:pointer}
-.ptr-actions .ptr-cancel{background:var(--log-surface);border:1px solid var(--log-border);color:var(--log-text)}
-.ptr-note{margin:0;color:var(--log-muted);font-size:10px;font-weight:700;line-height:1.5}
-.ptr-note b{color:var(--log-text)}
 
 /* BULLET, beside the DESCRIPTION label. Small on purpose: it is a typing aid,
    not an action, and it must never read as the thing that saves the defect. */
@@ -1296,13 +1594,65 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  font-size:9px;font-weight:900;letter-spacing:.4px;cursor:pointer;touch-action:manipulation}
 .insert-bullet:hover,.insert-bullet:focus-visible{border-color:var(--log-accent);outline:none}
 
-/* SHOP TIME, at the top of the PATH TO REPAIR screen. Boxed rather than loose
-   so it reads as a stored setting instead of another line of the writeup — it
-   is the one thing on that screen the feed's hours badge reads back. */
-.ptr-hours{display:flex;flex-direction:column;gap:5px;border-bottom:1px solid var(--log-border);
- background:color-mix(in srgb,var(--log-accent,#0b64bd) 5%,var(--log-surface,#fff));padding:12px 15px}
-.ptr-hours label{display:flex;align-items:center;justify-content:space-between;gap:10px;
- color:var(--log-muted);font-size:9px;font-weight:900;letter-spacing:.6px}
-.ptr-hours input{width:92px;min-height:44px;border:1px solid var(--log-border);border-radius:8px;
- background:var(--log-surface);color:var(--log-text);padding:0 10px;font-size:16px;font-weight:900;text-align:center}
-.ptr-hours small{color:var(--log-muted);font-size:9px;font-weight:800;line-height:1.45}
+
+/* THE STEP-BY-STEP HELPER. A bar in one fixed place and a ring on the live
+   field; `app/defect-log/_components/form-coach-bar.tsx` says why it is not a
+   floating tooltip.
+
+   EVERY COLOUR COMES OFF THE PAGE'S OWN THEME, both ends of every pairing,
+   with a literal fallback for the server render that cannot read LocalStorage.
+   That is not tidiness — PATH TO REPAIR shipped with a themed ink on an
+   unthemed white surface and measured 1.08:1 on three of the four themes.
+
+   THE INK IS NOT THE ACCENT, AND THAT IS MEASURED. The bar was built with the
+   title in `--log-accent` on an 11% accent tint, which is `.mystery-head`'s
+   pattern, and it came out 3.55:1 on the default theme — under AA for 10px
+   text. Swept over the four themes at six tints, as ink on that ground:
+
+     tint     --log-text   --log-muted   --log-accent
+      0%        9.28 min      4.90 min      4.63 min
+      4%        8.71          4.63          4.35
+      6%        8.42          4.50          4.21
+     11%        7.69          4.37          3.84
+     14%        7.32          3.98          3.66
+
+   So the accent cannot be text here at any tint, `--log-muted` needs the
+   ground near the surface, and `--log-text` is safe anywhere. The tint is 4%,
+   the title is `--log-text` and the message `--log-muted`, which floors at
+   4.63:1 across light, dark, midnight and tactical. 6% would floor at exactly
+   4.50 and a floor equal to the threshold is not a promise.
+
+   THE ACCENT IS STILL THERE, as the left stripe and the ring — surfaces with
+   no text on them, where its contrast only has to beat the surface. */
+.coach-bar{flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:9px 16px;border-left:3px solid var(--log-accent,#0b64bd);border-bottom:1px solid var(--log-border,#bac7d9);background:color-mix(in srgb,var(--log-accent,#0b64bd) 4%,var(--log-surface,#fff))}
+.coach-bar-say{display:flex;flex-direction:column;gap:3px;min-width:0}
+.coach-bar-say b{font-size:10px;font-weight:900;letter-spacing:.7px;color:var(--log-text,#172b4d)}
+.coach-bar-say small{font-size:9px;font-weight:700;line-height:1.45;color:var(--log-muted,#60728c)}
+.coach-bar-hide{flex:none;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--log-border,#bac7d9);border-radius:6px;background:var(--log-surface,#fff);color:var(--log-muted,#60728c);font-size:17px;font-weight:900;line-height:1;cursor:pointer;touch-action:manipulation}
+.coach-bar-hide:hover,.coach-bar-hide:focus-visible{border-color:var(--log-accent,#0b64bd);color:var(--log-text,#172b4d);outline:none}
+/* SCOPED TO THE DEFECT LOG'S OWN ROOT. This stylesheet is imported by the
+   Settings page too, and the attribute name is generic — the only thing
+   keeping it off another surface was that nothing else sets it. CLAUDE.md
+   already foresees a second form getting a helper, and that surface would
+   have inherited this page's --log-accent with its #0b64bd literal fallback.
+   The prefix costs nothing and the specificity is still below an override. */
+/* The ring. An outline rather than a border, because a border on a field that
+   already has one changes its box and moves every field below it; an outline
+   is drawn outside the box and shifts nothing. Measured at 320, 360, 390, 430,
+   820 and 1180: 4px clear of the field on every one, inside the editor's own
+   edges, so `.log-editor`'s `overflow:hidden` never clips it. */
+.defect-log-app [data-coach-active]{outline:3px solid var(--log-accent,#0b64bd);outline-offset:1px;border-radius:7px}
+/* A STEP THE SAVE WILL REFUSE WITHOUT IS MARKED BY THE STRIPE, NOT BY COLOUR.
+   The ground was going to be a stronger tint for these, which would have put
+   the message under AA again; and a difference carried by colour alone is not
+   a difference for everybody looking at it. The words already say which kind
+   of step it is, and the stripe is the quiet second signal. */
+.coach-bar[data-coach-blocking]{border-left-width:6px}
+@media(max-width:760px){.coach-bar{padding:9px 12px}.coach-bar-hide{width:44px;height:44px}}
+
+/* LOGGED BY HAND ONLY. The amber of the initials note beside it says "read
+   this before you trust the list"; this one is a statement of scope rather
+   than a warning, so it borrows the shape and drops to the accent's quieter
+   tint. Both sit above the share buttons, which is the last place somebody
+   looks before sending the list on. */
+.quick-filter-source-note{background:color-mix(in srgb,var(--log-accent,#0b64bd) 10%,var(--log-surface,#fff));color:var(--log-muted,#60728c)}

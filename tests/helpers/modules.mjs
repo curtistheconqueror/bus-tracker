@@ -8,7 +8,9 @@ export {noteIssues, normalizeSweepRow, sweepDefect, sweepFindings, sweepOkAgains
 export {busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig} from "../../src/lib/cloud/cloud-sync.ts";
 export {hasBusNumberConflict, hasLocationConflict, validateBusUpdate} from "../../src/lib/fleet/fleet-validation.ts";
 export {applyDownEntryToFleet} from "../../src/lib/down-sheet/down-sheet-sync.ts";
-export {downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, reconcileDownSheetMembership, selectedDownSheetBusIds} from "../../src/lib/down-sheet/down-sheet-counter.ts";
+export {SWIPE_AXIS_RATIO, SWIPE_COMMIT_PX, excludeFromFocusShare, focusShareIsEmpty, focusShareScope, focusShareScopeNote, putBackLastExclusion, swipeHidesRow, swipeOffsetPx} from "../../src/lib/defects/focus-share-scope.ts";
+export {addDefectPart, blankDefectPart, defectPartFields, defectPartsMissing, defectPartsText, normalizeDefectParts, partToLearn, partsToLearn, partsWithoutNumbers, removeDefectPart, updateDefectPart, withDefectParts} from "../../src/lib/defects/defect-parts.ts";
+export {downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, mapDownSheetBadgeBusIds, reconcileDownSheetMembership, selectedDownSheetBusIds} from "../../src/lib/down-sheet/down-sheet-counter.ts";
 export {syncTrackerDownSheetSelection} from "../../src/lib/down-sheet/tracker-membership-sync.ts";
 export {clearDownSheetState, readDownSheetClearSnapshot, restoreDownSheetState} from "../../src/lib/down-sheet/down-sheet-clear.ts";
 export {moveOrSwapBuses, roadServiceStatus, statusForLocation} from "../../src/lib/fleet/smart-status.ts";
@@ -35,9 +37,12 @@ export {operationalUpdateAt, stampOperationalChange} from "../../src/lib/shared/
 export {formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes} from "../../src/lib/down-sheet/repair-time-estimates.ts";
 export {aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsProgress, repairItemsTotal} from "../../src/lib/down-sheet/down-sheet-repair-items.ts";
 export {mergeReviewedRows, reviewScannedRows} from "../../src/lib/down-sheet/down-sheet-scan-import.ts";
+export {busNumbersInText, perBusReason, printedLineConflicts, unreadBusNumbers} from "../../src/lib/down-sheet/scan-multi-bus.ts";
+export {addMintedEntries, mintSkippedMessage} from "../../src/lib/down-sheet/sheet-mint.ts";
+export {ADDED_IN_APP_LABEL, clearAddedInApp, entryOriginLabel, markAddedInApp, wasAddedInApp} from "../../src/lib/down-sheet/entry-origin.ts";
 export {prepareFleetForScannedReplacement, scannedSheetRemovals} from "../../src/lib/down-sheet/down-sheet-replace.ts";
-export {DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch} from "../../src/lib/down-sheet/down-sheet-filters.ts";
-export {downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText} from "../../src/lib/down-sheet/down-sheet-share.ts";
+export {DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterLabel, downSheetFilterMatch} from "../../src/lib/down-sheet/down-sheet-filters.ts";
+export {downSheetShareContext, downSheetShareEmptyNote, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareScope, downSheetShareScopeLabel, downSheetShareText} from "../../src/lib/down-sheet/down-sheet-share.ts";
 export {RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord} from "../../src/lib/defects/defect-log-sync.ts";
 export {bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds} from "../../src/lib/fleet/mystery-buses.ts";
 export {reconcileDownSheetMembership as reconcileDS} from "../../src/lib/down-sheet/down-sheet-counter.ts";
@@ -46,7 +51,6 @@ export {QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, QUICK_FILTERS, quickFilterBusIds
 export {deferredBadgeCounts, heldDeferredBuses} from "../../src/lib/defects/deferred-counts.ts";
 export {readSettings} from "../../src/lib/defects/defect-log-settings.ts";
 export {EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings} from "../../src/lib/defects/findings-memory.ts";
-export {downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation} from "../../src/lib/down-sheet/down-sheet-badge-view.ts";
 export {DOWN_SHEET_GROUPS, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetWorkGroup, groupDownSheetEntries, matchesDownSheetSearch, orderDownSheetEntries} from "../../src/lib/down-sheet/down-sheet-view.ts";
 export {DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay} from "../../src/lib/down-sheet/down-sheet-display-settings.ts";
 export {DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay} from "../../src/lib/defects/defect-log-display-settings.ts";
@@ -57,3 +61,6 @@ export {FALLBACK_PROTOCOL_VERSION, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUE
 export {BOARD_TABLES, PAGE, readBoardRows, readLiveRows} from "../../src/lib/mcp/cloud-read.ts";
 export {createSessionCache, sessionCacheKey} from "../../src/lib/mcp/session-cache.ts";
 export {offeredToken, sameSecret} from "../../src/lib/mcp/agent-token.ts";
+export {CARE_LEVELS, INCIDENTS_STORAGE_KEY, INCIDENT_KINDS, createIncident, editIncident, incidentId, incidentsSince, normalizeIncident, readIncidents, serializeIncidents, sortIncidents, writeIncidents} from "../../src/lib/incidents/incidents.ts";
+export {SHOP_TALK_KINDS, SHOP_TALK_STORAGE_KEY, createShopTalkNote, handleShopTalkNote, isHandled, normalizeShopTalkNote, openHazardCount, readShopTalk, reopenShopTalkNote, serializeShopTalk, shopTalkId, sortShopTalk, writeShopTalk} from "../../src/lib/shop-talk/shop-talk.ts";
+export {DEFAULT_SHIFT_SETTINGS, SHIFT_SETTINGS_KEY, normalizeShiftSettings, readShiftSettings, shiftAt} from "../../src/lib/settings/shift-clock.ts";

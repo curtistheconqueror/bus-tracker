@@ -3,6 +3,8 @@ import {defectLabel,type StructuredDefect} from "./repair-catalog.ts";
    "offsite-3" reads as a typo to somebody who does not have the app open.
    Unknown slots stay blank rather than printing the raw id. */
 import {knownLocationLabel as shareAreaLabel} from "../fleet/location-label.ts";
+/* One string for whose garage this is — it was typed into four share modules. */
+import {SITE_ORGANIZATION,SITE_ORGANIZATION_CAPS} from "../settings/site-identity.ts";
 
 /* ONE BUS, EVERYTHING ON IT.
 
@@ -102,7 +104,7 @@ export function busShareHtml(bus:BusShareBus,defects:BusShareDefect[],stamp:stri
  }).join(""):"<p class=\"empty\">No defects on this bus.</p>";
  return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"+
   "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"+
-  "<title>Bus "+escapeHtml(bus.n)+" — Pace South</title><style>"+
+  "<title>Bus "+escapeHtml(bus.n)+" — "+SITE_ORGANIZATION+"</title><style>"+
   "*{box-sizing:border-box}body{margin:0;background:#eef2f9;color:#12244a;"+
   "font:15px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;padding:14px}"+
   "h1{margin:0;font-size:30px;font-weight:800}"+
@@ -119,7 +121,7 @@ export function busShareHtml(bus:BusShareBus,defects:BusShareDefect[],stamp:stri
   ".t{margin:3px 0 0;font-size:11px;color:#5b6883}"+
   ".empty{background:#fff;border-radius:8px;padding:16px;text-align:center;color:#5b6883}"+
   "footer{margin-top:16px;font-size:11px;color:#5b6883;text-align:center}"+
-  "</style></head><body><header class=\"top\"><small>PACE SOUTH · DEFECT LOG</small>"+
+  "</style></head><body><header class=\"top\"><small>"+SITE_ORGANIZATION_CAPS+" · DEFECT LOG</small>"+
   "<h1>Bus "+escapeHtml(bus.n)+"</h1>"+
   "<b>"+escapeHtml([area,bus.status,countLine(defects)].filter(Boolean).join("  ·  "))+"</b>"+
   "<b>"+escapeHtml(stamp)+"</b></header>"+cards+

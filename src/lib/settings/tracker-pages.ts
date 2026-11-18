@@ -14,6 +14,20 @@ export const TRACKER_PAGES:readonly TrackerPage[]=[
  {href:"/defect-log",label:"DEFECT LOG"},
  {href:"/fixed-repairs",label:"FIXED REPAIRS"},
  {href:"/lists",label:"FLEET CAMPAIGNS"},
+ /* The two surfaces that are about PEOPLE AND PLACES rather than about buses,
+    added the night Curtis slipped on oil in the shop.
+
+    They sit here rather than inside the Defect Log because a defect is
+    attached to a fleet number and these are not: the oil was on the floor,
+    it belonged to no bus, and filing it against one would have buried a
+    safety record in a maintenance history. Curtis: "you're right it doesn't
+    belong in defect".
+
+    SHOP TALK is deliberately next to INCIDENTS, because it is the cheap
+    version of one — a hazard posted and cleared is an incident that never
+    had to be filed. */
+ {href:"/incidents",label:"INCIDENTS"},
+ {href:"/shop-talk",label:"SHOP TALK"},
  /* The gear is a page now. Every settings panel in the app lives behind it,
     so the per-page gear buttons are gone. */
  {href:"/settings",label:"⚙ SETTINGS"},

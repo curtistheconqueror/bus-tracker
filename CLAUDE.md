@@ -11,8 +11,9 @@ surface.
 ## What it is
 
 An offline-first fleet maintenance app for the Pace South garage, used by shop
-foremen and mechanics on phones and one shop computer. Five surfaces: Facility
-Map, Down Sheet, Defect Log, Fixed Repairs, Fleet Campaigns.
+foremen and mechanics on phones and one shop computer. Seven surfaces: Facility
+Map, Down Sheet, Defect Log, Fixed Repairs, Fleet Campaigns, Incidents, Shop
+Talk.
 
 **Offline-first is not a feature, it is the premise.** Everything lives in the
 device's LocalStorage and works with the garage wifi down. Anything that syncs
@@ -40,6 +41,92 @@ Claude pushes to `main` and mirrors the same tree to `claude-contributions`:
 ```
 git checkout claude-contributions && git read-tree --reset -u main
 ```
+
+## Two things every new feature has to keep true
+
+Curtis, as a standing design spec rather than a task: *"as we add new features
+to this, to the site overall, we need it to be constructed in such a manner
+where our MCP integration will work fine, and also when we're ready to ship
+this app — if we're ready to give it to like Pace or any other organization
+where they can seamlessly plug it into their own infrastructure, whether
+they're beyond their private servers or otherwise — we have to always keep that
+design spec in mind."*
+
+Neither is a feature to build. Both are constraints a change either respects or
+quietly breaks, and the second one the app does not satisfy today.
+
+### 1. THE MCP READS THE APP'S OWN FUNCTIONS, so the rule is where logic lives
+
+**PR39** (`POST /api/mcp`, open and unmerged, five read-only tools) answers
+questions by calling the same functions the buttons call — `mysteryBusIds`,
+`locationLabel`, `buildFleetStatusReport`, `normalizeDefects`, and the cloud's
+own three payload and three merge functions in the same order a device's pull
+uses. Its own words: *"a tool that did its own arithmetic would be a second
+implementation of a rule, and the five copies of the location table are what
+that costs."*
+
+So the MCP constraint is already written in `docs/ARCHITECTURE.md` and is worth
+restating with its consequence: **a rule that lives in a page component is
+invisible to the MCP.** Put the decision in `src/lib/<area>/` as a `.ts` with no
+JSX and storage passed in; let the page call it. A window, a filter, a count or
+a label computed inline in a `page.tsx` has to be reimplemented in the route to
+be answerable, and then there are two of it.
+
+Two more, both already true and both cheap to break:
+
+- **A bus is addressed by FLEET NUMBER.** A bus id is device-local, so an id
+  means nothing to an agent. Anything an agent might ask for keys on the number.
+- **Every answer carries `asOf` beside `fetchedAt`.** The records live in each
+  device's LocalStorage and the cloud is a copy, so a feature that reports fleet
+  state needs to be able to say when it was last heard. What never travels stays
+  invisible: a HOLD, FULL SWEEP, the roles, the shift hours, PATH TO REPAIR, the
+  repair-hours ledger, the undo ledgers.
+
+Its security position is recorded, open, and not to be tidied away:
+`docs/MCP_SECURITY_FOLLOWUP.md` and `docs/AGENT_MCP.md`.
+
+### 2. ANOTHER GARAGE PLUGGING IT IN — what blocks it, measured
+
+The honest state: **the app is single-site today, and the obstacle is not
+branding.** Counted at this commit —
+
+| | what it is | where |
+| --- | --- | --- |
+| the yard's geometry | six independent descriptions of one building that must agree, plus **179 slot-prefix literals across 17 files** (`grep -rhoE` over `app src`, see below), some carrying BEHAVIOUR (`smart-status`, `mystery-buses`, `road-calls`) | `docs/roadmap/facility-config.md`, scoped and not built |
+| 52 listed storage keys (50 in use, 2 retired) | all prefixed `pace-`, and renaming one is forbidden above | the key list below |
+| the Shop Cloud | one project, one shop login, and RLS grants any authenticated user full insert and update | `supabase/migrations/0002_shared_records.sql` |
+| the MCP | one `MCP_TOKEN` with no issuer and no per-organisation identity | `docs/AGENT_MCP.md` |
+
+What is already portable and shows the shape of the answer: the **shift hours
+and pullouts** are device-editable because a contract is not a property of the
+software; the **site's own sections** come from `site-config.ts`; **`APP_NAME`**
+is one line; and the organisation's name is now **`src/lib/settings/site-identity.ts`**
+— it had been typed into four share modules and a fifth was added the day that
+file was written, which is how a string becomes unfindable.
+
+**That figure replaces "51 across 16 files", which was not reproducible by any
+reading and had been copied into three files.** The command the roadmap printed
+used `grep -rcoE`, where `-c` silently overrides `-o` and counts matching LINES
+rather than matches, and it searched `app` alone while the prose said `app src`.
+Measured at this commit, all three ways, so the next person can pick the one
+they mean:
+
+Spelled out in full, because a command with an `…` in it is a literal regex that
+matches four prefixes and returns a different number:
+
+```
+grep -rhoE '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   # 179 occurrences
+grep -rE   '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  65 matching lines
+grep -rlE  '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  17 files
+```
+
+**So the rule for a new feature is narrow and checkable:** do not add a seventh
+description of the building, do not hard-code the organisation's name or the
+site's geometry where a constant or `site-config.ts` can answer, and do not
+assume one shop, one cloud project or one token in anything that would have to
+be rewritten per customer. The big unbuilt piece stays
+`docs/roadmap/facility-config.md`, and pulling the site out of the code is the
+release that makes "seamlessly plug it in" true rather than aspirational.
 
 ## Agent budget
 
@@ -76,6 +163,8 @@ machine, because these sessions run in containers that are thrown away.
   fixed `height:38px`, which `min-height` cannot undo; that one cost two
   separate debugging rounds. Also covers broader-selector overrides and
   Tailwind class-name collisions.
+
+<!-- UI-only density preference: `pace-defect-log-card-view-v1` stores compact or detailed. It never stores repair records and is not synced. -->
 
 ## Things that will get you in trouble
 
@@ -142,6 +231,9 @@ the records
   pace-down-sheet-v1               Down Sheet entries
   pace-bus-lists-v1                Fleet Campaigns
   pace-bus-list-templates-v1       campaign column formats
+  pace-incidents-v1                INCIDENTS: what happened to a person, where
+  pace-shop-talk-v1                SHOP TALK: hazards, heads ups, suggestions
+  pace-heat-checks-v1              HEAT CHECKS: who checked which bus for heat, when, and what they found
 
 what the shop has taught it
   pace-parts-memory-v1             learned part numbers
@@ -169,8 +261,12 @@ the cloud's bookkeeping, per device
 
 per-device settings, never synced
   pace-app-mode-v1                 FULL or LITE on this device, and whether it was ever asked
+  pace-last-page-v1                the page this device was left on, reopened on a fresh start from the home screen
   pace-sweep-v1                    FULL SWEEP: when this walk began, and where from
   pace-role-v1                     the job title chosen on the home screen — COSMETIC, never a permission
+  pace-feedback-settings-v1        sound and vibration on this device, both OFF
+  pace-coach-v1                    the step-by-step helper on the defect form, OFF
+  pace-header-theme-v1             the app's header colour, and any per-page override
   pace-shift-settings-v1           when each shift runs, and the pullout times
   pace-sheet-ledger-v1             one compact snapshot per Down Sheet swap
   pace-board-settings-v1
@@ -188,11 +284,107 @@ per-device view state — which panel is open, what has been dismissed
   pace-down-sheet-soft-collapsed-v1    the DOWN SHEET's SOFT DOWN board, collapsed by default
   pace-down-sheet-idot-collapsed-v1    the DOWN SHEET's IDOT board, collapsed by default
   pace-defect-log-stats-open-v1
-  pace-defect-log-advanced-open-v1     ADVANCED ACTIONS, open or closed
+  pace-defect-log-advanced-open-v1     NO LONGER READ — ADVANCED ACTIONS starts collapsed on every visit (#49)
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
   pace-status-report-picks-v1          which boxes are ticked on the STATUS REPORT
+  pace-defect-log-card-view-v1         DETAILED or COMPACT cards on the Defect Log
 ```
+
+**`pace-last-page-v1` is where the app was left, and the app reopens there.**
+Curtis: *"when I leave phone app and go back in I want it to return to the tab
+I was using. Not default back to map. I was using the defect log."*
+
+It went back to the map because the manifest's start address is `/` and a
+phone closes a backgrounded app without saying so; the next tap on the icon is
+a fresh start there. The manifest cannot fix it: iOS reads the start address
+once, when the icon is made. So `src/lib/settings/last-page.ts` has two halves.
+**Remembering** is `pageMemory`, driven from an effect
+(`app/_components/last-page-live.tsx`), so a page is remembered only once it
+has come up. **Reopening** is a script the root layout writes at the top of
+every page, which runs before the page is drawn.
+
+**It only turns round a FRESH START OF AN INSTALLED COPY**, and all of these
+must hold: the first page of this run of the app (a mark in `sessionStorage`,
+written and read back first), no referrer, the bare `/` with no query, and the
+app running standalone. Each is a way of not bouncing somebody who tapped Map.
+A browser tab is never turned round. An installed copy on an iPad or a desktop
+is, the same as a phone.
+
+**A reopened page is ON PROBATION until it has stayed up.** The crash screen's
+only button is RELOAD, and the other way out of a page that would not draw was
+to close the app and open it again, which landed on the map. So the move is
+marked on the record before it is made, and the mark comes off only when the
+page has stayed up for `PAGE_SETTLE_MS` (two seconds); a fresh start that
+finds the mark stays on the map. That one does not depend on anything the
+broken page managed to write. A page whose crash (`pace-crash-report-v1`) is
+newer than the moment it was remembered is skipped as well, and if the mark
+cannot be written nothing moves.
+
+**Two cold reads each found a hole in that, and both are why it is shaped as
+it is.** Built first on the crash record alone: a page fails without leaving
+one when the phone is too full to save it, when its code never loads, and on a
+server error. Then with the mark coming off at the first draw: these pages
+read their records in effects AFTER the first draw, so one that throws on its
+own data had already been cleared, and was reopened on every start with no way
+to the map.
+
+**The network is asked first.** Pages load network-first, and wifi that is
+joined but dead hangs a request instead of failing it. The script asks for the
+page's headers and goes only when something answers or the request fails
+outright; a server answering with an error of its own is not gone to. After
+2.5 seconds of nothing it shows the map and stays for that run. A move that
+was started and has not arrived in another 2.5 seconds is stopped with
+`window.stop()` before the map is shown, so the map is not handed over and
+then taken away. **Where a browser will not stop a move, it still can be** -
+that is the one case left, and it has not been seen on a phone. `stop()` also
+ends whatever the map was still loading and any request it had in flight, a
+Shop Cloud pull included; what that costs has not been measured.
+
+**What the probation costs a good page, both known and left.** A page
+reopened, glanced at and pocketed inside the two seconds, on a phone that then
+closes the app, is still marked: the next start is the map. And a move that was
+started and stopped keeps its mark, because whether a stopped move really
+stopped cannot be read back - so that start, too, is followed by one on the
+map. Each costs one tap, and each errs toward the map.
+
+**The map underneath does not remember itself.** It loads behind the hidden
+screen while the script waits, and its own remembering would write "the map"
+over the page the person left: a start that gave up on slow wifi forgot the
+Defect Log for good. The script raises a flag on the window when it tries, and
+a map that was only fallen back to is remembered once somebody has touched it.
+
+**The script is a STRING, not a function written out with `toString()`.** It
+was the function first; the build re-prints a function, so what the tests ran
+was not what a phone was sent. A string is carried through as it is, the tests
+run that text by itself, and one of them finds it whole in the build. Nothing
+else checks it as code.
+
+The address only - never a `?scan=`, a search or an open form. Per device,
+never synced, and not in MASTER EXPORT. Every page can be reopened, Settings
+and Incidents included, and LITE does not change that.
+
+**EVERY PAGE, ON EVERY DEVICE, and that was asked and answered.** A shared iPad
+opens on whatever the last person left, Incidents included, which names who
+was hurt. Curtis, asked whether to leave Incidents and Settings out: *"Phone
+and shared iPad should act the same: reopen on whatever page I left, including
+Incidents, Settings and Defect Log. Only fall back to the map after a reset, a
+device restart, or something like that. I don't want to tap Defect Log every
+time I switch apps and come back 3 minutes later."* So do not add a list of
+pages that are skipped, and do not make the map the answer to anything that is
+not a page failing to draw or a network that will not answer. A device restart
+is NOT one of the things that lands on the map: a page cannot tell a restart
+from the phone closing the app, and the record is still there afterwards. A
+reset that clears the site's data is, because the record goes with it. **`pace-launch-seen`
+looks like a key and is the `sessionStorage` mark above.** The remembering
+half also registers the service worker, from every page: the map did that
+alone, and a fresh start that is turned round may never run the map's code.
+The note in `public/sw.js` that says registration runs "on every map load" is
+now short of the truth and was left, because changing that file's bytes
+re-installs the worker on every phone. There is no switch for any of this in
+Settings; one is a UI change and Curtis's call. **Never run on a phone:** that
+iOS starts a reopened home-screen app with an empty `sessionStorage` and no
+referrer is what the design rests on, and it was read, not measured.
 
 **`pace-sweep-v1` is one person's walk, and it never travels.** FULL SWEEP is a
 STATE rather than a sequence: the Facility Map can start it and so can the
@@ -248,6 +440,246 @@ length of that one" — with overlaps the sum double-counts every handover.
 Device-local for the reason the sweep is: it describes the building somebody is
 standing in, and a device that synced it would overwrite a garage running
 different hours.
+
+**`pace-feedback-settings-v1` is OFF, and the switch matters more than the
+sound.** Curtis: *"make sure the sound is off by default ok? Any sounds.
+Toggleable in settings."* When he asked, the app made no sound at all — no
+AudioContext, no Audio element, no audio file, no speech. The only thing a
+person could perceive without looking was the short buzz when a bus is picked
+up on the Facility Map.
+
+So the deliverable was never an off switch for a sound that does not exist. It
+is a tripwire a sound added in six months has to walk into:
+`tests/settings.test.mjs` scans `app/`, `src/` and `public/` and fails if a
+vibrate, an `Audio`, an `AudioContext`, a `speechSynthesis`, a `Notification`,
+a `showNotification`, an `<audio>` tag or an audio file path is named anywhere
+outside `src/lib/settings/feedback-settings.ts`.
+
+**It is a tripwire and not a proof.** It catches every ordinary way of adding a
+sound, including four that defeated its first draft — `createElement("audio")`,
+`new window.Audio`, an aliased `navigator`, and `Notification`, which rings and
+vibrates on Android and was not in the list at all. It does NOT catch
+`navigator["vib"+"rate"]()`, and no static token scan can. What it stops is
+somebody honest adding a chime without knowing there was a rule, which is the
+realistic failure.
+
+Comments are stripped by a **string-aware** scanner rather than a regex. The
+first version used `/\*[\s\S]*?\*\//g`, so a line holding `"https://x/*"`
+opened a pseudo-comment that swallowed real code after it — a planted
+`new Audio("/ding.mp3")` passed — while a `//` comment that did not start its
+line was never stripped at all, so prose about this rule failed the build. Two
+bugs in opposite directions, one cause. Strings are KEPT, because an audio path
+only ever lives in one, and a file extension is only matched after a quote,
+slash or `(`, so a `.wav` CSS class name is not an audio file.
+
+**One switch, two flags on disk, and they move together.** It was built as two
+switches on the reasoning that a buzz is not a sound. Curtis: *"Yes sound and
+vibration together."* The two fields stay only so that splitting them again is
+a UI change rather than a migration.
+
+**A mixed record is normalised on read**, and it has to be. A device that
+ticked only SOUND under the two-switch UI holds `{sound:true,vibration:false}`;
+read as-is, the single switch renders ON while holding a bus makes no buzz at
+all — the app's only perceivable feedback, silently missing, with no way out
+but toggling off and on. Either flag set now reads as both set.
+
+**Off is the safe read, which inverts `app-mode.ts` on purpose.** That file
+resolves an unreadable record to FULL, because taking pages away from a mechanic
+mid-shift is the worse failure. Here the generous reading is the harmful one, so
+anything that is not EXACTLY `true` — missing, corrupt, `"yes"`, `1` — reads as
+off, the spelling discipline `setBusHold` and the ledger's `gap` already follow.
+
+**`src/lib/settings/feedback-settings.ts` reads the setting at the moment of the
+buzz** rather than taking it as a prop. A flag plumbed from the page root goes
+stale, and a stale copy is a phone still buzzing just after somebody turned it
+off — which is the exact moment they are watching to see whether it worked.
+
+**`pace-coach-v1` is the step-by-step helper, and it points rather than
+gates.** Curtis: *"we need a little assistant highlighter... a highlight
+function that highlights each field that they need to address next so like the
+bus number being the first thing then after that the defects... and there may
+be a short message that can pop up and kind of point to the optional things
+that you can do and what would be next in case a person doesn't necessarily
+want to save a defect and recommended on the down sheet... it should be a
+toggle off and on for it."*
+
+**WHAT IT CALLS BLOCKING IS READ OFF THE FORM'S OWN REFUSALS**, and that is the
+whole correctness of it. `validateAndSave` refuses exactly five things — no
+bus, no category, a required count out of range, FIXED BY empty on a
+save-as-fixed where the device asks for initials, and a recent duplicate. So
+**the SPECIFIC DEFECT does not block a save**, which the form says in its own
+placeholder: *"or leave it and save the category alone"*. The first draft of
+`src/lib/defects/form-coach.ts` marked it required and marked REPORTED BY
+required too — `requireInitials` gates FIXED BY and never REPORTED BY — and
+both were simply false. A helper that says a field is needed when it is not is
+worse than no helper, because it is believed. The step is still the second stop
+on the walk, where Curtis put it; it just tells the truth about saving without
+it.
+
+**A BAR IN ONE PLACE AND A RING ON THE FIELD.** The message sits between the
+editor's header and the scrolling form, so it never moves; the ring is an
+outline on the live field. A tooltip floating beside each field in turn was not
+built, for three measured reasons: a block inserted above the live field pushes
+everything below it down, so the form jumps on every step; a floating card has
+to be re-measured on every scroll of a box that scrolls under a thumb, which is
+the bug the bus quick view was fixed for twice; and on a phone the field being
+pointed at is usually the one with the keyboard under it. **It does not scroll
+the form** — moving the page under somebody's thumb is the thing `BusSelector`
+already refuses to do with `autoFocus`.
+
+**The ring is set imperatively on an element the helper does not own.** Each
+coachable field carries `data-coach="<name>"` and an effect puts
+`data-coach-active` on whichever one the step names — the shape
+`header-theme-live.tsx` uses, and for the same reason: threading an `active`
+prop would mean a prop on three shared components and one CSS rule per step
+name, which drifts the moment a step is added. A renamed anchor would fail
+SILENTLY — the bar still says CHOOSE THE DEFECT and nothing lights up — so
+`tests/defects.test.mjs` reads the anchors out of the form, walks every step
+the module can produce, and insists the two sets are equal.
+
+**Off until somebody turns it on**, the rule every added behaviour here
+follows, and off is the safe READ as well: anything that is not exactly `true`
+is off, the spelling `feedback-settings.ts` uses. The × on the bar stops it for
+that one defect — the editor is keyed per defect, so reopening one gets it
+back — and Settings is the durable switch. Per device and never synced: it
+describes how one person wants the app to help them.
+
+Built for the Defect Log's LOG DEFECT form only, which is what was asked for
+and looked at first. Carrying it to another form means another anchor set and
+another walk, not another copy of the rule.
+
+**`pace-header-theme-v1` is the app's header colour, and it replaced five
+places that each decided one.** Curtis: *"B is fine all same color until I
+figure out a more solid color scheme because I do want to add some flare to
+it. Why is this not an option to color the headers differently in settings?"*
+
+It partly was, which is the whole problem. Three of the eight headers were
+already settable — the Facility Map through `--header-bg`, the Defect Log and
+Fixed Repairs through `--log-header` and `--fixed-header` — but through TWO
+page-level theme systems built when every page had its own gear, and the other
+five had the colour typed into a stylesheet. Nothing anywhere said what the
+APP's colour was. Measured before this: five different navies, two gradient
+angles, and flat against gradient.
+
+**ONE SHARED COLOUR AND A PER-PAGE OVERRIDE**, which is what was chosen when
+asked. Incidents' red and Shop Talk's green are gone from the default and are
+one override away. `src/lib/settings/header-theme.ts` owns it and
+`src/components/shared/header-theme-live.tsx` paints it, mounted ONCE in the
+root layout and following the route — the alternative is threading one value
+through eight pages that have nothing else in common, where a page that forgot
+to thread it keeps its old hard-coded colour silently, which is the bug this
+exists to remove. **Every header rule reads `--app-header-fill` with the APP'S
+DEFAULT as the fallback**, not that page's old colour. It WAS the old colour,
+on the reasoning that a render before this component has run should look like
+the app did — and this paints from an effect, so the browser has already drawn
+the server's HTML by then. Measured: Incidents came up rust and turned navy
+37ms later, Shop Talk came up green. Both are meant to be navy now, so the
+honest fallback is the colour the page will settle on.
+
+The Facility Map was missed by that first pass, because its fallback ran
+through `--header-bg`, whose own literal is the OLD `#06275c`: measured, it
+held that for 116ms while the other seven changed colour not at all, and with
+JavaScript off the eight drew two different navies. The lesson is the one this
+project keeps relearning — a fallback through a variable is a fallback to
+whatever that variable's literal is, and nobody looks at it. The Defect Log
+and Fixed Repairs still name their own page variable, which React writes
+inline; that is NOT "correct without JavaScript", because the server cannot
+read LocalStorage and writes the hook's default, which is the app default
+again. All eight open on one colour.
+
+**A PAGE THEME IS THE MIDDLE RUNG, and that was learned by measuring.** The
+Facility Map, the Defect Log and Fixed Repairs each offer Terminal, Black,
+Midnight and Tactical, in which the header colour is one member of a page-wide
+palette. Handing them the shared colour unconditionally was built first and
+measured at 430 on Tactical: a navy header block with the olive page starting
+at its bottom edge in a hard line, and the active nav tile still olive because
+it is keyed to the page's surface. Two apps stacked. So `resolveHeaderColor`
+is a three-rung ladder — **an override typed for this surface, then a
+non-default page theme, then the shared colour**. On the default theme, which
+is every device that has not opened those panels, all eight match; on a theme
+the page stays whole; and an override still wins over both, so Settings is
+never describing something a page will not do.
+
+**It asks whether the header COLOUR differs, not whether the theme NAME does**,
+and that distinction is the whole usefulness of the rung. `custom` is not a
+look somebody picked: both appearance panels set it when ANY colour in them
+changes, including one bus status colour or one section background. Read as a
+name, it took the Facility Map out of the shared setting on every device that
+had ever nudged a status colour — with the Settings row reporting *"its page
+theme decides this"* about a header nobody had chosen. `pageThemeHeader` in
+`src/lib/settings/page-header-themes.ts` is the one function all three callers
+use, so the module and the two pages cannot read one record and disagree: the
+theme TABLE answers first (the name is the fact, the stored palette is a copy
+of it, and a record can carry the name without the palette), the palette
+answers for `custom`, and a colour equal to that page's own default answers
+nothing at all.
+
+**THE INK COMES OFF THE SAME RUNG AS THE COLOUR**, and that is a correction.
+It shipped computing black-or-white for all eight headers, so Terminal's green
+`#61ff9d` and Tactical's `#e7ddb2` came out white on the three pages a theme
+decides. Curtis: *"Why did we have to change a theme?? The tactical theme.
+Themes should not be affected by default design."* He is right — a page theme
+is a designed pairing of a background and an ink, and taking half of it is not
+honouring it.
+
+So `resolveHeaderInk` walks the same ladder `resolveHeaderColor` does: an
+override typed for this surface is **computed**, a non-default page theme keeps
+**its own ink**, and the shared colour is **computed**. Rungs 1 and 3 are
+computed because those colours came out of a picker with no ink attached, and
+"white on a dark header" stops being true the moment somebody picks a pale one.
+The gate on rung 2 is the same `isHeaderColor(pageTheme)` expression the colour
+uses, so the two cannot come off different rungs; `pageThemeHeaderPair` returns
+the background and the ink as ONE value for the same reason. A theme with no
+ink of its own — `custom` on a device that stored a header colour and no header
+text — falls through to the computed one, because there is no pairing there.
+
+Measured at 1180: on Tactical the map header draws `#e7ddb2` and the Defect Log
+and Fixed Repairs `#f4e8b8`, their own; on the default theme all eight are white
+on navy; and with an override typed for the map and the Defect Log those two
+take the picked colour with BLACK computed on it while Fixed Repairs keeps
+Tactical's khaki. The Settings panel's contrast note is scored against the ink
+that will actually be drawn, not the one it would have computed.
+
+**An accent is not a header.** `--log-accent-text` exists because
+`--log-header-text` was doing both jobs: harmless while it came from the page's
+theme, and not harmless once it became the HEADER's computed ink — picking a
+pale header colour turned PATH TO REPAIR's heading, its buttons and the
+time-window chip black on the accent blue, measured 3.57:1, on surfaces that
+are not headers. An ink is computed for the surface it sits on or it is a
+guess.
+
+**The text colour is COMPUTED, never stored, and it is pure black or white.**
+The moment a background can be picked, "white on a dark header" is a trap: a
+light flare colour takes the page title with it. Whichever of the two reads
+better wins. It was a softer `#0b1b33` first; swept over the whole colour cube
+that bottoms out at 4.15:1, under AA on backgrounds the picker hands out,
+while `#000` floors at 4.58:1 because the two options bracket every background
+between them.
+
+**It is scored against BOTH ENDS OF THE GRADIENT**, which the first version
+did not do: the picked colour is only the bar's LEFT edge, and against the far
+end the cube floor was 3.37:1 while the function reported 4.58 and the Settings
+panel printed it. `headerContrast` is what the panel quotes and what the test
+sweeps. A gradient costs contrast at its far end and no lift avoids it — over
+the cube the floor is 3.86 at a 16% lift, **4.12 at 10%**, 4.39 at 4%, and
+4.58 only with no gradient at all — so the lift is 10% and the floor is
+written down rather than rounded up to a promise. The page title is 25px bold,
+which needs 3.0 for AA.
+
+**The gradient is 90deg, and that is not an angle the app used** — the
+literals it replaces were 110deg on two pages, 120deg on one and a vertical
+`linear-gradient(#0a326e,#041d47)` on the map, so there was none to preserve.
+A tilted gradient is height-dependent, and the Facility Map's header bar and
+the phone nav flush beneath it are two boxes of the same width and different
+heights that have always read as one block. Measured at 110deg: a 4-to-6 per
+channel step across that boundary, where the flat colour they shared before
+had none. At 90deg it is zero. **Both stops are plain hex**, computed in
+`headerStops` rather than left to CSS `color-mix`, so the colour the browser
+paints is the colour `headerTextFor` scored.
+
+Per device and never synced, like every appearance setting here: it describes
+what one person likes looking at, and a synced colour scheme repaints somebody
+else's phone mid-shift.
 
 **`pace-sheet-ledger-v1` exists because the app was throwing this away.** A
 scanned sheet REPLACES the live one, `pace-down-sheet-scan-undo-v1` keeps
@@ -358,6 +790,219 @@ repair marked done by the mechanic who did it becomes the finer signal and the
 sheet updates from it — at which point this ledger becomes the coarse check on
 that, not the only input.
 
+**`pace-heat-checks-v1` is a LOG OF CHECKS, not a sheet.** Curtis, on why the
+heat sheet is not a Down Sheet: *"the heat sheet needs to be shared and verify
+with multiple mechanics because a mechanic could be put on heat sheet duty"*,
+where the Down Sheet *"is just a snapshot of what currently happening during a
+shift"*. So a scan never REPLACES anything here. Each record is one person
+looking at one bus on one day — fleet number, `ok` or `no-heat`, the day, the
+initials — and a later check is added beside an earlier one, never over it.
+
+**Which buses are cold is NOT decided by this key.** A no-heat bus is a DEFECT
+(`A/C and HVAC` / `Heating - No heat`) on a bus that still runs — Curtis:
+*"they're letting them roll every day despite being cold because they're trying
+to make pull out"* — so it lives in the Defect Log, never on the Down Sheet,
+and No Heat Buses is the one list that says who is cold right now.
+`heatRoster` in `src/lib/defects/heat-check-log.ts` sets that list beside the
+last check; an open heat repair is not cleared by somebody saying the bus felt
+warm.
+
+**A line off the paper has an id made of what the line says**, so the same
+sheet photographed again, or on a second phone, logs no DATED line twice. A
+line with no date is named by the day it was read — with nothing in its place
+last winter's undated OK and this winter's were one check — so re-read on a
+later day it logs again: the same result twice, which moves no bus's standing.
+A tap in the app is the opposite and carries a random tail.
+
+**TWO DOORS FILL IT, AND THE BOARD IS WRITTEN ONE WAY FROM BOTH.** A photographed
+heat sheet is read on the **Defect Log** (SCAN HEAT SHEET, beside SCAN SWEEP),
+because that is where its results land and where the board is saved, undone and
+taken back out. The heat campaign is RUN from **Fleet Campaigns**, whose card
+links to that scanner and whose list takes a HEAT OK / NO HEAT tap at the bus.
+Both put a no-heat result on a bus through `src/lib/defects/heat-check-apply.ts`
+and nowhere else; Fleet Campaigns never writes the board itself — `fileHeatTap`
+takes STORAGE and reads the board fresh at the tap.
+
+**What a mark means is decided in `heat-check-import.ts`, not by the model.** The
+route returns the result cell AS WRITTEN. "N/R" reads as "needs repair" and as
+"no repair needed" equally well, so it was asked: Curtis — *"Yes N/R needs
+repair"*. A STRUCK-THROUGH row files nothing, closes nothing and is not logged:
+*"struck means fixed but I'll double check"*, and until he has, a pen line is
+nobody's finding.
+
+**A scanned heat defect is an ORDINARY defect.** Curtis: *"the defect itself has
+to be editable of course and be no different than logging one manually."* Its id
+carries the scan prefix only so SCAN BATCHES can take a wrong scan back out —
+and taking one out takes the checks that scan logged with it, from EVERY door:
+the panel, UNDO LAST and the AI Operator all end in `dropScanChecks`. The
+operator did not at first, and each bus the removed scan had called N/R dropped
+into VERIFY. A record somebody has since narrowed or written on is kept.
+
+**Taking a scan out puts each bus's STATUS back by the rule a save uses**, and
+only while the status is still the one that rule gives — `statusAfterDefectChange`
+in `defect-log-sync.ts`. Filing moved a bus in service to DEFECT; the removal
+used to rebuild the defects and leave it there, sixty buses reading DEFECT with
+nothing on them. A status somebody set since is left alone. It cannot return a
+status the filing itself flattened: a bus marked OUT with nothing downing it
+became DEFECT when the scan filed on it, as it would for a defect logged by
+hand. **PUT BACK stamps `scanRestoredAt`** beside the `updatedAt` it has to
+move, so a returned record still reads as untouched and the scan can be taken
+out again; and it leaves off a repair the bus already has open, which is what a
+re-scan between the removal and the PUT BACK would otherwise double. **It also
+leaves a No Heat record off a bus that is already on No Heat Buses** — the pair
+`applyHeatFiling` refuses to file, since "Heater boost pump" is not the same
+repair as "No heat" and the same-repair check cannot see it. Both doors say
+what was left off and why, from the restore's own counts (`scanRestoreLeftOff`,
+`scanRestoreNothingWords`).
+
+**A heat log that cannot be READ is not written over.** It draws as empty, and
+every write to it is refused and says why — the board's rule, for the case of a
+newer app's log on a phone still running an older page from its cache.
+
+**The review can only say no to a row it can see.** An N/R the reviewer unticks
+is neither filed nor logged; a row the RULES held back is unticked by rule and
+is still logged, because VERIFY is where it belongs. The OK buses are drawn as
+their own group — each one logged comes off the walking list — and an OK read
+below `HEAT_LOW_CONFIDENCE` is not logged at all, nor one whose date was
+written and cannot be placed: that went on as undated, and an undated line
+counts from the day it was READ, so last winter's OK took a bus off this
+winter's walk. A held-back row the reviewer ticks and then unticks is a "no"
+like any other (`declined`), and is not logged either. **The OK chips still
+cannot be turned down one at a time** — a control on each is a UI change and
+Curtis's call. Two rows with one bus number
+collapse only when they are the same line on two photos: same mark, same date,
+same initials. Anything else is a misread number and goes to a person.
+
+**MASTER EXPORT carries it and a restore MERGES it**, the way the swap ledger is
+merged and for the same reason: it is events. **It does not SYNC**, which for a
+log whose whole reason is changing hands is the open gap. The no-heat DEFECTS
+already travel through the Shop Cloud like any defect; the checks — who looked,
+the OK results, who is still unchecked — stay on the device that recorded them.
+Carrying them needs a new table, which is a write to the live database and
+Curtis's call.
+
+**FOUR LIMITS, KNOWN AND LEFT.** (1) Two devices that each scan the same sheet
+before either has synced will each file their own defect for a bus: the checks
+dedupe by id and the defects cannot, because a deterministic defect id would
+collide with the tombstone a removed scan leaves. Scan on one device, or sync
+first. (2) A scan that files NO defect leaves no batch for SCAN BATCHES. UNDO
+LAST takes its checks back out, but only while it is still the last thing done
+on the Defect Log AND the page has not been left — the undo is held in the
+page, not on disk. After that a wrong check is corrected by the next check on
+that bus.
+(3) An undated line off the paper never outranks a dated check — all that is
+known is that it was written before the photo. (4) UNDO THIS TAP takes back the
+check and never the defect a NO HEAT tap opened; that is the Defect Log's to
+correct, which is why the tap asks first.
+
+**THE PHOTO READ ITSELF HAS NEVER BEEN RUN.** Everything after the route was
+driven in a browser with the route's answer stubbed; `/api/heat-sheet-scan`
+needs the OpenRouter key and has not seen a real photograph. Its first real
+sheet is the test of its prompt.
+
+**THE WALK HOLDS STILL ONCE IT HAS STARTED.** `heatRoster` ranks worst-first,
+which is what somebody wants when a walk starts and not once it is under way: a
+NO HEAT tap sent that bus to the top and slid every row it passed down one,
+under the thumb that had just tapped. Curtis, asked: *the row stays where it is
+and just changes how it's marked; the list only re-sorts when you leave and
+come back.* So `heatWalkRoster` (`heat-check-log.ts`) draws the walk's own
+order — bus numbers pinned at the first RECORDED check, not on mount, so the
+list still opens ranked — and it is dropped on a lane change or on closing the
+list. A held row stays even when its new standing would take it out of the
+lane; a bus that arrives mid-walk from another device goes on the end. **Every
+recorded check adds what is on the screen to the held order, not only the
+first** (`heatWalkPin`): a newcomer drawn on the end was in nobody's held order,
+so HEAT OK on it took its row out from under the next one — the thing the hold
+exists to stop.
+
+**Only a recorded check pins it.** `checkHeat` reports whether it filed, because
+a tap can be refused — no initials, a cancelled NO HEAT question, a log that
+will not take the check — and a refused tap that pinned froze the list on a
+gesture that wrote nothing. **One case is left:** when the check could not be
+saved but its No Heat defect WAS opened, `checkHeat` also reports false, so the
+board changes and the list is not held. Read, not measured.
+
+**The held order is in-memory and nowhere else** — not stored, not synced, and
+not answerable by the MCP route. And **the lane tab counts the whole roster
+while the rows come from the held order**, so TO DO can read 6 above eight
+rows, two of them marked HEAT OK. That follows from what was chosen; making the
+count follow the held list is a second decision and Curtis's.
+
+**A/C BUSES IS COOLING, NOT THE WHOLE CATEGORY.** The filter's words match the
+CATEGORY "A/C and HVAC", so every heating repair in it answered too — measured,
+one cooling fault and two no-heat buses read as three A/C buses. Curtis chose
+to narrow it. Heating is excluded by the catalog's HEATING GROUP and nothing
+else, through the one expression the heat walk also turns on
+(`HVAC_HEATING_GROUP` in `quick-filters.ts`): two spellings of "this is the
+heating group" would eventually disagree, and a bus on both lists or neither is
+how that shows up. Run over the whole catalog: the 24 repairs under A/C and HVAC
+split 18 to A/C and 6 to the heat walk, none on both, none on neither.
+**Controls and Blowers stays A/C on purpose** — one of its repairs is "Operator
+A/C blower". **It moves three surfaces:** the Defect Log's A/C Buses list, the
+campaigns card that links to it, and the Facility Map's A/C highlight and
+quick-filter count.
+
+**THE A/C CARD STILL PRINTS NO NUMBER, for a different reason.** It is an idle
+spring campaign whose own text says it is not running; a live count on it is a
+question for whoever starts that walk, not a leftover of the counting bug.
+
+**`pace-incidents-v1` and `pace-shop-talk-v1` are about PEOPLE AND PLACES, not
+buses.** Added the night Curtis slipped on oil in the shop. A defect is attached
+to a fleet number; the oil was on the floor and belonged to no bus, so filing it
+against one would have buried a safety record in a maintenance history. Curtis:
+*"you're right it doesn't belong in defect"*.
+
+**The only required field on an incident is WHAT HAPPENED.** Curtis asked for it
+in those words — *"don't make any of the fields except for the ones that matter
+mandatory to save the incident"* — and the reason outlasts the convenience: the
+incident most worth having is filed by somebody shaken, sore, or halfway out the
+door. A form that refuses to save over an empty witness box does not collect a
+better report, it collects no report. `care:""` is *not recorded* and is
+deliberately distinct from `"none"`; reading a blank box as "no treatment
+needed" would have the app inventing a medical fact.
+
+**The time it HAPPENED is editable and the time it was FILED is not.** Reports
+get written an hour later or the next morning, and the gap between the two is
+itself a fact about how one came to exist. An edit keeps the record and its
+filing stamp — a correction to an incident is still that incident.
+
+**The shift is resolved once and STORED**, the rule `pace-sheet-ledger-v1`
+follows: if somebody edits the garage's hours in six weeks, the shift a fall
+happened on must not migrate to another crew. It is resolved from when it
+HAPPENED, not when it was filed, so a fall at 23:50 written up at 00:20 belongs
+to the night crew who were on the floor.
+
+**INCIDENTS IS DEVICE-LOCAL AND NEVER SYNCS**, for the reason a HOLD is: it
+names a person and an injury, and this app has no login, so a synced incident
+would put "who got hurt and how" on every phone with nothing deciding who may
+read it. Curtis chose that when asked. Sharing one is a deliberate act, and the
+screen says the app does not report it for anybody.
+
+**SHOP TALK is the cheap version of an incident.** A hazard posted and cleared
+is an incident that never had to be filed, which is why open hazards sort above
+everything and stay visible until somebody marks them handled. Nothing is
+deleted — "the oil in bay 7 was reported four times this month" is a fact that
+only exists if the first three are kept. The count on the board itself is OPEN
+HAZARDS only, because a count that includes suggestions stops meaning "go look
+now". **There is no nav badge** — `TrackerNav` draws labels and nothing else.
+An earlier version of this paragraph said there was one, in the same change
+that added the surface and did not build it; a badge on every page is a UI
+change and therefore Curtis's call before it exists, not after.
+Its not syncing is a limitation rather than a decision: carrying it would need
+the `shop_memory` migration, which is Curtis's call. **MASTER EXPORT does not
+carry `pace-shop-talk-v1` or `pace-incidents-v1` either** — `fleet-backup.ts`
+names its keys explicitly and neither is in the list, so a device move loses
+both. The Shop Talk screen used to claim the export carried it; it no longer
+does. Whether these two should ride that file is open: the argument for is the
+one PATH TO REPAIR won on — a hazard board does not re-learn itself — and the
+argument against, for incidents only, is that the file would then carry who
+got hurt onto another phone, which is the reason the surface does not sync.
+
+**Both draw their location list from `site-config.ts`**, never a prefix and
+never a hand-typed list — a sixth copy of that table would bring back the bug
+that named all 84 garage spaces "Main Garage". A bus, when one is involved, is
+remembered by FLEET NUMBER, never by a device-local id.
+
 **`pace-ptr-v1` is PATH TO REPAIR, and it is keyed to the REPAIR rather than
 to the defect.** Curtis: *"basically steps, general steps to point people in the
 right direction of how to get it repaired"* — refer to Cummins INSIGHT, check
@@ -407,10 +1052,71 @@ nothing decays, and when a figure looks wrong there is one place it came from
 and one person who put it there. The adaptive version stays parked by his
 decision, and this is the thing it would have to beat.
 
-**Three sources, most specific first**, in `src/lib/defects/defect-estimates.ts`:
-the hours typed on THIS defect, then this ledger, then the catalog's own
-estimate. The catalog is last because it is a guess made by somebody who has
-never stood in this garage.
+**Four sources, most specific first**, in `src/lib/defects/defect-estimates.ts`:
+**ESTIMATED TIME OF REPAIR** typed on this defect, then the billable hours typed
+on it, then this ledger, then the catalog's own estimate. The catalog is last
+because it is a guess made by somebody who has never stood in this garage.
+
+**`estimateHours` ON THE DEFECT IS NOT ONE OF THE BILLABLE HOURS BESIDE IT**, and
+that is why it is its own field rather than a relabelled one. `repairHours` and
+`diagnosticHours` are time WORKED — `src/lib/reports/work-time.ts` sums them per
+person per day — so an estimate written into either would land on somebody's
+work ledger as hours they never spent. It sits ABOVE them in the ladder because
+it is the only one of the four that answers the question being asked; the two
+only ever meet on a job that is part-billed and still open, since a completed
+repair adds nothing to the badge at all.
+
+**THE DEFECT LOG'S BOX OWNS IT, AND THE SHEET'S BOXES OWN THE SHEET'S.** One
+direction: a Down Sheet card BUILT from an estimated defect is seeded from it
+through `estimateFromHours` rather than from the catalog, at both places a card
+is built from a record. Nothing carries a sheet figure back onto the defect.
+
+**It was bidirectional for one commit, and a cold read measured what that
+does.** Type 6 in the Defect Log on a bus already on the sheet, then clear it:
+the card still holds the 360 minutes it was seeded with, so the next save of
+that row — changing the mechanic, ticking a card, anything — reads 360, finds it
+is not the catalog's 720, and writes the 6 straight back on. A cleared estimate
+that returns is the bug `workStates` and `downSheetRecommendation` are deleted
+rather than blanked to avoid. `{...linked}` in `applyDownEntryToFleet` keeps
+whatever the record holds, which is all that is wanted.
+
+**So an estimate already on the sheet is changed on the sheet.** The Defect
+Log's badge and a sheet row can therefore quote different figures for the same
+repair when the entry already existed — the sheet seeds only at creation. That
+is a known limit, not a claim to the contrary.
+
+**The Defect Log's WHAT WAS FOUND box MOVED to ADVANCED DETAILS.** Curtis:
+*"where it says optional what was found replace this with estimated time of
+repair ... We have " description above, so it kind of redundant."* The estimate
+has that slot; the finding box sits beside DIAGNOSIS / TEST / VERIFICATION,
+which is what it answers, and a record carrying a finding opens that section so
+it can be read. That form's DESCRIPTION is **ADDITIONAL DETAILS**.
+
+**Taking it off the page altogether was the first version, and it broke the
+open-defect case.** The Down Sheet's own finding box is inside
+`{item.done && …}` and Fixed Repairs lists completed repairs only, so an OPEN
+defect had nowhere left in the app to type a cause, read one already stored, or
+clear it — with the DIAGNOSED work state still on the form and nothing to say
+what was diagnosed. The FOUND BEFORE chips moved with the box, so
+`pace-findings-memory-v1` is offered on all three surfaces again.
+
+**AN UNFINISHED DOWN SHEET CARD HAS NO OPINION ABOUT WHAT WAS DONE**, and that
+was a fix. `applyDownEntryToFleet` wrote `clean(target.actionTaken)||linked?.…`
+and its three neighbours for every card, finished or not, so a card still
+holding an old wording restored it onto the record on the next save of that
+row — and a finding or a figure cleared in the Defect Log came straight back.
+Everything the sheet collects about finished work sits in ONE `{item.done && …}`
+block in the editor — FIX / STEPS TAKEN, WHAT WAS FOUND, REPAIR HOURS and
+DIAGNOSTIC HOURS — so all four carry the same staleness and all four are now
+gated on the repair being completed. The card keeps its own copies; re-ticking
+it speaks for the sheet again.
+
+The gate is `target.done||entryCompleted`, which is **wider than the box**:
+setting the whole ENTRY to Completed without ticking a card still writes that
+card's stored values. Deliberate — marking the entry complete is a statement
+that the work is done, and the card's text is the only account of it there
+is — and the alternative loses fix details on every entry somebody completes
+without ticking each card first, which is the commoner gesture.
 
 **Keyed per SPECIFIC REPAIR, not per category**, through the same
 `repairIdentityKey` PATH TO REPAIR uses — one function, so a writeup and a time
@@ -544,7 +1250,10 @@ renaming one throws away what the device already holds. The name records where
 the panel used to live; the value is still "is this panel collapsed".
 
 `pace-locate-ack`, `pace-touch-drop` and `pace-open-quick-filter` look like keys
-and are not — they are CustomEvent names.
+and are not — they are CustomEvent names. **`pace-header-theme-v1` is BOTH**:
+the storage key, and the name Settings dispatches on `window` so the page it
+is on repaints without waiting for a `storage` event, which only ever fires
+in the OTHER tabs. One name for one thing changing, deliberately.
 
 **The two tombstone ledgers are load-bearing.** The merges are additive by
 design — they keep every record the receiver alone holds — so a removal can
@@ -556,6 +1265,195 @@ Grouped catalog categories are held in **two** structures that must stay in
 step: `REPAIR_OPTIONS` (the stored identity, prefixed `"Group - Item"`) and
 `REPAIR_OPTION_GROUPS` (the bare names the picker draws).
 
+## SCAN SHEET: one door in front of the three scanners
+
+Three sheets get photographed — the Vehicle Down Sheet, the farebox / Ventra
+sweep, the heat check sheet — and the person holding the paper had to know
+which button on which page reads which. The Down Sheet's **SCAN SHEET** button
+now takes the photo, asks one cheap question of a small copy of it
+(`/api/scan-identify`: which sheet is this), and opens THAT sheet's own scanner
+with the photos in it. It reads no rows and files nothing. **It adds no storage
+key.**
+
+**THE DOOR IS THE BUTTON THE DOWN SHEET ALREADY HAD, AND THERE IS NO FOURTH.**
+It was built as a separate button called SCAN PAPER, on both pages, beside the
+three scanners' own. Curtis, before it was published: *"I'd rather the current
+scan button just do the job"*, and *"we will put the other button on the back
+burner."* So SCAN SHEET opens the door; the Defect Log has none and its SCAN
+SWEEP and SCAN HEAT SHEET open their scanner directly, as they always did. The
+name is one constant, `PAPER_DOOR`, drawn by the button, the box it opens and
+the Down Sheet scanner's own heading.
+The code says "paper" for the thing photographed because a Down Sheet is one
+of three kinds of it.
+
+**WHAT THAT COSTS, because it is not free.** Every Down Sheet scan now pays the
+first look — a few seconds and a small read — where it used to open the scanner
+at once. And **no button on the Down Sheet opens its scanner except through the
+door**, so the door must never be a dead end. Every screen the look can leave a
+person on has a way past the look:
+
+- **the look fails** — no signal, no key, a refusal, or `PAPER_LOOK_MS` (20
+  seconds) with no answer: every sheet is offered with every page. The time
+  limit is there because wifi that is joined but dead does not fail a request,
+  it hangs it, and the box would sit on WORKING with only CANCEL to press;
+- **the look is SURE AND WRONG about the whole batch** — a Down Sheet read as a
+  heat sheet — it offers to open the other page, and beside that is NOT A HEAT
+  CHECK SHEET? PICK THE SHEET YOURSELF, which offers every OTHER sheet;
+- **the look is unsure, or the pages disagree**: the person is asked, and what
+  they are offered follows the look — a sheet no page read as is not offered,
+  and a page placed as another sheet is left out of each choice. Whenever that
+  is short of everything (`paperHoldsBack`), NOT RIGHT? SHOW EVERY SHEET, WITH
+  EVERY PAGE is under the choices.
+
+Both buttons end in `paperOverruled`, which **sends every page and drops the
+look's placements whole.** Applied to the new pick they would hold back every
+page the look had just placed. The two cases that made it necessary, found by a
+cold read of the first version, which had the way out on one screen only: a
+two-page Down Sheet read as a sweep and a heat sheet was offered those two and
+no Down Sheet; a three-page one with its last page read as a heat sheet could
+only ever be sent as two, into a scanner whose import replaces the live sheet.
+While SCAN SHEET also opened the scanner directly, the way round all of this
+was the other button. A test walks every combination of placements for one,
+two and three pages and holds that each sheet can be reached with every page.
+
+**A SCANNER THAT REFUSES PHOTOS THE DOOR SENT SAYS HOW TO GET PAST THE DOOR**
+(`paperSentWrongWords`). The sweep and heat scanners turn away a page that is
+not theirs and name the button that reads it — and for a Down Sheet that
+button is the door, which is what sent the page there.
+
+The one case with no way round on the same screen: the look is sure a HEAT
+sheet is a Down Sheet. It goes straight into the Down Sheet scanner, as
+pressing SCAN SHEET on that photo always did, and the way to read it properly
+is SCAN HEAT SHEET on the Defect Log.
+
+**The scanner can still be opened empty by ADDRESS**: `/down-sheet?scan=down-sheet`
+with no `photos=` opens it with nothing in it, the way the Fleet Campaigns link
+opens the heat scanner. No button on any page makes that address today.
+
+**PUTTING THE DOOR ON ANOTHER PAGE IS ONE BUTTON.** Curtis: *"we can just place
+this button anywhere we want for ease of access."* `ScanPaper` takes the route
+it is drawn on as `here`, and both pages already TAKE a hand-off off their
+address — the Down Sheet's receiver has no sender today and is kept for this.
+A page that reads none of the three sheets needs only the button and the
+component; one that reads a sheet also needs `onHere`, the way the Down Sheet
+does it. Where it goes is a UI change and his call first.
+
+**A NEW SHEET IS ONE ROW IN `src/lib/scan/paper-kinds.ts`, ITS SCANNER, AND THE
+LINE ON ITS PAGE THAT OPENS THAT SCANNER.** The table is what the first look's
+prompt is built from, what the screen names and lists the sheets from, and
+where the address a page is sent to comes from. The page's NAME is not in it —
+that is looked up in `tracker-pages.ts`. Do not type a sheet's description into
+the route, or a sheet's name into `scan-paper.tsx` in any spelling; tests hold
+both. The Defect Log names each of its sheets when it opens a scanner
+(`openScanner`) and has no `else`: an `else` opens the sweep scanner, empty,
+for whatever is added next.
+
+**THE APP ONLY DECIDES BY ITSELF WHEN EVERY PAGE AGREES**, and it trusts nothing
+the first look sends back (`paper-identify.ts`). An unknown kind, a page that
+was never sent, or a confidence under `PAPER_SURE` is not placed, never
+guessed. One unplaced page, or two pages placed as different sheets, and the
+person is asked — and told WHY each page was not placed, because "does not look
+like any of these sheets", "might be a heat check sheet, but the reader was not
+sure" and "could not be made out" are three different things to someone about
+to send that page somewhere.
+
+**A PAGE PLACED AS A DIFFERENT SHEET IS NOT SENT TO THE SCANNER THAT WAS PICKED.
+IT IS HELD BACK, AND THE SCANNER SAYS SO.** "Placed" is the `PAPER_SURE` line
+and nothing softer: an unplaced page goes with whatever the person picks. The
+count held back travels with the photos, and the scanner opens with an amber
+line telling the person to add the page back if it belongs. That line is there
+because the look can be confidently wrong: page three of a Down Sheet read as a
+heat sheet would otherwise be left out without a trace, and its buses would
+show as COMING OFF.
+
+**FOR THE DOWN SHEET, THE FIRST LOOK IS THE ONLY CHECK BEFORE A PERSON'S EYES.**
+The sweep and heat scanners each ask their own route what the page is and
+refuse one that is not theirs. The Down Sheet scanner does not —
+`down-sheet-scan` was never asked that — and its import REPLACES the live sheet.
+So a heat sheet the look calls a Down Sheet opens the replacing scanner, reads,
+and shows every row as FLEET MATCH, because all three sheets list real buses.
+That is no worse than SCAN SHEET was before it became the door, when it read
+whatever it was handed, and the review and the import's own confirm still
+stand in the way. It is still the weakest point here, and the fix is a document verdict
+on the Down Sheet route — which changes a production prompt and needs a key to
+prove, so it is not in this change.
+
+**THE PHOTOS CROSS PAGES IN MEMORY AND NOWHERE ELSE** (`paper-handoff.ts`). Not
+LocalStorage, not the address, not an upload to be fetched back: a photographed
+sheet carries names and initials, and the only copy this app has ever kept of
+one is the one in the camera roll. Memory only survives a change of page that
+does not reload the app, so **this is the one place the app moves with the
+router (`router.push`) instead of a full page load.** Every other link here is
+a full load on purpose — it rehydrates LocalStorage across surfaces — so do not
+copy this elsewhere without that reason. The address still carries `?scan=` and
+`photos=N`, so a page that is reached by a reload instead can tell "nobody sent
+any" from "they were sent and did not make it", and says so. **All of them or
+none:** a hand-off that does not match the count in the address is treated as
+lost outright.
+
+**WHEN THE ROUTER CANNOT MAKE THE MOVE, IT FALLS BACK TO A PAGE LOAD BY ITSELF**
+and the scanner that opens says the photos were lost. That happened for real
+during the browser checks — the dev server answered one page fetch with a 500 —
+and the destination did exactly that. The fallback is vinext's, not ours:
+`push` returns before the move happens, so the `catch` around it in
+`scan-paper.tsx` only ever sees an address the router refuses outright.
+
+**MOVING WITHOUT A RELOAD LEAVES BOTH PAGES' STYLESHEETS LOADED.** No reload ever
+produces that state, so a browser check that reloads will never see it. So a
+class this feature adds to a page stylesheet must be one the OTHER page's
+sheet does not also style: today that is `.scan-handed` on the Down Sheet and
+`.sweep-handed` on the Defect Log, the line a scanner shows when it was handed
+photos. The door's own styles are all `.paper-` and live with the component.
+
+**What the other page's stylesheet does to a page it was never written for,
+measured on the built worker** while the door was on both pages — only the
+first of the two moves below can happen today, the second needs a door on the
+Defect Log again — by comparing every element against a fresh load
+of the same page: the Defect Log reached from the Down Sheet had 78 of 80
+elements identical, the other two being `<html>` and `<body>`, whose colour and
+background take the Down Sheet's — not visible, because the page's own root
+covers both. The Down Sheet reached from the Defect Log had 138 of 148
+identical; the five board collapse toggles and their wrappers drew 44px where a
+fresh load draws 38px, because `defect-log.css` still styles `.mystery-toggle`
+from when that board lived there. It lasts until the next full page load, which
+is the next tap on any nav link. That was one board state on one width, not
+every state: two page stylesheets sharing class names is a risk this feature
+introduced and did not remove. If it ever shows as more than six pixels, the
+fix is to stop moving softly and carry the photos another way.
+
+**A SCANNER HANDED PHOTOS READS THEM WITHOUT A SECOND PRESS — ONCE.** Reading is
+all that happens unasked: the review, the ticks, the approve button and its
+confirm are untouched. On the two scanners that keep notes, the read waits
+until the kept notes are in the box — started a render earlier it sends none
+and then writes "none kept" over them. **The cost:** notes for this one scan
+cannot be typed before that first read. Kept notes go with it; for a one-off
+note, CHANGE PHOTOS comes back to the ordinary first screen and reads again.
+**Since SCAN SHEET became the door this is every Down Sheet scan**, not only
+one that arrived from another page: the scanner's own first screen, where a
+note is typed before reading, is reached only through CHANGE PHOTOS, and a
+one-off note therefore costs a second full read. Curtis was told; making a
+same-page hand-off wait for its own READ press is the alternative, at the price
+of pressing READ twice on every scan.
+
+**CANCEL MEANS CANCEL.** A look outlives the press that started it. Closing
+the box aborts the request and ignores anything already on its way back; it
+used to let the answer open a scanner and send the full-size photos after the
+person had backed out. Once the page is being left, both ways of closing go
+dead instead, because closing would not stop the move.
+
+**A HAND-OFF IS FOR ONE OPENING.** Both pages drop it when the scanner shuts —
+on the change from open to shut, not "whenever shut", which is also true the
+moment the page opens and raced the effect that takes a hand-off off the
+address. Left in place, the next press of SCAN SWEEP opens on yesterday's
+photos and starts reading them.
+
+**What has never been run:** `/api/scan-identify` against a real photograph. The
+development machine has no OpenRouter key, so every browser check drove the
+screens with the route's answer stubbed. The design assumes the look is wrong
+sometimes; how often is not known. "Cheap" is also relative: the look uses
+`SCAN_IDENTIFY_MODEL` if one is set and otherwise the Down Sheet scan's model,
+so its cost follows whatever that is.
+
 ## Checking your work
 
 ```
@@ -563,6 +1461,17 @@ npm test          # builds, then runs every file in tests/
 npm run lint
 npm run build
 ```
+
+**A COLD READ of the diff, before any push that carries a code change.** One
+subagent, handed the diff and the question and never your reasoning — a
+reviewer given your conclusion returns it to you agreed with. Read the whole
+change against `main`, not the last commit: two of the defects this has caught
+were invisible in a single-commit diff. **Every finding gets answered** — fixed
+in a named commit, or declined with the reason on the record — because a pass
+nobody must answer is not a gate. It does not replace the three above or your
+own reading, and it is never the sole witness to a claim. The mirror push
+carries no diff of its own and needs none. Why this is a gate, and what it has
+caught: `.claude/skills/fresh-context-review`.
 
 **Measure the UI in a real browser rather than reading the CSS.** Chromium is at
 `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`; `npm run dev` serves on
@@ -591,6 +1500,12 @@ app/<route>/_components/             React drawn by exactly one route
 src/lib/fleet/bus-hold.ts            HOLD THIS BUS: the field, what lifts it, the held list
 src/lib/fleet/location-label.ts      slot id -> the words a person says, trouble bays included
 src/lib/defects/repair-catalog.ts    the defect catalog, rename maps, count fields
+src/lib/defects/heat-check-import.ts the heat sheet's rules: what a mark means, what may be filed
+src/lib/defects/heat-check-log.ts    the heat check log, the roster, the list to hand out
+src/lib/defects/heat-check-apply.ts  putting a no-heat result on a bus, for the scan and the tap
+src/lib/scan/paper-kinds.ts          the sheets this shop photographs, and which page reads each
+src/lib/scan/paper-identify.ts       which sheet a photo is, and what to ask when it is not one answer
+src/lib/scan/paper-handoff.ts        getting the photos to the scanner that reads them, in memory
 src/lib/storage/section-transfer.ts  per-section device transfers and their merge rules
 src/lib/storage/storage.ts           storage keys, envelopes, recovery snapshots
 app/globals.css                      the whole facility map, all breakpoints

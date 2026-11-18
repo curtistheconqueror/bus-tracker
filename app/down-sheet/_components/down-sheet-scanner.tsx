@@ -3,6 +3,7 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 import {REPAIR_OPTIONS,repairCategoryLabel} from "@/src/lib/defects/repair-catalog";
+import {unreadBusNumbers} from "@/src/lib/down-sheet/scan-multi-bus";
 import {describeLineGaps,isMarginRow,mergeReviewedRows,normalizedSection,reviewScannedRows,scannedLineGaps,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "@/src/lib/down-sheet/down-sheet-scan-import";
 import {knownMechanicNames} from "@/src/lib/down-sheet/scan-spelling";
 import {downSheetGroup,downSheetGroupLabel} from "@/src/lib/down-sheet/down-sheet-view";
@@ -10,6 +11,8 @@ import {scannedSheetRemovals,type ReplaceDownEntry} from "@/src/lib/down-sheet/d
 import {scanReadyPhoto} from "@/src/lib/defects/scan-photo";
 import {readScanNotes,rememberScanNotes,SCAN_NOTES_KEY,SCAN_NOTES_LIMIT} from "@/src/lib/defects/scan-notes";
 import {writeSetting} from "@/src/lib/storage/storage";
+import {handedStart,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
+import {PAPER_DOOR} from "@/src/lib/scan/paper-kinds";
 
 type SelectedPhoto={file:File;url:string;key:string};
 
@@ -19,6 +22,10 @@ type Props={
  defaultShift:"1st"|"2nd"|"3rd";
  onClose:()=>void;
  onImport:(records:ScanImportRecord[])=>void;
+ /* Set when SCAN SHEET was the way in: the photos it took, already identified
+    as this scanner's sheet. Absent only when the page was opened at an
+    address asking for this scanner with no photos. */
+ handed?:HandedPhotos|null;
 };
 
 const MAX_FILES=6;
@@ -26,12 +33,18 @@ const MAX_FILES=6;
    margins lands here; clean printed rows do not. */
 const LOW_CONFIDENCE=0.75;
 
-export default function DownSheetScanner({fleet,currentEntries,defaultShift,onClose,onImport}:Props){
- const [photos,setPhotos]=useState<SelectedPhoto[]>([]);
+export default function DownSheetScanner({fleet,currentEntries,defaultShift,onClose,onImport,handed}:Props){
+ /* Asked once, when the scanner opens. A hand-off is for this opening only. */
+ const [start]=useState(()=>handedStart(handed,"down-sheet"));
+ const [photos,setPhotos]=useState<SelectedPhoto[]>(()=>start.files.slice(0,MAX_FILES).map((file,index)=>({file,url:URL.createObjectURL(file),key:`handed-${index}-${file.name}-${file.lastModified}`})));
+ /* The lines that say SCAN SHEET opened this stay up only while the photos
+    are the ones it handed over. Once a photo is added or taken away they
+    describe a batch that is no longer the one on screen. */
+ const [fromPaper,setFromPaper]=useState(true);
  const [rows,setRows]=useState<ReviewedScanRow[]>([]);
  const [busy,setBusy]=useState(false);
  const [progress,setProgress]=useState("");
- const [error,setError]=useState("");
+ const [error,setError]=useState(start.lost);
  /* What the person holding the sheet knows the camera will get wrong — "line
     23 is 17565", "the margin name is Carlos". Sent with every page. Remembered
     on the device only when asked, so a one-off correction does not come back
@@ -42,7 +55,11 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
 
  useEffect(()=>{photosRef.current=photos},[photos]);
  useEffect(()=>()=>photosRef.current.forEach(photo=>URL.revokeObjectURL(photo.url)),[]);
- useEffect(()=>{const kept=readScanNotes(localStorage.getItem(SCAN_NOTES_KEY),"down-sheet");if(kept){setNotes(kept);setKeepNotes(true)}},[]);
+ /* Whether the kept notes have been looked for yet. A read that starts by
+    itself has to wait for this: started a render earlier it would send no
+    notes, and then write "no notes kept" over the ones the device was holding. */
+ const [notesLoaded,setNotesLoaded]=useState(false);
+ useEffect(()=>{const kept=readScanNotes(localStorage.getItem(SCAN_NOTES_KEY),"down-sheet");if(kept){setNotes(kept);setKeepNotes(true)}setNotesLoaded(true)},[]);
  const imports=useMemo(()=>mergeReviewedRows(rows),[rows]);
  const comingOff=useMemo(()=>scannedSheetRemovals(currentEntries,imports.map(record=>record.busId)),[currentEntries,imports]);
  /* Two different doubts, and only one of them was ever shown.
@@ -59,22 +76,51 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
     the bus goes out broken. Blank lines are normal, so this reports rather
     than blocks. */
  const lineGaps=useMemo(()=>scannedLineGaps(rows),[rows]);
+ /* THE BUSES A LINE NAMES THAT NO ROW CAME BACK FOR, which LINES NOT READ
+    above cannot see: that counts printed numbers, and this line arrived — it
+    arrived carrying nine bus numbers in its words and one row. Curtis's IDOT
+    line is the case. Eight buses down on the paper and absent from the app,
+    with nothing on screen saying so, is the exact failure the gap warning
+    beside it was written for. */
+ const unread=useMemo(()=>unreadBusNumbers(rows),[rows]);
 
+ /* THE PHOTOS ARE FROZEN WHILE A READ IS RUNNING, the rule the heat scanner
+    learned first. A read is about the photos it was started with. With these
+    live, a page added mid-read never reached the review, the review then hid
+    the photo strip, and what was approved was a sheet with a page missing —
+    here that is buses coming off a sheet the import REPLACES. It mattered
+    less while a read only ever began with a press; a hand-off starts one by
+    itself, so the window is open the moment the scanner is. The file inputs
+    are locked with the buttons: they are invisible, and a keyboard could
+    otherwise still reach one and open a dialog under a read.
+
+    THE NOTES ARE FROZEN WITH THEM. A read sends the notes it was started
+    with, and saves "keep these" as it was ticked then. Left live, a
+    correction typed while the read ran was in neither the read nor the kept
+    copy, and the review that followed hid the box it was sitting in: the
+    person had told the app something and nothing said it was not used. They
+    are live again when the read ends: CHANGE PHOTOS goes back to the first
+    screen, and the next READ press sends whatever is in the box then.
+
+    The cost, on a hand-off only: the read starts by itself, so a note can no
+    longer be typed WHILE it runs and kept for the next one. It has to wait
+    for the read to end. */
  const addPhotos=(files:FileList|null)=>{
-  if(!files)return;
+  if(!files||busy)return;
   const incoming=Array.from(files).filter(file=>["image/jpeg","image/png","image/webp"].includes(file.type));
   setPhotos(current=>{
    const available=Math.max(0,MAX_FILES-current.length),next=incoming.slice(0,available).map((file,index)=>({file,url:URL.createObjectURL(file),key:`${file.name}-${file.lastModified}-${index}-${Math.random()}`}));
    if(incoming.length>available)setError(`Use no more than ${MAX_FILES} photos.`);else setError("");
    return [...current,...next];
   });
+  setFromPaper(false);
   if(cameraRef.current)cameraRef.current.value="";
   if(uploadRef.current)uploadRef.current.value="";
  };
- const removePhoto=(key:string)=>setPhotos(current=>{const removed=current.find(photo=>photo.key===key);if(removed)URL.revokeObjectURL(removed.url);return current.filter(photo=>photo.key!==key)});
+ const removePhoto=(key:string)=>{if(busy)return;setFromPaper(false);setPhotos(current=>{const removed=current.find(photo=>photo.key===key);if(removed)URL.revokeObjectURL(removed.url);return current.filter(photo=>photo.key!==key)})};
  const updateRow=(key:string,patch:Partial<ReviewedScanRow>)=>setRows(current=>current.map(row=>row.key===key?{...row,...patch}:row));
  const readSheet=async()=>{
-  if(!photos.length)return;
+  if(!photos.length||busy)return;
   setBusy(true);setError("");
   writeSetting(localStorage,SCAN_NOTES_KEY,rememberScanNotes(localStorage.getItem(SCAN_NOTES_KEY),"down-sheet",notes,keepNotes));
   try{
@@ -97,6 +143,14 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
    if(!reviewed.length)setError("No bus repair rows were found. Try a clearer photo.");
   }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false);setProgress("")}
  };
+ /* PHOTOS THAT SCAN SHEET HANDED IN ARE READ WITHOUT A SECOND PRESS — once,
+    and only after the kept notes are in the box. Reading is all it does by
+    itself: the rows still stop at the review, and nothing replaces the sheet
+    until IMPORT APPROVED and its confirm. Notes KEPT on this device go with
+    it; notes for this one scan cannot be typed first — CHANGE PHOTOS comes
+    back to the ordinary first screen, where they can be, and reads again. */
+ const wantsRead=useRef(start.read);
+ useEffect(()=>{if(!notesLoaded||!wantsRead.current)return;wantsRead.current=false;void readSheet()},[notesLoaded]);// eslint-disable-line react-hooks/exhaustive-deps
  const approve=()=>{
   if(!imports.length){setError("Select at least one fleet-matched row.");return}
   if(!confirm(`Replace the current Down Sheet with ${imports.length} reviewed bus${imports.length===1?"":"es"}?\n\n${comingOff.length} bus${comingOff.length===1?" is":"es are"} coming off the current sheet. Physical locations and saved defects will remain unchanged. Omitted inspections return to service according to their unresolved defects.`))return;
@@ -117,24 +171,27 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
  useEffect(()=>lockPageScroll("scan-sheet-open"),[]);
  return <div className="down-shade scan-shade" role="dialog" aria-modal="true" aria-labelledby="scan-title">
   <section className="scan-modal">
-   <header className="repair-editor-head"><div><span>PHOTO IMPORT</span><h2 id="scan-title">SCAN SHEET</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header>
+   <header className="repair-editor-head"><div><span>PHOTO IMPORT</span><h2 id="scan-title">{PAPER_DOOR}</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header>
    <div className="scan-body">
+    {fromPaper&&start.note&&<p className="scan-handed" role="status">{start.note}</p>}
+    {fromPaper&&start.warning&&<p className="scan-handed held-back" role="alert">{start.warning}</p>}
     {!rows.length&&<>
      <div className="scan-intro"><b>ADD UP TO 6 PAGES</b><span>Photos are sent for processing only after you press Read Sheet.</span></div>
      <div className="scan-pickers">
-      <button type="button" onClick={()=>cameraRef.current?.click()}>📷 TAKE PHOTO</button>
-      <button type="button" onClick={()=>uploadRef.current?.click()}>⇧ UPLOAD FILE</button>
-      <input ref={cameraRef} className="scan-file-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event=>addPhotos(event.target.files)}/>
-      <input ref={uploadRef} className="scan-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event=>addPhotos(event.target.files)}/>
+      <button type="button" disabled={busy} onClick={()=>cameraRef.current?.click()}>📷 TAKE PHOTO</button>
+      <button type="button" disabled={busy} onClick={()=>uploadRef.current?.click()}>⇧ UPLOAD FILE</button>
+      <input ref={cameraRef} className="scan-file-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" tabIndex={-1} disabled={busy} onChange={event=>addPhotos(event.target.files)}/>
+      <input ref={uploadRef} className="scan-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple tabIndex={-1} disabled={busy} onChange={event=>addPhotos(event.target.files)}/>
      </div>
-     <div className="scan-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
-     <label className="scan-notes"><span><b>NOTES FOR THIS SCAN</b><small>{notes.length}/{SCAN_NOTES_LIMIT}</small></span><textarea value={notes} maxLength={SCAN_NOTES_LIMIT} rows={3} onChange={event=>setNotes(event.target.value.slice(0,SCAN_NOTES_LIMIT))} placeholder="Anything the camera might get wrong. Line 23 is 17565. The margin name is Carlos. TIROS means tires. A note can correct how a row is read, never add a bus that is not on the sheet."/></label>
-     <label className="scan-notes-keep"><input type="checkbox" checked={keepNotes} onChange={event=>setKeepNotes(event.target.checked)}/><span>Keep these notes on this device for the next scan</span></label>
+     <div className="scan-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" disabled={busy} onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
+     <label className="scan-notes"><span><b>NOTES FOR THIS SCAN</b><small>{notes.length}/{SCAN_NOTES_LIMIT}</small></span><textarea value={notes} disabled={busy} maxLength={SCAN_NOTES_LIMIT} rows={3} onChange={event=>setNotes(event.target.value.slice(0,SCAN_NOTES_LIMIT))} placeholder="Anything the camera might get wrong. Line 23 is 17565. The margin name is Carlos. TIROS means tires. A note can correct how a row is read, never add a bus that is not on the sheet."/></label>
+     <label className="scan-notes-keep"><input type="checkbox" checked={keepNotes} disabled={busy} onChange={event=>setKeepNotes(event.target.checked)}/><span>Keep these notes on this device for the next scan</span></label>
      <button className="scan-read" type="button" onClick={readSheet} disabled={!photos.length||busy}>{busy?progress||"READING…":"READ SHEET"}</button>
     </>}
     {rows.length>0&&<>
      <div className="scan-review-head"><div><b>REVIEW ROWS</b><span>{imports.length} bus{imports.length===1?"":"es"} ready{flagged?` · ${flagged} flagged`:""}</span></div><button type="button" onClick={()=>{setRows([]);setError("")}}>CHANGE PHOTOS</button></div>
      {lineGaps.length>0&&<p className="scan-line-gaps" role="status"><b>LINES NOT READ: {describeLineGaps(lineGaps)}</b><small>Blank lines on the sheet are normal. Check the paper for any of these that had a bus written on them &mdash; a row missed here does not reach the Down Sheet at all.</small></p>}
+     {unread.length>0&&<p className="scan-line-gaps scan-unread-buses" role="status"><b>WRITTEN ON A ROW BUT NOT READ AS ONE: {unread.map(item=>item.busNumber).join(", ")}</b><small>A line naming several buses should produce one row per bus. {unread.length===1?"This number is":"These numbers are"} written in another row&apos;s wording and {unread.length===1?"has":"have"} no row here, so {unread.length===1?"it":"they"} would not reach the Down Sheet at all. Check the paper and add {unread.length===1?"it":"them"} by hand.</small></p>}
      <div className="scan-rows">{rows.map(row=>{
       const repairs=REPAIR_OPTIONS[row.category]||REPAIR_OPTIONS.Miscellaneous;
       /* Which band of the sheet this row is about to land in, shown before the

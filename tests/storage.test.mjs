@@ -136,7 +136,8 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  assert.deepEqual([...positions].sort((left,right)=>left-right),positions,"settings.css is imported last");
  assert.match(layout,/import "\.\/globals\.css"/,"globals.css still comes first, from the layout");
  assert.match(css,/^html,body\{/m,"the page shell is restated after three stylesheets that each set it");
- assert.match(css,/\.settings-header nav\{[^}]*grid-template-columns:repeat\(6/,"six links, one row on a desktop");
+ assert.match(css,/\.settings-header nav\{[^}]*grid-template-columns:repeat\(4/,
+  "four across, two rows — a layout choice rather than a count of how many pages exist");
  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.settings-header nav\{[^}]*grid-template-columns:repeat\(3/,"six links, two full rows on a phone");
 
  /* One section per page, each rendering that page's OWN panel inline - the
@@ -195,11 +196,19 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  storage.setItem(BOARD_SETTINGS_KEY,JSON.stringify({theme:"midnight",downSheetBadgeView:"off-road",futureField:"keep"}));
  const board=readBoardSettings(storage.getItem(BOARD_SETTINGS_KEY));
  assert.equal(board.theme,"midnight");
- assert.equal(board.downSheetBadgeView,"off-road");
+ /* downSheetBadgeView IS NO LONGER READ. It was a three-way DS badge filter on
+    the map that hid the badge for a bus parked outside the chosen group, and
+    Curtis killed it on his own rule - "there should be no way that a bus can
+    have its badge removed from the map by simply relocating it". */
+ assert.equal(board.downSheetBadgeView,undefined,"the DS badge view must not come back through the settings reader");
  assert.ok(writeBoardSettings(storage,{...board,busDisplay:"number"}).ok);
  const storedBoard=JSON.parse(storage.getItem(BOARD_SETTINGS_KEY));
  assert.equal(storedBoard.busDisplay,"number");
- assert.equal(storedBoard.downSheetBadgeView,"off-road","the DS badge menu's field survives a Settings-page write");
+ /* AND IT IS NOT SCRUBBED EITHER, which is the point of the merge this test is
+    about: a device that holds "off-road" keeps holding it, inert, rather than
+    having a settings write reach in and edit a field nothing reads. The same
+    sentence covers `futureField` below - anything a later release adds. */
+ assert.equal(storedBoard.downSheetBadgeView,"off-road","a write must not scrub the dead field it no longer names");
  assert.equal(storedBoard.futureField,"keep","a field this release has not heard of survives too");
  assert.equal(storedBoard.statusVersion,3,"colours are stamped the way the map reads them back");
  assert.deepEqual(readBoardSettings(storage.getItem(BOARD_SETTINGS_KEY)).colors,board.colors,"the midnight colours read back as written");
@@ -1141,6 +1150,14 @@ test("MASTER EXPORT and MASTER IMPORT carry the same set of keys",async()=>{
  const ledger=restoreSource.match(/writeSetting\(storage,(\w+),JSON\.stringify\(mergeSheetLedgers\(readSheetLedger\(storage\),backup\.(\w+)\)/);
  assert.ok(ledger,"the sheet ledger no longer merges through the branch this test knows about");
  restored.set(ledger[2],ledger[1]);
+ /* And the heat check log, the second thing that merges rather than replaces.
+    It writes through its own helper, which names its key inside
+    heat-check-log.ts, so the key is taken from the export side's import and
+    the pairing asserted is field-to-field. */
+ const heat=restoreSource.match(/writeHeatChecks\(storage,mergeHeatChecks\(readHeatChecks\(storage\),backup\.(\w+)\)\)/);
+ assert.ok(heat,"the heat check log no longer merges through the branch this test knows about");
+ assert.match(backupSource,/import \{HEAT_CHECKS_KEY\} from "\.\.\/defects\/heat-check-log\.ts"/);
+ restored.set(heat[1],"HEAT_CHECKS_KEY");
 
  assert.ok(exported.size>=10,"expected the export to read at least ten keys, found "+exported.size);
  assert.deepEqual([...restored.keys()].sort(),[...exported.keys()].sort(),
@@ -1366,4 +1383,60 @@ test("the sheet ledger keeps the tempo the app used to throw away",async()=>{
   "the undo copy is secured before the ledger is touched");
  assert.equal(/if\(!recordSheetSwap\(|recordSheetSwap\([^)]*\)\.ok\)\s*\{[^}]*return/.test(pageCode),false,
   "and a ledger failure never stops the import");
+});
+
+test("whose garage this is lives in one place, so a second one is not a find-and-replace",async()=>{
+ /* Curtis, as a standing design spec: "when we're ready to give it to like Pace
+    or any other organization where they can seamlessly plug it in to their own
+    infrastructure... we have to always keep that design spec in mind."
+
+    This does not make the app multi-site — the yard is still described in six
+    places, see docs/roadmap/facility-config.md. It holds the one string that was
+    typed into four share modules, each twice, with a fifth added the day the
+    constant was written. */
+ const {SITE_ORGANIZATION,SITE_ORGANIZATION_CAPS}=await import("../src/lib/settings/site-identity.ts");
+ assert.equal(SITE_ORGANIZATION,"Pace South");
+ /* Derived, never a second constant: two strings that must agree about one
+    name are two strings that will eventually disagree. */
+ assert.equal(SITE_ORGANIZATION_CAPS,SITE_ORGANIZATION.toUpperCase());
+
+ /* AND NOTHING SPELLS IT ANY MORE. Comments may name it — this one does — so
+    they are stripped before the scan, and the module that owns the string is
+    the one file allowed to hold it. */
+ const OWNER="src/lib/settings/site-identity.ts";
+ const files=[];
+ const walk=async dir=>{
+  for(const entry of await readdir(new URL("../"+dir+"/",import.meta.url),{withFileTypes:true})){
+   const path=dir+"/"+entry.name;
+   if(entry.isDirectory())await walk(path);
+   else if(/\.tsx?$/.test(entry.name))files.push(path);
+  }
+ };
+ await walk("src");await walk("app");
+ const offenders=[];
+ for(const path of files){
+  if(path===OWNER)continue;
+  const source=await readFile(new URL("../"+path,import.meta.url),"utf8");
+  const code=source.replace(/\/\*[\s\S]*?\*\//g,"").split("\n").filter(line=>!line.trim().startsWith("//")).join("\n");
+  if(/Pace South|PACE SOUTH/i.test(code))offenders.push(path);
+ }
+ assert.deepEqual(offenders,[],"the organisation's name belongs in "+OWNER);
+
+ /* The four share modules and the two report fallbacks read it. Named rather
+    than counted, so adding a fifth share that hard-codes the name fails here
+    rather than being found by somebody shipping to another garage. */
+ for(const path of ["src/lib/defects/bus-share.ts","src/lib/defects/fixed-share.ts",
+  "src/lib/defects/quick-filter-share.ts","src/lib/down-sheet/down-sheet-share.ts",
+  "src/lib/reports/fleet-status-report.ts","src/lib/reports/fleet-status-report-print.ts"]){
+  const source=await readFile(new URL("../"+path,import.meta.url),"utf8");
+  assert.match(source,/from "\.\.\/settings\/site-identity\.ts"/,path+" must read the one constant");
+ }
+
+ /* The two reports still take their heading as an OPTION and only fall back to
+    it — a report sent to a superintendent is a document whose title that person
+    may want to set per send, which was true before this and stays true. */
+ const {buildFleetStatusReport}=await import("../src/lib/reports/fleet-status-report.ts");
+ assert.equal(typeof buildFleetStatusReport,"function");
+ const report=await readFile(new URL("../src/lib/reports/fleet-status-report.ts",import.meta.url),"utf8");
+ assert.match(report,/clean\(options\.title\)\|\|SITE_ORGANIZATION_CAPS/);
 });

@@ -38,8 +38,12 @@ import "../fixed-repairs/fixed-repairs.css";
 import "./settings.css";
 import MapSettingsPanel from "./_components/map-settings-panel";
 import CloudSyncControl from "./_components/cloud-sync-control";
+import {DEFAULT_FEEDBACK,type FeedbackSettings,loadFeedbackSettings,saveFeedbackSettings} from "@/src/lib/settings/feedback-settings";
+import {DEFAULT_HEADER_COLOR,DEFAULT_HEADER_THEME,HEADER_SURFACES,HEADER_THEME_KEY,type HeaderTheme,headerContrast,headerGradient,headerTextFor,loadHeaderTheme,resolveHeaderColor,resolveHeaderInk,saveHeaderTheme} from "@/src/lib/settings/header-theme";
+import {pageHeaderThemes} from "@/src/lib/settings/page-header-themes";
 import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "@/src/lib/settings/map-settings";
 import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "@/src/lib/storage/fleet-restore";
+import {heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
 import DownSheetSettings from "./_components/down-sheet-settings";
 import {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings} from "@/src/lib/down-sheet/down-sheet-settings-store";
 import LogSettingsModal from "./_components/defect-log-settings-modal";
@@ -161,6 +165,29 @@ function SectionBody({id,open,children}:{id:string;open:boolean;children:ReactNo
  return <div id={id+"-body"} className="settings-section-body" hidden={!open}>{children}</div>;
 }
 
+/* ONE CONTROL THAT IS ALSO THE SWATCH.
+
+   `<input type="color">` cannot be given content, so showing a colour AND
+   what its text will look like took two elements per row — a swatch chip and
+   a picker, side by side, saying the same thing twice on eight rows. Here the
+   real input fills the box at opacity 0: the box draws the colour and the
+   computed ink, the input takes the click, the focus and the keyboard, and
+   `:focus-within` puts the ring back on the box. One element per row.
+
+   44px, because it is a swatch a thumb has to hit and this app's floor for
+   that is 44 everywhere else. */
+/* `ink` is for a row whose page theme decides its header text, so the Aa shows
+   the colour that page actually draws. Without it the swatch drew a computed
+   white over Tactical's olive while the note beside it quoted the khaki's
+   9.97:1 — the panel describing one thing and measuring another, which is the
+   bug the note itself was fixed for one commit earlier. */
+function HeaderSwatch({colour,ink,label,onPick}:{colour:string;ink?:string;label:string;onPick:(value:string)=>void}){
+ return <label className="hc-swatch" style={{background:headerGradient(colour),color:ink||headerTextFor(colour)}}>
+  <span aria-hidden="true">Aa</span>
+  <input type="color" value={colour} onChange={event=>onPick(event.target.value)} aria-label={label}/>
+ </label>;
+}
+
 export default function SettingsPage(){
  const [saveProblem,setSaveProblem]=useState<FleetWriteReason|"">("");
  const report=(result:StorageWriteResult)=>setSaveProblem(result.reason||"");
@@ -178,7 +205,53 @@ export default function SettingsPage(){
   if(!written.ok){alert("This device could not save that preference. It will go back to how it was next time the app opens.");return}
   window.dispatchEvent(new CustomEvent(APP_MODE_STORAGE_KEY));
  };
+ /* Sound and vibration, both off until asked for. Written straight through
+    rather than via useStoredSettings, because the module owns its own
+    serializer and the rule that anything but a literal `true` reads as off
+    has to survive this page as well as a hand-edited file. */
+ /* The app's header colour, and the only place it is written. HeaderThemeLive
+    paints from it and writes nothing, so there is one writer and one reader. */
+ const [headerTheme,setHeaderThemeState]=useState<HeaderTheme>(DEFAULT_HEADER_THEME);
+ useEffect(()=>{setHeaderThemeState(loadHeaderTheme(localStorage))},[]);
+ const setHeaderTheme=(next:HeaderTheme)=>{
+  /* SAVED FIRST. It set the state and then saved, so a refused write left the
+     swatches showing a colour no header had taken and no repaint had been
+     asked for — the panel disagreeing with the page it is on, which is worse
+     than the write failing. Nothing moves unless the write lands. */
+  if(!saveHeaderTheme(localStorage,next)){alert("This device could not save that colour, so nothing was changed.");return}
+  setHeaderThemeState(next);
+  /* `storage` fires in OTHER tabs only, so this is what repaints THIS one. */
+  window.dispatchEvent(new CustomEvent(HEADER_THEME_KEY));
+ };
+ const [feedback,setFeedbackState]=useState<FeedbackSettings>(DEFAULT_FEEDBACK);
+ useEffect(()=>{setFeedbackState(loadFeedbackSettings(localStorage))},[]);
+ const setFeedback=(next:FeedbackSettings)=>{
+  setFeedbackState(next);
+  if(!saveFeedbackSettings(localStorage,next))alert("This device could not save that preference. It will go back to how it was next time the app opens.");
+ };
  const [log,updateLog,reloadLog]=useStoredSettings(LOG_SETTINGS_KEY,readLogSettings,writeLogSettings,report);
+
+ /* What each page's OWN theme is currently imposing, so the header-colour
+    panel can say so. Three surfaces carry a whole-page theme that outranks
+    the shared colour, and a row claiming to follow a colour the page will not
+    draw is the panel lying about the app.
+
+    DERIVED FROM THE LIVE SETTINGS THIS PAGE ALREADY HOLDS, not read from
+    storage: both appearance panels are further down THIS screen, so a
+    snapshot taken on mount would describe the theme as it was before the
+    person changed it, a few rows above the control that changed it.
+
+    It sits HERE, below both, and not beside the header theme further up —
+    `board` and `log` are `const`, so reading them earlier in the function is
+    a temporal-dead-zone ReferenceError, and this page is server-rendered, so
+    it is a 500 on /settings rather than a bad render. Written there first;
+    `tests/storage.test.mjs` caught it, because the two tests at its "every
+    setting in the app lives on one page" and "MASTER EXPORT and MASTER
+    IMPORT" render this component through `tests/helpers/setup.mjs`. Nothing
+    greps for `react-dom/server` in this repo and finds it — the helper drives
+    the BUILT SSR bundle — which is worth knowing before concluding, as a
+    reader of this file did, that no such test exists. */
+ const pageThemes=pageHeaderThemes(board,log);
 
  const [open,setOpen]=useState<Record<SectionKey,boolean>>(DEFAULT_OPEN);
  const toggle=(key:SectionKey)=>setOpen(current=>({...current,[key]:!current[key]}));
@@ -303,7 +376,7 @@ export default function SettingsPage(){
      would otherwise still be showing the settings the file just replaced. */
   reloadBoard();reloadDown();reloadLog();
   setMergeUndo(null);
-  alert("MASTER IMPORT complete. Restored: "+result.restored.join(", ")+".");
+  alert("MASTER IMPORT complete. Restored: "+result.restored.join(", ")+"."+(result.heatCheckProblem?"\n\nTHE HEAT CHECKS IN THIS FILE WERE NOT RESTORED — "+heatLogProblemWords(result.heatCheckProblem)+".":""));
  };
 
  /* One theme across every page. It writes into each page's own settings rather
@@ -426,10 +499,105 @@ export default function SettingsPage(){
          permission — anyone holding the device can turn it off — so this is a
          plain switch rather than anything gated. */}
      <SettingsDrawers>
-     <SettingsDrawer title="THIS DEVICE" note="Lite mode, and showing the first-time welcome screen again.">
+     {/* The note names what is INSIDE, because that is the only thing a person
+         scanning closed drawers has to go on. It said "Lite mode, and showing
+         the first-time welcome screen again" while also holding the header
+         colour and the sound switch — and Curtis's question was "why is this
+         not an option in settings?", so a header colour nobody can find is
+         the same answer again. */}
+     <SettingsDrawer title="THIS DEVICE" note="Header colour, sound and vibration, Lite mode, and showing the first-time welcome screen again.">
      <section className="settings-lite-switch">
       <label className="settings-check"><input type="checkbox" checked={appMode==="lite"} onChange={event=>setAppMode(event.target.checked?"lite":"full")}/>
        <span><b>LITE MODE ON THIS DEVICE</b><small>Draws less of the app so a new person can learn the workflow: Fleet Campaigns, the advanced actions on both sheets, DEFERRED, and the diagnosis half of the defect form all stand down. Nothing changes about what is saved or synced — a Lite phone and a full phone write the same records to the same Shop Cloud.</small></span></label>
+     </section>
+     {/* Curtis: "make sure the sound is off by default ok? Any sounds.
+         Toggleable in settings." Two switches rather than one because a buzz
+         is not a sound: a loud garage is the case for vibration and against
+         noise. Both start off, and anything the app gains later that can be
+         heard has to come through this same setting — a test scans the source
+         tree for audio APIs and fails if one appears outside that module. */}
+     {/* Curtis: "Why is this not an option to color the headers differently in
+         settings?" It partly was — the Facility Map, the Defect Log and Fixed
+         Repairs each had a header colour inside their OWN page's theme, and
+         the other five had it typed into the stylesheet. Nothing said what the
+         app's colour was, which is how five different navies happened. This is
+         that missing thing: one colour, and a page can differ when it has a
+         reason to. */}
+     {/* MINIMALIST, WITH MORE CONTROLS THAN BEFORE RATHER THAN FEWER. Curtis:
+         "Just make it as much of a minimalist design as you can. Even though
+         we have more settings controls."
+
+         Measured at 390, before and after, both from `innerText` and the
+         rendered box: 57 elements, 18 controls, 149 words and 643px at 390 became
+         51 elements, 10 controls, 53 words and 490px. Two swatches on every row showing the
+         same colour, "following the one above" written out seven times to say
+         that nothing is happening, EIGHT GREYED-OUT FOLLOW BUTTONS — one per
+         row, out of the box — and six lines of paragraph before the first
+         control.
+
+         What went, and why each was safe to lose:
+         - The second swatch. The colour well IS the swatch now: a real
+           <input type="color"> at opacity 0 filling a box that draws the
+           colour and the computed ink. One element doing both jobs, and the
+           `Aa` still shows a pale pick turning the words black.
+         - The status line, except when there IS something to say. Seven rows
+           saying "following the one above" is the absence of news.
+         - The disabled buttons. A row with no override has nothing to clear,
+           so it carries no control at all; one appears when there is.
+         - The paragraph. The rows teach it: a tagged row shows what decides
+           that page, and the swatch beside it shows the result. */}
+     <section className="settings-header-colour">
+      <div className="hc-head">
+       <div><b>HEADER COLOUR</b><small>Every page uses this. Give one its own below — that wins, even on a page with its own theme.</small></div>
+       <HeaderSwatch colour={headerTheme.shared} label="Header colour for every page"
+        onPick={value=>setHeaderTheme({...headerTheme,shared:value})}/>
+      </div>
+      <div className="hc-list">
+       {HEADER_SURFACES.map(surface=>{
+        const own=headerTheme.overrides[surface.key];
+        const page=pageThemes[surface.key];
+        /* The same function the pages resolve through, so this row shows what
+           that page draws rather than a second opinion about it. */
+        const effective=resolveHeaderColor(headerTheme,surface.key,page?.header);
+        return <div className="hc-row" key={surface.key}>
+         <b>{surface.label}</b>
+         {own?<i>own</i>:page?<i>page theme</i>:null}
+         {own?<button type="button" className="hc-clear" aria-label={"Clear "+surface.label+"'s own header colour"}
+          onClick={()=>{const next={...headerTheme.overrides};delete next[surface.key];setHeaderTheme({...headerTheme,overrides:next})}}>&#215;</button>:null}
+         <HeaderSwatch colour={effective} ink={resolveHeaderInk(headerTheme,surface.key,page?.header,page?.text)} label={surface.label+" header colour"}
+          onPick={value=>setHeaderTheme({...headerTheme,overrides:{...headerTheme.overrides,[surface.key]:value}})}/>
+        </div>;
+       })}
+      </div>
+      <div className="hc-foot">
+       <button type="button" className="hc-reset" onClick={()=>setHeaderTheme({shared:DEFAULT_HEADER_COLOR,overrides:{}})}>Reset all to navy</button>
+       {/* THE WORST OF THE EIGHT, against the text that will actually be
+           drawn. It quoted the SHARED colour against WHITE: wrong twice over,
+           because the title switches to black on a light colour, and because
+           a pale override on one page left the note reporting the navy
+           everybody else has. Shown rather than enforced. */}
+       <small>{(() => {
+        const worst=HEADER_SURFACES.map(surface=>{
+         const page=pageThemes[surface.key];
+         const colour=resolveHeaderColor(headerTheme,surface.key,page?.header);
+         /* `headerContrast`, which scores BOTH ends of the bar. The flat
+            colour is only its left edge, and quoting that printed 4.58 for a
+            header whose right end was 3.37.
+            AGAINST THE INK THAT WILL ACTUALLY BE DRAWN, which on a page its
+            own theme decides is the THEME'S ink and not the computed one.
+            Scored against the computed one it would quote a number for black
+            or white text that page is not using — the same species of
+            wrongness as quoting the shared colour for a page carrying an
+            override, which is what this note did before. */
+         return {label:surface.label,ratio:headerContrast(colour,resolveHeaderInk(headerTheme,surface.key,page?.header,page?.text))};
+        }).reduce((low,row)=>row.ratio<low.ratio?row:low);
+        return Math.round(worst.ratio*100)/100+":1 on "+worst.label;
+       })()}</small>
+      </div>
+     </section>
+     <section className="settings-feedback">
+      <label className="settings-check"><input type="checkbox" checked={feedback.sound} onChange={event=>setFeedback({sound:event.target.checked,vibration:event.target.checked})}/>
+       <span><b>SOUND &amp; VIBRATION ON THIS DEVICE</b><small>Off. The app makes no sound at all today — no alerts, no chimes, nothing on save — and the one buzz is the short one when you hold a bus on the Facility Map and it lifts to be moved. The blue ring shows that too, so nothing is lost with this off. Anything added later that can be heard or felt stays quiet until you turn this on.</small></span></label>
      </section>
      <section className="settings-welcome-again">
       <div><b>FIRST-TIME WELCOME</b><small>Show the opening screen again and pick FULL or LITE, exactly as a device seeing this app for the first time would. Nothing is changed until you choose.</small></div>

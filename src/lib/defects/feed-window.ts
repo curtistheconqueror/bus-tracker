@@ -1,5 +1,5 @@
 import {activeShift,type ShiftSettings,DEFAULT_SHIFT_SETTINGS,shiftLabel} from "../settings/shift-clock.ts";
-import {loggedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
+import {completedMinutesElapsed,loggedByHand,loggedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
 
 /* "JUST STAY FOCUSED ON TODAY."
 
@@ -20,7 +20,7 @@ import {loggedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
    three to one number means the filter itself is a single comparison and there
    is no second code path for a clock-based window to be wrong in. */
 
-export type FeedWindowKey="all"|"shift"|"today"|"24h"|"3d"|"7d";
+export type FeedWindowKey="all"|"shift"|"today"|"24h"|"3d"|"7d"|"30d";
 
 /* DELIBERATELY NOT `TIME_WINDOWS`, and not added to it.
 
@@ -41,10 +41,31 @@ export const FEED_WINDOWS:{key:FeedWindowKey;label:string}[]=[
  {key:"24h",label:"LAST 24H"},
  {key:"3d",label:"LAST 3 DAYS"},
  {key:"7d",label:"LAST 7 DAYS"},
+ /* A MONTH, ON BOTH SCREENS, and this used to be a second list.
+
+    It shipped as `FIXED_REPAIR_WINDOWS` — a superset only Fixed Repairs drew —
+    on the argument that a month is a reasonable span to ask a HISTORY for and
+    a strange one to ask a live board, "where thirty days is every record it
+    has". Curtis asked for it on the feed as well, and the argument was wrong
+    on the facts anyway: a DEFERRED defect sits on this board for as long as it
+    takes, so a board carrying months of held-back work is exactly where this
+    narrows something.
+
+    So the two lists collapsed back into one. Two tables that must agree about
+    what a window key means are two tables that will eventually disagree — and
+    they already had, once: `30d` resolved to a limit through `FIXED_MINUTES`
+    and to "" through `feedWindowLabel`, which is a narrowed list under a
+    heading claiming no window at all. One table cannot do that. */
+ {key:"30d",label:"LAST 30 DAYS"},
 ];
 
-const FIXED_MINUTES:Partial<Record<FeedWindowKey,number>>={"24h":24*60,"3d":3*24*60,"7d":7*24*60};
+const FIXED_MINUTES:Partial<Record<FeedWindowKey,number>>={"24h":24*60,"3d":3*24*60,"7d":7*24*60,"30d":30*24*60};
 
+/* THE ONE LIST, for the reason `feedWindowLabel` reads it too: a key the
+   exported type and `FIXED_MINUTES` both accept, refused by the exported
+   guard, is the second code path the comment above says this file avoids.
+   Nothing calls this from `app/` today — which is exactly why it would be
+   wrong when something persisting or URL-parsing a window finally does. */
 export function isFeedWindowKey(value:unknown):value is FeedWindowKey{
  return FEED_WINDOWS.some(item=>item.key===value);
 }
@@ -89,6 +110,42 @@ export function feedWindowMinutes(key:FeedWindowKey,now:Date=new Date(),settings
  return null;
 }
 
+/* AND WHETHER THE WINDOW SOMEBODY PICKED IS ACTUALLY IN FORCE.
+
+   `feedWindowMinutes` and `feedWindowLabel` degrade TOGETHER to "no window"
+   when the clock cannot answer — a shift somebody has edited into a shape with
+   no window covering now, or a `now` that cannot be read at all. That pairing
+   is deliberate and is the right failure: a narrowed board under a heading
+   saying THIS SHIFT is the one outcome this file exists to prevent.
+
+   But it leaves the drop-down reading THIS SHIFT over the WHOLE history with
+   nothing on screen saying why, which is its own small lie — the control
+   claims a state the list does not have. So the degradation is made askable
+   rather than silent, in one function both screens read, because two pages
+   each re-deriving "the key is not ALL and the limit came back null" are two
+   pages that will eventually disagree about when to warn.
+
+   ALL is never unresolved: it is the absence of a window, not a failure to
+   resolve one. */
+export function feedWindowUnresolved(key:FeedWindowKey,now:Date=new Date(),settings:ShiftSettings=DEFAULT_SHIFT_SETTINGS){
+ return key!=="all"&&feedWindowMinutes(key,now,settings)===null;
+}
+
+/* AND WHAT TO SAY ABOUT IT, here rather than on each screen, for the reason
+   `feedWindowLabel` is here: two pages wording the same degradation differently
+   is how somebody learns the message is decoration.
+
+   TWO CAUSES AND TWO SENTENCES, because "the shift hours cover no window that
+   includes now" and "this device's clock cannot be read" send a person to
+   different places — Settings in the first case, the phone itself in the
+   second. A single sentence covering both would be wrong half the time, which
+   is how a warning stops being read. Only `shift` can reach the first; `today`
+   is the only other key that can degrade at all, and only on a broken clock. */
+export function feedWindowUnresolvedNote(key:FeedWindowKey){
+ if(key==="shift")return "SHIFT HOURS DO NOT COVER NOW — SHOWING EVERY DATE";
+ return "THIS DEVICE'S CLOCK CANNOT ANSWER — SHOWING EVERY DATE";
+}
+
 /* Zero is a real limit. Standing at 14:00 exactly, the shift is zero minutes
    old and only something logged this minute belongs in it; at 00:00 the same
    is true of TODAY. `if(!limit)` would read either as "no window" and hand back
@@ -109,7 +166,52 @@ export function withinFeedWindow(minutes:number|null,limit:number|null){
    logged on Monday, and a window keyed off the edit would quietly refill
    TODAY with last week's work every time somebody touched a record. */
 export function defectWithinFeedWindow(defect:StructuredDefect,limit:number|null,now:Date=new Date()){
+ /* A ROW READ OFF A SCANNED SHEET IS OUT OF EVERY NARROWED WINDOW, because its
+    `createdAt` is WHEN THE SCAN RAN rather than when anybody logged anything.
+    Importing yesterday's paper at 20:00 would drop that whole sheet into TODAY,
+    LAST 24H and THIS SHIFT at once, on a list whose entire claim is "this is
+    what got logged".
+
+    Curtis, choosing this over marking them: "I have no reason to share
+    something off the down sheet because the down sheet is already coming from
+    the source... for this particular function, no, just things that were
+    logged by hand."
+
+    AND AT THE ONE CALLER THIS FILE HAS TODAY, THE GUARD NEVER FIRES. A cold
+    read caught the claim this comment used to make. The Defect Log's feed is
+    built by `defectLogRecords`, which filters `defect.source==="defect-log"`
+    before anything here sees a record, and `loggedByHand` is `source !==
+    "down-sheet"` - so every record reaching this function already satisfies it.
+    The line that was removed from here said "ALL still shows them", which was
+    the opposite of true: on that screen a scanned row is not in ALL either,
+    because it never enters the list at all. The wrong account was more
+    dangerous than the dead line, since it described a behaviour somebody could
+    go looking for.
+
+    IT STAYS, as a property of the question rather than of today's caller. This
+    is the function that answers "is this defect inside this window", for the
+    feed and for anything that asks later off a list assembled some other way -
+    a whole-fleet read, an export, a route. The filter that currently makes it
+    moot lives in a different module and is not this function's to rely on. The
+    place the same rule is LIVE is the DEFECTS LOGGED quick filter, which runs
+    over the board's own defects. */
+ if(limit!==null&&!loggedByHand(defect))return false;
  return withinFeedWindow(loggedMinutesElapsed(defect,now),limit);
+}
+
+/* AND FIXED REPAIRS ASKS WHEN IT WAS FINISHED, which is the same window around
+   the opposite stamp.
+
+   Curtis: "any repairs I fixed in the past day or two." A repair reported on
+   Monday and finished this morning belongs in TODAY, so this cannot be
+   `defectWithinFeedWindow` — that one deliberately refuses to follow an edit,
+   and a completion is the one edit that IS the event being asked about.
+
+   The comparison itself is `withinFeedWindow`, shared, so there is one place
+   that decides what a limit means and one place that decides what an undated
+   record does. Only the stamp differs. */
+export function fixedWithinFeedWindow(defect:StructuredDefect,limit:number|null,now:Date=new Date()){
+ return withinFeedWindow(completedMinutesElapsed(defect,now),limit);
 }
 
 /* What the bar above the feed says it is showing. "" for ALL, because a board
@@ -128,5 +230,10 @@ export function feedWindowLabel(key:FeedWindowKey,now:Date=new Date(),settings:S
  /* Checked the same way the limit is, so the pair cannot disagree about whether
     there is a window at all. */
  if(key==="today")return Number.isNaN(now.getTime())?"":"TODAY";
+ /* THE SAME TABLE THE LIMIT COMES OFF, which is why there is only one of them
+    now. Caught by a test rather than by reading, back when there were two:
+    `30d` resolved to 1440*30 minutes through `FIXED_MINUTES` and to "" here,
+    which is the precise pairing this file's own header calls the one outcome
+    worth writing code to prevent. */
  return FEED_WINDOWS.find(item=>item.key===key)?.label||"";
 }

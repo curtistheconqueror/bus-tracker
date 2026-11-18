@@ -1,10 +1,10 @@
-import {hasWorkState,isDownSheetRecommended,isUnresolved,loggedMinutesElapsed,normalizeDefects,ROAD_CALL_KEY,type StructuredDefect} from "./repair-catalog.ts";
+import {hasWorkState,isDownSheetRecommended,isUnresolved,loggedByHand,loggedMinutesElapsed,normalizeDefects,ROAD_CALL_KEY,type StructuredDefect} from "./repair-catalog.ts";
 import {hasRecentRoadCall,ROAD_CALL_WINDOW_DAYS,type RoadCallEvent} from "../fleet/road-calls.ts";
 import {isFarebox,isIbsVentra} from "../fleet/tech-services.ts";
 
 export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil"|"no-cabin-heat"|"not-duplicated"|"down-sheet-recommended"|"deferred"|"road-call"|"logged";
 export type QuickFilterBus={
- id:string;n?:string;pendingRepair?:string;checkEngine?:boolean;badRampKneeler?:boolean;noHorn?:boolean;farebox?:boolean;ibsVentra?:boolean;defects?:StructuredDefect[];roadCalls?:RoadCallEvent[];
+ id:string;n?:string;s?:string;pendingRepair?:string;checkEngine?:boolean;badRampKneeler?:boolean;noHorn?:boolean;farebox?:boolean;ibsVentra?:boolean;defects?:StructuredDefect[];roadCalls?:RoadCallEvent[];
 };
 
 export const QUICK_FILTERS:{key:QuickFilterKey;label:string;shortLabel:string}[]=[
@@ -58,8 +58,29 @@ export const QUICK_FILTERS:{key:QuickFilterKey;label:string;shortLabel:string}[]
  {key:"logged",label:"Defects Logged",shortLabel:"Logged"},
 ];
 
+/* THE CATALOG'S OWN HEATING GROUP, anchored to where the category sits. Named
+   once because TWO filters now turn on it and they must not disagree: a bus is
+   on the heat walk BECAUSE of this group and is kept off the A/C list BY it.
+   Spelled out twice, the day somebody edits one is the day a no-heat bus is on
+   both lists or neither.
+
+   Anchored with ^ for the reason recorded against `no-cabin-heat` below: the
+   category is joined FIRST, so an unanchored group match also reads free text a
+   mechanic typed, and "floor heating - works fine" in the details of a COOLING
+   record satisfied it. */
+const HVAC_HEATING_GROUP=/^a\/c and hvac heating\s*-\s/i;
+
 function quickFilterTextMatch(text:string,key:QuickFilterKey){
- if(key==="ac")return /\b(?:a\/c|ac|hvac|air conditioning)\b/i.test(text);
+ /* A/C BUSES IS COOLING, NOT THE WHOLE CATEGORY. The words alone match the
+    CATEGORY "A/C and HVAC", so every heating repair in it answered this filter
+    too: measured, one cooling fault and two no-heat buses read as three A/C
+    buses. Curtis chose to narrow it when asked — it changes a list he already
+    uses, which is why it was his call and not a tidy-up.
+
+    Heating is excluded by the GROUP and nothing else. Controls and Blowers
+    stays in: one of its repairs is "Operator A/C blower", and a blower that
+    does not run is an A/C bus whichever season it is. */
+ if(key==="ac")return /\b(?:a\/c|ac|hvac|air conditioning)\b/i.test(text)&&!HVAC_HEATING_GROUP.test(text);
  if(key==="check-engine")return /\b(?:check|stop)\s+(?:engine|eng)\b|\bengine\s+light\b/i.test(text);
  if(key==="bad-ramp")return /\b(?:ramp|kneeler|wheelchair lift|wheelchair ramp)\b/i.test(text);
  if(key==="no-horn")return /\bhorn\b/i.test(text);
@@ -78,8 +99,53 @@ function quickFilterTextMatch(text:string,key:QuickFilterKey){
  /* Matched on the repair rather than on the word "heat", which appears in
     Amerex heat sensors, in Overheating, and in half the estimate notes in the
     fleet. A winter list that pulls in an overheating bus is a list somebody
-    checks once and then stops trusting. */
- if(key==="no-cabin-heat")return /\bsurge tank\s*-\s*(?:heating side|both sides)\b/i.test(text)||/\bheater\s*\/\s*defroster\b/i.test(text);
+    checks once and then stops trusting.
+
+    THE FIRST TEST IS THE GROUP, NOT A LIST OF ISSUES. Everything in the
+    catalog's "A/C and HVAC → Heating" group is by definition a no-heat
+    defect, so matching the group prefix means a heating repair added to the
+    catalog next winter lands on this list without anybody remembering to come
+    back here. An issue list would have to be edited twice and would quietly
+    stop being complete the first time it was not.
+
+    `\bheating\s*-\s` cannot catch "Overheating": \b needs a non-word
+    boundary and "r"→"h" is not one. Checked, not assumed.
+
+    IT IS ANCHORED TO THE START OF THE TEXT, WHERE THE CATEGORY IS. defectText
+    joins the category FIRST and then the issue, details, diagnosticNote,
+    actionTaken and shopNotes, so any group match loose in that string also
+    reads free text a mechanic typed.
+
+    Requiring the category somewhere in the string was not enough and shipped
+    once believing it was: `/heating\s*-\s/ && /a\/c and hvac/` is satisfied by
+    an HVAC record whose issue is COOLING and whose details say "floor heating
+    - works fine", because the two halves can be satisfied by different parts
+    of the same string. A separate `/\bhvac\s+heating\s*-\s/` alternative was
+    looser still - it needed no category at all, so "hvac heating - runs warm"
+    typed into an Engine or Bodywork record reached the heat sheet too. All
+    three reproduced. Anchoring with ^ ties the group to the category position
+    rather than to the category's mere presence, which is the thing that was
+    actually meant.
+
+    The legacy free-text `pendingRepair` string carries no category at all, so
+    it can never satisfy this branch - it is covered by `heater / defroster`
+    below, which is the only legacy heating wording that predates the grouping.
+
+    The two switches are matched by name because they live in Bus Controls, not
+    in HVAC — Curtis kept them there, and a bus whose heat knob is broken has
+    no heat whichever category the record sits in.
+
+    `heater / defroster` keeps its own branch even though it is now
+    "Heating - Heater / defroster": the legacy free-text `pendingRepair`
+    string at the bottom of quickFilterDefects never passes through
+    migrateRepairIdentity, so a bus carrying the old bare wording there would
+    drop off this list the day the catalog was grouped. */
+ if(key==="no-cabin-heat")return HVAC_HEATING_GROUP.test(text)
+  ||/\bsurge tank\s*-\s*(?:heating side|both sides)\b/i.test(text)
+  ||/\bcoolant leak\s*-\s*heating side\b/i.test(text)
+  ||/\bheater\s*\/\s*defroster\b/i.test(text)
+  ||/\bfloor heat switch\b/i.test(text)
+  ||/\bhvac\s*\/\s*heat controls\b/i.test(text);
  /* None of these five is a wording question. The legacy `pendingRepair` string
     at the bottom of quickFilterDefects is matched through here, and a free-text
     match would put a bus into "logged" on the strength of a sentence that
@@ -92,11 +158,80 @@ function defectText(defect:StructuredDefect){
  return [defect.category,defect.issue,...(defect.symptoms||[]),...(defect.fluids||[]),defect.details,defect.diagnosticNote,defect.actionTaken,defect.shopNotes].filter(Boolean).join(" ");
 }
 
+/* THE HEAT SHEET READS THE REPAIR, NOT THE PROSE ABOUT IT.
+
+   defectText joins details, the diagnostic note, the action taken and the shop
+   notes, and the five named heat branches below matched anywhere in it. So a
+   mechanic writing what he CHECKED put the bus on the list: "Floor heat switch
+   checked and working" and "no coolant leak - heating side found" both reached
+   it, each one a note recording the opposite of a no-heat bus. Anchoring the
+   group match fixed only the group; these were the same bug in the branches
+   left alone, and they were worse, because a sentence clearing a bus is the
+   most likely sentence to contain these words.
+
+   THE TWO PLACEHOLDER ISSUES ARE THE EXCEPTION, and this is the part that is
+   easy to get wrong: for them there IS no structured identity to read. Both
+   carry the whole complaint in `details` — `Driver-reported defect` is what
+   normalizeDefects synthesises for a bus holding a legacy `pendingRepair` and
+   no defects array, and `Manual entry` is what the bottom of
+   quickFilterDefects synthesises when the array is empty. Measured, not
+   assumed: those are the two shapes a legacy no-heat bus actually arrives in.
+   Dropping details for them would have taken every one of those buses off the
+   list silently, which is the regression this exception exists to prevent.
+
+   Scoped to this one key deliberately. The other free-text filters have the
+   same shape and predate this change, and some of them want it — `add-oil`
+   exists to catch "needs 2 qts" typed in a box, where there is no catalog
+   issue to read instead. Narrowing those is a separate decision. */
+const IDENTITY_IN_DETAILS=new Set(["manual entry","driver-reported defect"]);
+function repairIdentityText(defect:StructuredDefect){
+ const issue=String(defect.issue||"").trim();
+ const placeholder=IDENTITY_IN_DETAILS.has(issue.toLowerCase());
+ return [defect.category,issue,placeholder?defect.details:""].filter(Boolean).join(" ");
+}
+
+/* WHETHER ONE REPAIR IS A NO-HEAT REPAIR, open or finished.
+
+   The list above only ever asks this of work still outstanding, so the question
+   had no name of its own. The heat sheet scan needs it of FINISHED work too — a
+   heat repair closed after the day a bus was checked is the reason not to file
+   that check as a new fault — and the alternative was a second copy of what a
+   heating repair is, kept in step with this one by hope.
+
+   It is the same two functions `quickFilterDefects` composes for this key, in
+   the same order, and deliberately says nothing about `isUnresolved`: the
+   caller knows which it is asking about. */
+export function isNoHeatRepair(defect:StructuredDefect){
+ return quickFilterTextMatch(repairIdentityText(defect),"no-cabin-heat");
+}
+
 /* Whether a work-state stamp falls inside the road-call window. */
 function recentStamp(at:string|undefined,now:string){
  const stamped=Date.parse(String(at||""));
  return !Number.isNaN(stamped)&&stamped>=new Date(now).getTime()-ROAD_CALL_WINDOW_DAYS*24*60*60*1000;
 }
+
+/* LOGGED MEANS SOMEBODY LOGGED IT, not that a record exists - and DEFECTS
+   LOGGED is where that rule is live, because this filter runs over the board's
+   own defects, scanned rows included.
+
+   Curtis, looking at a DEFECTS LOGGED share that had picked up rows off a
+   scanned sheet: "I have no reason to share something off the down sheet
+   because the down sheet is already coming from the source - the down sheet is
+   located in an office, so I'm not gonna send them something that they already
+   have written down... for this particular function, no, just things that were
+   logged by hand." That is what put ninety rows behind a SHOW ALL on a list
+   whose entire claim is "this is what got logged".
+
+   THE RULE ITSELF - what the source means, why only the paper is excluded, and
+   why a defect keeps the source it was born with - is written once, over
+   `loggedByHand` in repair-catalog.ts, where `DefectSource` is defined. It
+   lives there rather than here because feed-window.ts needs the same answer
+   and cannot import this file without pulling road-calls and tech-services in
+   behind it. This comment used to carry its own copy of all three paragraphs;
+   two copies of a rule is how the two stop agreeing. Re-exported so nothing
+   that names it from this module breaks. */
+export {loggedByHand};
 
 /* Whether this defect was written down inside the window the drawer is set to.
    `null` means no window, which is ALL. An undated record is out of every
@@ -173,8 +308,8 @@ export function quickFilterDefects(bus:QuickFilterBus,key:QuickFilterKey,now=new
      list headed 2ND SHIFT. The other filters ignore the window on purpose —
      they answer "what is true now", where the age of the record is not the
      question being asked. */
-  :key==="logged"?isUnresolved(defect)&&loggedWithin(defect,now,narrow.maxAgeMinutes??null)&&loggedBy(defect,narrow.initials||"")
-  :isUnresolved(defect)&&quickFilterTextMatch(defectText(defect),key)),legacy=(bus.pendingRepair||"").trim();
+  :key==="logged"?isUnresolved(defect)&&loggedByHand(defect)&&loggedWithin(defect,now,narrow.maxAgeMinutes??null)&&loggedBy(defect,narrow.initials||"")
+  :isUnresolved(defect)&&quickFilterTextMatch(key==="no-cabin-heat"?repairIdentityText(defect):defectText(defect),key)),legacy=(bus.pendingRepair||"").trim();
  if(key==="logged")matches.sort((a,b)=>loggedFirst(a,b,now));
  if(matches.length||normalized.length||!legacy||!quickFilterTextMatch(legacy,key))return matches;
  return [{id:bus.id+"-quick-filter-legacy",category:"Miscellaneous",issue:"Manual entry",details:legacy,operability:"service",state:"open"} as StructuredDefect];

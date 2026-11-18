@@ -1,17 +1,17 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-10-20
+Updated: 2026-11-18
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 187 (application release 191)
-Live feature checkpoint: commit b33775685b61acafdf4325807c82e92281c9fc2c
+Live release: Sites Version 194 (application release 197)
+Live feature checkpoint: commit 12822f60c7e5d76d3702108b33711cc116ca4f61
 
 ## Read this first
 
 This file is the authoritative continuation guide. Older snapshots are preserved under docs/archive for historical reference only. Do not use an archived handoff as current implementation guidance.
 
-The project is an offline-capable fleet maintenance operations application with five surfaces:
+The project is an offline-capable fleet maintenance operations application with seven surfaces:
 
 1. Facility Map — physical location, operating status, fleet markers, fast movement, and AI Operator commands.
 2. Interactive Down Sheet — scheduled repairs, shifts, assignments, estimates, photo import, and completion workflow.
@@ -19,7 +19,64 @@ The project is an offline-capable fleet maintenance operations application with 
 4. Fixed Repairs — offline completed-repair history used for future diagnosis, with carried defect facts plus editable fix, verification, part, technician, and completion-time fields.
 5. Fleet Campaigns — independent device-local punch lists with custom columns, reusable report formats, completion initials/timestamps, and shareable text output. Also hosts the Work Time panel, which totals a person's day across campaign rows and Defect Log repairs; the panel takes its records as props and is built to be relocated.
 
+6. Incidents — device-local records of events involving people and places.
+7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
+
+## Latest publication
+
+Sites Version 194 / application release 197 deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Installed copies reopen the remembered page after safe document/hydration readiness; Doors picker receives its display-only emoji. PR50 CodeRabbit final review covered this exact SHA with no actionable comments; CI451 (44229747699) passed. Production build and 470 tests passed; ESLint zero errors and one preexisting warning. Browser loopback regression proved delayed-script/stalled-destination recovery; live HTTP200 and exact corrected inline script verified on Map, Defect Log, Down Sheet and Settings. Live Defect Log rendering checked. Physical iOS/Home Screen and real garage network behavior remain unverified. The initial service-worker document request remains unbounded; readiness taking more than the 2.5-second script budget falls back to map for that run. Sites192 and193 were saved candidates, never deployed. Rollback: Sites191 at a9f610d42123cd6cfaaf32b61d8c78048d585c82.
+
+### Previous publication
+
+Sites Version 191 / application release 196 deployed 2026-11-17 at 07:12:36.997726 UTC from `a9f610d42123cd6cfaaf32b61d8c78048d585c82`. Curtis explicitly requested only two Defect Log changes and live publication: ADVANCED ACTIONS starts collapsed on each visit while its button remains; Detailed becomes the default and precedes Compact. Saved explicit card-view choices remain supported. Editor Advanced Details, other pages and operational records are unchanged.
+
+PR49 CodeRabbit completed at `50810e7` with no actionable comments and minimal merge/security risk; exact-head CI 44035855706 passed. Local production build, 469 tests and lint pass (zero lint errors, one existing ignored .remember file warning). Standalone TypeScript has the same 238 diagnostics as the isolated pre-change baseline after normalizing file paths/line numbers; no new errors. Browser interaction and physical-device verification were unavailable in this task. Previous release verification is preserved below.
+
+Rollback: Sites 190 / `sites-v190` at `a1d90e85a6489ab9c6ff636e50ed813d98363978`. Legacy-look archive remains untouched.
+
+### Previous publication
+
+Sites Version 190 was deployed 2026-11-17 at 06:11:14.623645 UTC from `a1d90e85a6489ab9c6ff636e50ed813d98363978`, after Curtis approved making the redesign live. It includes the entire previously queued application release 194 plus application release 195 (PR48 compact mobile navigation and optional defect cards). No prior queued feature was discarded. PR39 remains unmerged and excluded.
+
+Exact-head CI passed; the merged source tree equals reviewed `05ea7aa`. Local production build, lint and 468 tests passed. All eight live routes returned 200; 76 emitted browser/static assets matched the release build. Live Chromium passed 24 route/viewport checks and navigation/card interaction flows. Four recoverable React #418 hydration warnings occurred on Settings: independent server/client clocks cross a minute boundary in its hidden SHIFT ENDS IN display. The component and clock module are byte-unchanged from the pre-redesign baseline. Fresh UTC/Chicago core-route checks were clean; this is not established as a cache issue. Physical iPhone/Safari/Home Screen, hardware safe areas, VoiceOver and native share are not claimed; the heat scanner and sheet identifier still need a real photograph.
+
+Previous-live rollback is Sites 189 at `a009c08fad02aa6859ec6445784f744c6e269c8d`. The requested pre-redesign code remains on `legacy/pre-minimalist-20261117-103f00d` at `103f00d15e73d09642720963043b16b05347c440`. Full queued-work history is archived in `docs/archive/PUBLISH_RELEASE_194_195.md`; release evidence is in `docs/RELEASES.md`. Older publication sections below are historical.
+
 ## Domain ownership
+
+Application 193 was published 2026-10-25 at 21:45:24.014279 UTC. ADVANCED
+ACTIONS drawers use navy on the Defect Log and purple on the Down Sheet;
+both openers are taller and DAILY STATS has a taller accent-edged bar.
+Only two stylesheets and their tests changed; service-worker v7 is unchanged.
+Local and exact-source CI lint/build/388 tests passed, and an independent cold
+read found no actionable defect. Eight live HTTP routes and 40 asset byte
+comparisons passed, including checks of the delivered CSS contracts.
+Those are source/asset checks, not computed-style or browser interaction tests.
+Phone/Safari/Home Screen and shop-computer/iPad drawer wrapping, contrast and
+focus checks remain manual. See docs/RELEASES.md for evidence and limits.
+Rollback is application 192 / Sites 188, `sites-v188` at
+`2ddc026c139c45acec7c24128633841d96e7dee3`. Later documentation-only work was
+preserved on main. PR39 remains separately held; no Supabase or credentials
+were changed by this release.
+
+Application 192 adds Incidents and Shop Talk alongside the five operational
+surfaces above. Both use device-local stores, do not sync, and are excluded
+from MASTER EXPORT/IMPORT. A device move or loss does not carry these records.
+Incidents does not replace supervisor reporting. Shop Talk keeps handled notes.
+The grouped HVAC picker adds Heating; No Heat Buses reads repair identity,
+while A/C Buses continues to include heating repairs in the shared category.
+The category glyph is now ❄️+♨️. No navigation badge was added.
+
+Published 2026-10-23 02:26:48.844011 UTC. Eight HTTP routes and 40 deployed
+asset byte comparisons passed, including service-worker v7 and both new
+surface bundles. Local and exact-source CI lint/build/388 tests passed.
+Fresh browser interaction, native phone/iPad/Safari and offline-device checks
+remain unperformed here. An existing generated Defect Log preload reference
+is absent from build output; the actual manifest asset was verified.
+Rollback is application 191 / Sites 187, `sites-v187` at
+`b33775685b61acafdf4325807c82e92281c9fc2c`.
+PR39 MCP remains unmerged and excluded; no Supabase or credential changes were
+made by this release. See docs/RELEASES.md for publication identifiers.
 
 These boundaries prevent synchronization bugs:
 
@@ -46,7 +103,10 @@ Preserve these rules through refactors and backend migration:
 - Mystery logic excludes decommissioned buses, Main Garage ready rows, bays 11 and 12, and road buses. It identifies eligible on-property work-area buses that are absent from the Down Sheet.
 - Completing one linked repair must not erase unrelated active defects.
 - Work states are Inspected, Diagnosed and Parts on order, and that set is closed. A state may be added later; one already written onto records must not be removed or renamed. An absent key means not ticked, and unticking deletes the stamp with the key so a name never outlives the tick that made it.
-- A finding is what the shop found, not what the driver reported, and it renders through defectLabel so every surface shows it. Anything that builds its own defect line must go through that function rather than reassembling category and issue, or the finding silently stops reaching the Down Sheet.
+- A finding is what the shop found, not what the driver reported, and it renders through defectLabel so every surface shows it. Anything that builds its own defect line must go through that function rather than reassembling category and issue, or the finding silently stops reaching the Down Sheet. It is typed in the Defect Log's ADVANCED DETAILS, on the Down Sheet row editor once a repair is marked done, and on Fixed Repairs; the Defect Log's main form asks ESTIMATED TIME OF REPAIR in the slot the finding used to hold, at Curtis's request, as redundant with the description above it. A finding cleared on an open defect can be restored by the next Down Sheet save of a card still carrying the old wording — a pre-existing behaviour of `applyDownEntryToFleet`.
+- ESTIMATED TIME OF REPAIR is a per-defect estimate and is NOT billable time. `repairHours` and `diagnosticHours` are hours worked and reach the Work Time panel; `estimateHours` never does. It outranks every other source of an estimate — the billable hours, the shop's own repair-time ledger, and the catalog. The Defect Log's box owns the defect's estimate and the Down Sheet's boxes own the sheet's: a card BUILT from an estimated defect is seeded from it, and nothing carries a sheet figure back onto the record, because a card still holding a seeded number would resurrect an estimate somebody had cleared.
+- Fixed Repairs owns the view of its own history. It narrows by WHEN A REPAIR WAS FIXED — `completedAt`, falling back to `updatedAt` so a record cleared from the Down Sheet still dates correctly — never by when the defect was logged, and its share carries exactly the repairs on screen with the window named in the heading. Both drop-downs offer the same seven windows through to 30 days — they were two lists for one release, on the argument that a month is every record a live board has, which was wrong because a deferred defect sits on that board for as long as it takes. Its scope bar names every filter that narrowed the list: the window, the category and the search, each measured against the stage above it.
+- PATH TO REPAIR is keyed for every repair and reachable from TWO screens: the PTR button inside the Defect Log's FOCUS view, and a PTR button on every Fixed Repairs history card. Curtis asked for the second — *"The path to repair should be for everything"* — and Fixed Repairs is where somebody is standing the moment after they finish the job. The panel itself is one component, `src/components/defects/path-to-repair-panel.tsx`; both hosts hold the libraries and pass them in, because each one's own button reads the writeups to choose between PTR and PTR +. Its colours are its own `--ptr-*` names, mapped by each host, so the Defect Log's page themes still drive it and Fixed Repairs gets its own green. Further entry points — the Defect Log's feed cards, the defect editor, the Down Sheet — remain open and are Curtis's call.
 - Defect Log totals count direct Defect Log records only. Down Sheet or tracker records may display for continuity but do not inflate that count.
 - A reviewed photo import is authoritative for the Down Sheet only: it replaces every prior Down Sheet row, reconciles every DS badge, lists buses coming off before approval, and remains undoable. It must never delete or complete Defect Log records.
 - Export and import remain the durable recovery path while Shop Cloud is introduced, configured, and verified across devices.
@@ -186,3 +246,5 @@ The future operator-facing defect-card replacement is documented at docs/roadmap
 ## Safe continuation prompt
 
 Open C:\Users\curti\pace-south-bus-tracker and read README.md, PROJECT_HANDOFF.md, CONTRIBUTING.md, docs/PUBLISH_NEXT.md, docs/RELEASES.md, and docs/SITES_PUBLISHING_RUNBOOK.md completely before acting. Inspect git status and recent commits. Preserve LocalStorage migrations, fleet identity, facility slot IDs, capacity-safe swaps, touch behavior, linked repair records, and all user data. Work in small stages, add focused tests, run npm test and git diff --check, and commit only the requested change. Never create a new hosting project or publish without explicit approval.
+
+Live verification: home, Defect Log and Down Sheet returned HTTP 200; Defect Log server output starts Detailed with Advanced Actions collapsed and drawer absent; all 27 referenced emitted JavaScript assets matched the release build byte-for-byte. This is HTTP/source verification, not fresh browser interaction.

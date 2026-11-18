@@ -2,14 +2,14 @@
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%;background:var(--down-bg);font-family:Arial,Helvetica,sans-serif;color:var(--down-ink)}
 button,input,select,textarea{font:inherit}
-.down-app{min-height:100vh;border:5px solid var(--down-navy);background:linear-gradient(180deg,#f9fbff,#e8edf6);padding-bottom:30px}
-.down-header{height:auto;min-height:78px;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:10px 20px;background:linear-gradient(120deg,#041d47,#0a397d);color:#fff;box-shadow:0 3px 13px #00183b55}
-.down-header span{font-size:9px;font-weight:900;letter-spacing:1.5px;color:#9fc7ff}
+.down-app{min-height:100vh;border:5px solid var(--app-header,var(--down-navy));background:linear-gradient(180deg,#f9fbff,#e8edf6);padding-bottom:30px}
+.down-header{height:auto;min-height:78px;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:10px 20px;background:var(--app-header-fill,linear-gradient(90deg,#041d47,#1d3459));color:var(--app-header-text,#fff);box-shadow:0 3px 13px #00183b55}
+.down-header span{font-size:9px;font-weight:900;letter-spacing:1.5px;color:color-mix(in srgb,var(--app-header-text,#fff) 84%,transparent)}
 .down-header h1{margin:1px 0 0;font-size:25px;line-height:1;text-transform:uppercase}
-.down-header p{margin:4px 0 0;font-size:9px;letter-spacing:.5px;color:#dbeaff}
-.down-header nav{display:flex;gap:7px}
-.down-header nav a{min-width:108px;height:36px;display:flex;align-items:center;justify-content:center;border:1px solid #81a9dc;border-radius:6px;color:#eaf3ff;text-decoration:none;font-size:10px;font-weight:900}
-.down-header nav a.active{background:#fff;color:var(--down-navy);border-color:#fff}
+.down-header p{margin:4px 0 0;font-size:9px;letter-spacing:.5px;color:color-mix(in srgb,var(--app-header-text,#fff) 90%,transparent)}
+.down-header nav{flex:1 1 auto;height:auto;min-height:0;display:flex;flex-wrap:wrap;gap:7px}
+.down-header nav a{min-width:108px;height:36px;display:flex;align-items:center;justify-content:center;border:1px solid color-mix(in srgb,var(--app-header-text,#fff) 42%,transparent);border-radius:6px;color:var(--app-header-text,#fff);text-decoration:none;font-size:10px;font-weight:900}
+.down-header nav a.active{background:var(--app-header-text,#fff);color:var(--app-header,var(--down-navy));border-color:var(--app-header-text,#fff)}
 .down-summary{margin:12px 14px 8px;display:grid;grid-template-columns:1.25fr repeat(7,1fr);gap:7px}
 .down-summary>div,.down-summary>button{min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #c3cde0;border-radius:7px;background:#fff;box-shadow:0 2px 6px #17376115}
 .down-summary strong{font-size:24px;line-height:1;color:#11396d}
@@ -55,7 +55,7 @@ button,input,select,textarea{font:inherit}
    widening that one column takes nothing away from the others: the table is
    inside a horizontal scroller and simply gets longer. 40px for the ON ROAD
    badge, then 90px more for the DELETE button beside it. */
-.down-table{width:100%;min-width:1280px;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.down-table{width:100%;min-width:1331px;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .down-table th{position:sticky;top:0;z-index:2;height:29px;padding:4px 7px;border-right:1px solid #d2d9e5;border-bottom:1px solid #8999b4;background:#e8eef7;color:#21395f;font-size:8px;letter-spacing:.4px;text-align:left}
 .down-table th:nth-child(1){width:48px;text-align:center}/* 108px fitted the number and its status label exactly, so the ON ROAD badge
    beside it overflowed into the reason column and was clipped by 21px —
@@ -179,7 +179,7 @@ button,input,select,textarea{font:inherit}
  .down-header{flex-wrap:wrap}
  .down-header>div{order:1}
  .down-header>.app-refresh{order:2}
- .down-header nav{order:3;flex:1 0 100%;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+ .down-header nav{order:3;flex:1 0 100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px}
  .down-header nav a{min-width:0;width:100%}
 }
 @media(max-width:900px){.down-header{padding:9px 12px}.down-header h1{font-size:20px}.down-summary{grid-template-columns:repeat(3,1fr)}.down-controls{flex-wrap:wrap}.completed-toggle{margin-left:0}.sheet-scroll{max-height:none}.down-app{padding-bottom:16px}}
@@ -223,7 +223,7 @@ button,input,select,textarea{font:inherit}
 .scan-previews{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px}.scan-previews:empty{display:none}.scan-previews figure{margin:0;border:1px solid #b8c4d6;border-radius:7px;background:#fff;overflow:hidden}.scan-previews img{display:block;width:100%;height:150px;object-fit:cover}.scan-previews figcaption{display:flex;align-items:center;justify-content:space-between;padding:7px;font-size:8px;font-weight:900}.scan-previews figcaption button{border:0;background:transparent;color:#a1262e;font-size:7px;font-weight:900;cursor:pointer}
 .scan-read{align-self:center;min-width:180px;background:#6b31b6}.scan-read:disabled{opacity:.45;cursor:not-allowed}
 /* NOTES FOR THIS SCAN: what the person knows the camera will get wrong, sent with the photo. */
-.scan-notes{display:flex;flex-direction:column;gap:5px}.scan-notes>span{display:flex;align-items:baseline;justify-content:space-between}.scan-notes b{font-size:9px;font-weight:900;letter-spacing:.4px;color:#3d1c6e}.scan-notes small{font-size:8px;color:#75849b}.scan-notes textarea{width:100%;min-height:64px;border:1px solid #c9b7e6;border-radius:7px;background:#fff;padding:8px 10px;color:#1d3457;font:inherit;font-size:11px;line-height:1.4;resize:vertical}.scan-notes textarea::placeholder{color:#9aa6b8}
+.scan-notes{display:flex;flex-direction:column;gap:5px}.scan-notes>span{display:flex;align-items:baseline;justify-content:space-between}.scan-notes b{font-size:9px;font-weight:900;letter-spacing:.4px;color:#3d1c6e}.scan-notes small{font-size:8px;color:#75849b}.scan-notes textarea{width:100%;min-height:64px;border:1px solid #c9b7e6;border-radius:7px;background:#fff;padding:8px 10px;color:#1d3457;font:inherit;font-size:11px;line-height:1.4;resize:vertical}.scan-notes textarea::placeholder{color:#9aa6b8}.scan-notes textarea:disabled{opacity:.55;cursor:not-allowed}.scan-notes-keep input:disabled{cursor:not-allowed}.scan-notes-keep:has(input:disabled){opacity:.55;cursor:not-allowed}
 .scan-notes-keep{display:flex;align-items:center;gap:8px;font-size:9px;font-weight:800;color:#3d1c6e;cursor:pointer}.scan-notes-keep input{width:16px;height:16px}
 @media(max-width:760px){.scan-notes textarea{font-size:16px;min-height:80px}.scan-notes-keep{min-height:44px;font-size:11px}.scan-notes-keep input{width:20px;height:20px}}
 .scan-review-head{display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border:1px solid #c7d1e1;border-radius:7px;background:#fff}.scan-review-head div{display:flex;flex-direction:column;gap:2px}.scan-review-head b{font-size:11px;color:#183b6d}.scan-review-head span{font-size:8px;color:#65758e}.scan-review-head button{border:1px solid #aebcd1;border-radius:5px;background:#f4f7fb;padding:7px 10px;color:#314a6d;font-size:8px;font-weight:900;cursor:pointer}
@@ -238,9 +238,9 @@ button,input,select,textarea{font:inherit}
 .scan-shade{padding:4px;height:100dvh}.scan-modal{width:100%;max-height:100dvh;border-radius:0}.scan-body{padding:10px}.scan-pickers{display:grid;grid-template-columns:1fr 1fr}.scan-pickers button{padding:0 8px}.scan-previews{grid-template-columns:repeat(2,1fr)}.scan-row{grid-template-columns:28px 1fr}.scan-bus{grid-column:2}.scan-reason,.scan-row>label:not(.scan-select){grid-column:1/-1}.scan-replacement header{align-items:flex-start}.scan-replacement>div{grid-template-columns:repeat(2,minmax(0,1fr))}.scan-rows{max-height:none}}
 
 /* Per-repair planning and readable page tabs */
-.down-header nav a{background:#0b4f9e;border-color:#8fc0f3;color:#fff;text-shadow:0 1px 2px #001a3f;box-shadow:inset 0 0 0 1px #ffffff12}
-.down-header nav a:hover,.down-header nav a:focus-visible{background:#1268bf;border-color:#fff;outline:none}
-.down-header nav a.active{background:#fff;color:#06275c;text-shadow:none;box-shadow:0 2px 8px #00183b55}
+.down-header nav a{background:color-mix(in srgb,var(--app-header,#041d47) 90%,var(--app-header-text,#fff));border-color:color-mix(in srgb,var(--app-header-text,#fff) 42%,transparent);color:var(--app-header-text,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--app-header-text,#fff) 9%,transparent)}
+.down-header nav a:hover,.down-header nav a:focus-visible{background:color-mix(in srgb,var(--app-header,#041d47) 74%,var(--app-header-text,#fff));border-color:var(--app-header-text,#fff);outline:none}
+.down-header nav a.active{background:var(--app-header-text,#fff);color:var(--app-header,#06275c);text-shadow:none;box-shadow:0 2px 8px #00183b55}
 .repair-items{margin:2px 0 4px;padding:0 0 12px;border:1px solid #b9c7d9;border-radius:8px;background:#eef3fa}
 .repair-items>legend{margin-left:12px;padding:0 7px;color:#183b6d;font-size:9px;font-weight:900;letter-spacing:.55px}
 .repair-items-head{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:linear-gradient(110deg,#d9eaff,#f5f9ff);border-bottom:1px solid #b9c7d9;border-radius:7px 7px 0 0}
@@ -258,7 +258,7 @@ button,input,select,textarea{font:inherit}
 .down-table .work-group-row td{height:29px;padding:5px 10px;border-bottom:1px solid #9db0ca;background:#dde9f8!important;color:#173e73;font-size:8px;font-weight:900;letter-spacing:.65px}.down-table .work-group-row.group-1 td{background:#f5e8df!important;color:#7c431d}.down-table .work-group-row.group-2 td{background:#f0e7fb!important;color:#68358b}.down-table .work-group-row.group-3 td{background:#fff0bd!important;color:#715200}
 @media(max-width:760px){.down-view-controls{margin:0 8px 8px;align-items:stretch;flex-wrap:wrap}.down-search{flex-basis:100%;min-width:0}.down-order{flex:1;width:auto}.down-view-controls label>b{font-size:8px}.quick-notes-editor{grid-template-columns:1fr}.quick-notes-editor textarea{border-left:0;border-top:1px solid #c8d2e2}.quick-notes-editor button{justify-self:end;width:94px}}
 /* Version 85 editable interface text */
-.down-header h1{color:var(--down-page-title-color,#fff);font-size:var(--down-page-title-size,25px)}
+.down-header h1{color:var(--down-page-title-color,var(--app-header-text,#fff));font-size:var(--down-page-title-size,25px)}
 .down-summary span{color:var(--down-summary-color,#657590);font-size:var(--down-summary-size,8px)}
 .quick-notes label b{color:var(--down-quick-notes-color,#163765);font-size:var(--down-quick-notes-size,10px)}
 .sheet-title span{color:var(--down-sheet-title-color,#163765);font-size:var(--down-sheet-title-size,15px)}
@@ -477,8 +477,18 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .delete-entry:hover,.delete-entry:focus-visible{background:#b4321f;color:#fff;outline:none}
 /* Same shape and slot as DELETE, green because it is the good outcome. It is
    the one press that closes a bus out, so it sits before the destructive one. */
-.fix-entry{display:inline-flex;align-items:center;justify-content:center;flex:none;width:26px;height:26px;padding:0;border:1px solid #1f6b37;border-radius:6px;background:#e4f4e8;color:#17552b;font-size:13px;font-weight:900;line-height:1;vertical-align:middle;cursor:pointer;touch-action:manipulation}
+/* IT SAYS WHAT IT IS. This was a bare green tick and nothing else, which is
+   why Curtis asked for "its own Mark as fixed button, just like the defect
+   sheet has" about a button that already existed and had done the whole job
+   since it was built. A tick is not a word.
+
+   `min-width:26px` here is INERT and kept only as a floor: the grid track
+   below stretches this button to 62px on the shop computer and the phone
+   block sets `width:44px`, so 26px can never bind. It used to be described as
+   the reason the pair lines up, which it is not — the two FIXED TRACKS are. */
+.fix-entry{display:inline-flex;align-items:center;justify-content:center;flex:none;gap:5px;width:auto;min-width:26px;height:26px;padding:0 7px;border:1px solid #1f6b37;border-radius:6px;background:#e4f4e8;color:#17552b;font-size:13px;font-weight:900;line-height:1;vertical-align:middle;cursor:pointer;touch-action:manipulation}
 .fix-entry:hover,.fix-entry:focus-visible{background:#1f6b37;color:#fff;outline:none}
+.fix-entry b{font-size:8px;font-weight:900;letter-spacing:.5px;line-height:1;text-align:center}
 .down-deleted-note.fixed{border-color:#1f6b37;border-left-color:#1f6b37;background:#e9f6ec;color:#17552b}
 .down-deleted-note.fixed button{border-color:#1f6b37;color:#17552b}
 .down-deleted-note{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 14px 9px;padding:8px 11px;border:1px solid #b4321f;border-left:4px solid #b4321f;border-radius:6px;background:#fdeeeb;font-size:10px;font-weight:800;color:#7c2011}
@@ -520,7 +530,33 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
  .down-deleted-note{margin:0 8px 8px}
  .down-deleted-note button{width:100%;min-height:44px}
  /* 26px is fine under a mouse and not under a thumb. */
- .delete-entry,.fix-entry{width:44px;height:44px;font-size:18px}
+ .delete-entry{width:44px;height:44px;font-size:18px}
+ /* ON A PHONE THE WORD GOES UNDER THE TICK, not beside it. Beside it was
+    measured and clipped: this cell is 114px and two 44px thumb targets with a
+    gap already fill it, so the button came out 45px wide with scrollWidth 46
+    against clientWidth 43 and the word's right edge past the button's. Widening
+    the cell instead would have squeezed REASON, which is the bug the comment
+    further up this file was written for. Stacked, the target stays 44px wide
+    and the column does not move.
+
+    AND IT COSTS NO ROW HEIGHT, which this comment used to claim it did. The
+    stacked button is 44px and `.down-table td{height:55px}` above already
+    floors an entry row higher than that, so the word changes nothing: measured
+    identical with the word and with it hidden, 55px on a row whose REASON fits
+    one line and 75.59px on one that wraps to three, at 360, 390, 430, 760 and
+    1180. The height is the REASON's, not the button's. */
+ .fix-entry{flex-direction:column;justify-content:center;gap:1px;width:44px;min-width:44px;height:auto;min-height:44px;font-size:17px;padding:4px 0;line-height:1}
+ /* UP a point on a phone, not down. Five lines from here this file says "the
+    status label and the badge are both a point larger here", and `.on-road-badge`
+    does go 8px to 9px. 7px was the smallest text on the sheet, on the device
+    the sheet is actually used on. Read through `declaredFontSizePx` by the
+    test, so a `font:` shorthand or a `%` here is seen rather than guessed. */
+ /* TWO LINES ON A PHONE, inside the 44px target rather than widening it.
+    Measured: the widest line is FIXED at 31.56px in DejaVu Sans against a
+    42px content box, and the button comes out 48px tall - under the 55px the
+    `.down-table td` floor already gives an entry row, so two lines cost no
+    row height either. */
+ .fix-entry b{font-size:9px;letter-spacing:.3px;line-height:1.15;white-space:normal}
  /* The status label and the badge are both a point larger here, and the target
     is 44px, so the tab stops move out to match rather than letting anything
     spill into the reason column. */
@@ -587,16 +623,42 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    SCAN SHEET already wears on this page and nothing on the Defect Log does, so
    the button says which sheet you are on before you have read a word of it. */
 .down-header-actions{flex:none;display:flex;min-width:0;max-width:210px;flex-direction:column;align-items:stretch;gap:7px}
-.down-advanced-toggle{width:100%;min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #a271e8;border-radius:6px;background:#6b31b6;color:#fff;padding:6px 12px;font:inherit;cursor:pointer;box-shadow:0 0 0 2px #6b31b633}
+.down-advanced-toggle{width:100%;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #c49bf2;border-radius:8px;background:#6b31b6;color:#fff;padding:9px 13px;font:inherit;cursor:pointer;box-shadow:0 0 0 2px #6b31b633}
 .down-advanced-toggle:hover,.down-advanced-toggle:focus-visible{background:#7d3ccd;border-color:#fff;outline:none}
 .down-advanced-toggle>span{display:flex;min-width:0;flex-direction:column;gap:2px;text-align:left}
-.down-advanced-toggle b{color:#fff;font-size:10px;font-weight:900;letter-spacing:.5px}
-.down-advanced-toggle small{min-width:0;color:#e4d3fb;font-size:7px;font-weight:900;line-height:1.2;overflow-wrap:anywhere}
-.down-advanced-toggle>i{flex:none;border:1px solid #ffffff8a;border-radius:6px;color:#fff;padding:5px 9px;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.5px}
+/* 11px here, 14px on phones, and the split is forced by MEASUREMENT rather
+   than taste. .down-header-actions is capped at 210px above 760px - a test
+   records that uncapping it pushed the page 40px sideways at 1180 - which
+   leaves the text column 118px wide once the chip, the padding and the gap
+   are taken out. "ADVANCED ACTIONS" needs about 125px at 12px and 148px at
+   14px, so both wrapped to two lines and the control grew to 87-96px against
+   the 48px it replaced.
+
+   11px wrapped too. 10px is what fits on one line in 118px, which is why the
+   original chose it - that number was not arbitrary and this change walked
+   into the same wall before reading it.
+
+   So above 760px the prominence comes from the purple fill and the taller
+   control, not the type. Below 760px the cap is lifted, the column is full
+   width, and the label takes the same 14px as the Defect Log's. */
+.down-advanced-toggle b{color:#fff;font-size:10px;font-weight:900;letter-spacing:.4px}
+.down-advanced-toggle small{min-width:0;color:#eaddfd;font-size:7px;font-weight:900;line-height:1.2;overflow-wrap:anywhere}
+.down-advanced-toggle>i{flex:none;border:1px solid #ffffffad;border-radius:6px;color:#fff;padding:5px 9px;font-style:normal;font-size:9px;font-weight:900;letter-spacing:.5px}
 /* The drawer opens directly under the header, so it loses the rounded top a
-   card in the middle of the page would have. */
-.down-advanced{margin:0 14px 10px;overflow:hidden;border:1px solid #b7c3d7;border-top:0;border-radius:0 0 9px 9px;background:#fff}
-.down-advanced-body{display:grid;gap:9px;padding:9px;background:#eef2f8}
+   card in the middle of the page would have.
+
+   AND IT WEARS THE BUTTON'S PURPLE. It opened white under a #6b31b6 button,
+   so the two read as unrelated and the drawer looked like it belonged to the
+   sheet below it. Curtis, about both pages: "that button for advanced
+   features, it brings down the menu that doesn't look like it belongs with
+   the color of that button."
+
+   Purple here and navy on the Defect Log is the point, not an inconsistency:
+   each drawer takes the colour of the button that opens it, and those two
+   buttons are deliberately different so the two navy headers cannot be
+   mistaken for one another. A test holds that apart. */
+.down-advanced{margin:0 14px 10px;overflow:hidden;border:1px solid #a271e8;border-top:0;border-radius:0 0 9px 9px;background:#6b31b6;box-shadow:0 10px 22px #2a0f4d4d}
+.down-advanced-body{display:grid;gap:9px;padding:9px;background:transparent}
 .down-advanced-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:6px;align-items:center;border:1px solid #c4cedd;border-radius:7px;background:#fff;padding:8px}
 .down-advanced-label{grid-column:1/-1;font-size:7px;font-weight:900;letter-spacing:.6px;color:#60728c}
 .down-advanced-group>.shift-filter{display:contents}
@@ -604,7 +666,9 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-advanced-group>.shift-filter>button,.down-advanced-group>.completed-toggle,.down-advanced-group>button{width:100%;min-height:44px;display:flex;align-items:center;justify-content:center;gap:5px;margin:0;text-align:center}
 @media(max-width:760px){
  .down-header-actions{width:100%;max-width:none}
- .down-advanced-toggle{min-height:44px}
+ .down-advanced-toggle{min-height:56px}
+ .down-advanced-toggle b{font-size:14px}
+ .down-advanced-toggle small{font-size:9px}
  .down-advanced{margin:0 8px 8px}
  .down-advanced-group{grid-template-columns:repeat(2,minmax(0,1fr))}
  .down-advanced-group>.shift-filter>span{grid-column:1/-1}
@@ -624,9 +688,59 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 
    Out here they cost a deliberate scroll, which is the point, and both now ask
    before they act. */
-.down-table th.row-actions-head{width:104px}
+/* 155px, AND THE ARITHMETIC IS THE GRID'S, NOT THE WORD'S. This said 110px
+   and "six more pixels buys the slack", which was wrong twice over. The six
+   pixels of COLUMN width cannot affect the button's internal fit at all — the
+   first track is a fixed width however wide the cell is, and what gives the
+   label room is that track stretching the button. Measured at the 96px MARK
+   FIXED needs: the button's BORDER box is 96.00px and its contents — tick
+   11.50 + gap 5 + label 54.78 — are 71.28px, so 87.28px with the padding and
+   border, leaving 8.7px clear. (An earlier version of this line read "a 94px
+   content box against 87.23px": 94 is the PADDING box and 87.23 a border-box
+   figure, two frames 2px apart, which a reviewer caught. The conclusion was
+   right and the comparison was not.) Forced to DejaVu Sans the label is
+   61.02px, so 93.52px in the border box and it still fits. (The
+   "3.34px over in DejaVu Sans" this comment used to carry belonged to the old
+   auto-width button, not to a stretched one.)
+
+   What the column width decides is whether the GRID fits. It is 96 + 8 + 36 =
+   140px; `*{box-sizing:border-box}` at the top of this file means a `th` width
+   is the border box, so the cell also owes 14px of `td` padding and a 1px
+   border — 155px. The phone's two 44px targets and their 10px gap need 113px,
+   so the desktop figure covers both. At 110px it was 11px short of its own contents and only
+   looked right because `min-width` below is deliberately larger than the sum
+   of the columns and Chrome spreads the surplus, leaving 0.45px of DELETE in
+   the cell's own right padding. Anyone who later made `min-width` match the
+   columns, which this file reads as if it were the rule, would have pushed
+   DELETE 3px past the table's right edge on the spot. Declared honestly now,
+   and a test checks the declaration rather than the render. */
+.down-table th.row-actions-head{width:155px}
 .down-table td.row-actions{text-align:center}
-.row-actions-slots{display:inline-grid;grid-template-columns:36px 36px;justify-content:center;gap:8px;align-items:center}
+/* FIXED TRACKS, NOT `auto`. With `auto` the first track took MARK FIXED's
+   full width on an open row and collapsed to the button's min-width on a
+   completed one, so the grid was 99.03px on one row and 70px on the next and
+   DELETE sat 48.5px apart between neighbours — measured. Worse, every DELETE
+   on the shop computer moved when the word was added, including on completed
+   rows that never draw a MARK FIXED at all. A destructive control is not
+   something to let wander.
+
+   96px, NOT 62px, because the label is MARK FIXED now rather than FIXED -
+   Curtis asked for "its own Mark as fixed button, just like the defect sheet
+   has", and the Defect Log's `.quick-fix` reads MARK FIXED. Measured inline at
+   8px/.5px: tick 11.45 + gap 5 + word 56 + padding 14 + border 2 = 88.45px,
+   and 93.47px forced to DejaVu Sans, so 96px clears both.
+
+   `justify-content:center` is INERT for the same reason: with both tracks
+   fixed the inline-grid is exactly their sum — 140px on the shop computer and
+   98px on a phone — so there is nothing inside it to distribute. What centres the pair in the cell is `text-align:center` on the
+   line above. Kept so that a future `auto` track does not also lose the
+   centring, and recorded rather than left to be rediscovered. */
+.row-actions-slots{display:inline-grid;grid-template-columns:96px 36px;justify-content:center;gap:8px;align-items:center}
+/* AND DELETE STAYS IN ITS OWN TRACK. A lone child auto-places into column 1,
+   so on a completed row DELETE slid into the slot MARK FIXED normally holds
+   and left the reserved track empty beside it. That predates the word and is
+   why the two rows never lined up. */
+.delete-entry{grid-column:2}
 @media(max-width:760px){.row-actions-slots{grid-template-columns:44px 44px;gap:10px}}
 /* THE STATUS REPORT. Shares .shade with the other Down Sheet modals so the
    backdrop and the scroll lock behave identically; everything below is its
@@ -738,7 +852,9 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-quick-filter-actions{display:flex;flex-wrap:wrap;gap:6px}
 .down-quick-filter-actions button{min-height:32px;border:1px solid #6b3fc4;border-radius:5px;background:#6b3fc4;color:#fff;padding:0 11px;font-size:9px;font-weight:900;cursor:pointer;touch-action:manipulation}
 .down-quick-filter-actions button+button{background:#fff;color:#4a2a8c}
-.down-quick-filter-note>small{flex-basis:100%;color:#4a2a8c;font-size:9px;font-weight:900}
+/* The share's own word sits in the hint's line rather than claiming a row of
+   its own, so a result never moves the sheet underneath it. */
+.down-quick-filter-note>p>small.said{color:#4a2a8c;font-weight:900}
 /* The trigger takes this page's own control styling. Bare, it inherits nothing
    but display:inline-flex from globals.css and renders as unstyled text. */
 .down-view-controls .quick-filter-trigger{height:32px;border:1px solid #aebbd0;border-radius:5px;background:#f2f5f9;color:#294264;padding:0 10px;font-size:8px;font-weight:900;cursor:pointer}
@@ -749,6 +865,15 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
  .down-quick-filter-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
  .down-quick-filter-actions button{min-height:44px;font-size:10px}
  .down-quick-filter-actions .down-quick-filter-clear{grid-column:1/-1}
+ /* THREE ACROSS WHEN THERE IS NO FILTER. The two-column grid above is right
+    for the filtered bar, which carries a fourth button; with only the three
+    share actions it strands SHARE PAGE alone on a second row and the block
+    costs 151px of a phone screen it now occupies on EVERY visit, where it
+    used to appear only once a filter had been picked. Measured at 390: 151px
+    stranded, 101px three across. The 44px targets above are untouched - at
+    360 each button still gets about 100px of width, and the shortest label
+    here is nine characters. */
+ .down-quick-filter-note.sheet-share .down-quick-filter-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
  .down-view-controls>.quick-filter-control{flex:1}
  .down-view-controls .quick-filter-trigger{width:100%;height:44px;min-height:44px;font-size:9px}
 }
@@ -803,3 +928,30 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .in-service-toggle{height:auto;min-height:38px;width:100%;border:1px solid #9aa7c2;border-radius:7px;background:#fff;color:#2b3c60;padding:6px 10px;font-size:10px;font-weight:900;letter-spacing:.04em;cursor:pointer}
 .in-service-toggle.on{border-color:#0d7a3f;background:#e6f6ec;color:#0b5c31}
 .group-count.in-service strong{color:#0d7a3f}
+
+/* A BUS FLAGGED DOWN THAT THE ACTIVE CAP HAD NO ROOM FOR. The sheet used to
+   drop these silently and `reconcileDownSheetMembership` then took their map
+   badge away too — measured: three of five buses off the sheet and off the
+   map, on a sheet holding two active entries, because the cap was counting
+   completed history. The cap counts the active rows now, and anything still
+   left out says so here. Styled as the scan's own LINES NOT READ warning,
+   which is the same kind of fact: a bus that is down and nowhere to be seen. */
+.down-mint-skipped{display:grid;grid-template-columns:1fr auto;gap:3px 10px;align-items:center;margin:0 14px 8px;padding:9px 11px;border:1px solid #d9a441;border-left:4px solid #c07a00;border-radius:6px;background:#fff8ec}
+.down-mint-skipped b{grid-column:1;font-size:9px;font-weight:900;letter-spacing:.6px;color:#7a4d05}
+.down-mint-skipped small{grid-column:1;font-size:9px;font-weight:700;line-height:1.45;color:#7a4d05}
+.down-mint-skipped button{grid-column:2;grid-row:1/-1;width:44px;height:44px;border:1px solid #d9a441;border-radius:6px;background:#fff;color:#7a4d05;font-size:17px;font-weight:900;line-height:1;cursor:pointer;touch-action:manipulation}
+@media(max-width:760px){.down-mint-skipped{margin:0 8px 8px}}
+
+/* ADDED VIA APP — a row the app itself put on the sheet rather than one read
+   off the office's scanned sheet, whether somebody typed it into ADD DOWN BUS
+   or the board's own `down` flag minted it. Curtis: "we'll know that it was not on the downsheet
+   originally." Shaped like ON ROAD beside it, since both answer "something
+   else is true about this row", and amber rather than that badge's green:
+   green reads as settled, and the whole point of this one is that the master
+   sheet has not confirmed the bus yet. It clears itself on the next scan. */
+.added-in-app-badge{align-self:flex-start;display:inline-flex;align-items:center;flex:none;padding:3px 7px;border:1px dashed #b07d12;border-radius:9px;background:#fff6e3;color:#7a4d05;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.4px;vertical-align:middle;white-space:nowrap}
+@media(max-width:760px){.added-in-app-badge{font-size:9px;padding:4px 8px}}
+/* The line the scanner shows when SCAN SHEET opened it, and the warning when
+   SCAN SHEET held pages of the batch back. */
+.scan-handed{margin:0;padding:8px 11px;border-left:4px solid #08733f;background:#e6f6ec;color:#0c3b22;font-size:9px;font-weight:900;letter-spacing:.3px;line-height:1.4}
+.scan-handed.held-back{border-left-color:#c98a00;background:#fff3d6;color:#6b4a00}

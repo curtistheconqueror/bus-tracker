@@ -244,9 +244,12 @@ test("the lists page neutralises the global aside and section styling",async()=>
  // and it precedes the rules that then style them deliberately
  assert.ok(css.indexOf(".lists-index,.lists-layout{position:static")<css.indexOf(".lists-layout{display:grid"));
  // The global bare nav is white; Campaigns must explicitly restore the dark
- // header tab bar so inactive phone tabs cannot become white-on-white.
- assert.match(css,/\.lists-header nav\{[^}]*background:#082f60/);
- assert.match(css,/\.lists-header nav a\{[^}]*background:#082f60[^}]*color:#fff/);
+ // header tab bar so inactive phone tabs cannot become white-on-white. It was
+ // the literal #082f60, a navy picked to sit on the old navy header; the
+ // header's colour is a setting now, so what has to hold is that the band is
+ // DERIVED from it and its labels follow the header's computed text colour.
+ assert.match(css,/\.lists-header nav\{[^}]*background:color-mix\(in srgb,var\(--app-header,[^)]*\) \d+%,var\(--app-header-text,[^)]*\)\)/);
+ assert.match(css,/\.lists-header nav a\{[^}]*background:color-mix\(in srgb,var\(--app-header,[^)]*\) \d+%,var\(--app-header-text,[^)]*\)\);color:var\(--app-header-text,#fff\)/);
 });
 
 test("the repair details panel opens for a record that has repair details",async()=>{
@@ -393,7 +396,9 @@ test("Fixed Repairs windows the render instead of drawing every completed repair
  // A new search or category collapses back to the first page rather than
  // staying wherever a previous SHOW ALL left it — a person narrowing the list
  // wants the top of the new result, not five hundred rows into an old browse.
- assert.match(fixedPage,/useEffect\(\(\)=>setVisibleCount\(PAGE_SIZE\),\[search,category\]\)/);
+ /* And the WINDOW joins them, or picking LAST 24H leaves somebody five hundred
+    rows into a browse that no longer exists. */
+ assert.match(fixedPage,/useEffect\(\(\)=>setVisibleCount\(PAGE_SIZE\),\[search,category,fixedWindow\]\)/);
 
  // The count line is honest about what is capped and what is not: it says
  // "OF" only once something is actually hidden, and reads as a plain count
@@ -599,7 +604,14 @@ test("a render error shows a screen with a way out, not a white one",async()=>{
     to refresh, and it's just stuck." A render error unmounts the entire tree,
     and in standalone mode there is no address bar, no reload button and no
     pull-to-refresh. The app is bricked until iOS kills the process. */
- assert.match(layout,/<CrashGuard>\{children\}<\/CrashGuard>/,"every page is inside the boundary");
+ /* Written as "CrashGuard is the only thing in <body>, and {children} is
+    inside it" rather than pinned as that exact pair of tags: what matters is
+    that nothing renders outside the boundary, and a component added beside
+    {children} INSIDE it — which is where a component that runs on every page
+    belongs — is the safe case, not the one to fail on. */
+ assert.match(layout,/<body(?: className="fleetstep-shell")?><CrashGuard>[\s\S]*\{children\}[\s\S]*<\/CrashGuard><\/body>/,
+   "every page is inside the boundary");
+ assert.doesNotMatch(layout,/<body(?: className="fleetstep-shell")?>(?!<CrashGuard>)/,"nothing renders outside the boundary");
  assert.match(guard,/static getDerivedStateFromError/,"a class component, because componentDidCatch has no hook equivalent");
  assert.match(guard,/componentDidCatch/);
  assert.match(guard,/location\.reload/,"the one control a standalone app cannot otherwise offer");
@@ -916,4 +928,792 @@ test("Fixed Repairs is themed all the way into the card, not just around it",asy
   assert.ok(rule,selector+" still has a rule");
   assert.doesNotMatch(rule,/var\(--fixed-green/,selector+" no longer uses the light-theme green");
  }
+});
+
+test("scrolling the facility map does not move a bus", async () => {
+ const [css,mapPage]=await Promise.all([
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+ ]);
+
+ /* THE REGRESSION THIS TEST EXISTS TO CATCH, and it shipped in the first
+    commit this repository has. `.token{touch-action:none}` told the browser
+    never to scroll when a finger landed on a bus, and the drag armed on 7px of
+    travel with no time requirement at all. The map is 4366px tall on a 390px
+    phone and a bus token is most of what is under a thumb, so a plain swipe up
+    carried garage-6 to wall-7 and scrolled the page zero pixels. Measured in
+    Chromium, not read off the stylesheet. Curtis: "when you're moving up and
+    down on the screen, you're gonna be moving buses all over the place." */
+ const tokenRule=css.match(/\n\.token\{touch-action:[^;]+;/);
+ assert.ok(tokenRule,"the token still declares a touch-action");
+ assert.doesNotMatch(tokenRule[0],/touch-action:none/,"a finger on a bus must still be able to scroll the page");
+ assert.match(tokenRule[0],/touch-action:manipulation/,"panning passes through; double-tap zoom stays off, since double tap opens the editor");
+
+ /* A hold, not a distance. The constants are the fix; a bare Math.hypot test
+    in onPointerMove deciding `active` is what it replaced.
+
+    READ AS NUMBERS rather than matched as \d+, which `HOLD_MS=0` satisfies —
+    the first version of this assertion passed on a hold of zero, which is the
+    bug with the constants renamed. */
+ const held=mapPage.match(/const HOLD_MS=(\d+),HOLD_SLOP=(\d+),DRAG_SLOP=(\d+);/);
+ assert.ok(held,"the hold is spelled out in named constants");
+ const [holdMs,holdSlop,dragSlop]=held.slice(1,4).map(Number);
+ assert.ok(holdMs>=250,"a hold shorter than a quarter second does not survive a scroll flick, measured at 250ms");
+ assert.ok(holdMs<=700,"a hold this long reads as the app ignoring the finger");
+ assert.ok(holdSlop>0&&dragSlop>0,"both slops have to admit some drift; a thumb is not a mouse");
+ assert.match(mapPage,/holdTimer\.current=window\.setTimeout\(armTouchDrag,HOLD_MS\)/,"pointerdown arms a timer rather than the drag itself");
+ assert.doesNotMatch(mapPage,/!state\.active&&Math\.hypot\([^)]*\)>=7\)\{state\.active=true/,"travel alone must never arm a drag");
+ assert.match(mapPage,/if\(!state\.active\)\{if\(Math\.hypot\([^)]*\)>=HOLD_SLOP\)cancelHold\(\);return\}/,"movement before the hold fires is a scroll, and gives up on the drag");
+
+ /* Only a non-passive touchmove listener can cancel a scroll: a pointermove
+    preventDefault does not, and React registers touchmove passively. Blocking
+    it is also why every exit path has to release it, or the page is left
+    unable to scroll at all. */
+ assert.match(mapPage,/document\.addEventListener\("touchmove",handler,\{passive:false\}\)/,"an armed drag takes scrolling back");
+ /* And the arm has to CALL it. Without this line the whole suite passed with
+    blockScroll() deleted from armTouchDrag — which is the original bug back
+    in full, because touch-action no longer stops the scroll either. */
+ const arm=mapPage.match(/const armTouchDrag=\(\)=>\{[\s\S]*?\};/);
+ assert.ok(arm,"armTouchDrag still exists");
+ assert.match(arm[0],/blockScroll\(\)/,"arming a drag is what takes scrolling back");
+ assert.match(arm[0],/state\.armX=state\.lastX;state\.armY=state\.lastY/,"travel is measured from where the drag armed, not from touchdown");
+ assert.match(mapPage,/Math\.hypot\(event\.clientX-state\.armX,event\.clientY-state\.armY\)>=DRAG_SLOP/);
+
+ /* One finger owns a token. A second used to overwrite the first's gesture,
+    leaving the ring and the scroll block on a page that could no longer
+    scroll, and turning the first finger's lift into a tap. */
+ assert.match(mapPage,/if\(touchDrag\.current\.pointerId>=0\)return;touchDrag\.current=\{pointerId:event\.pointerId/,"a live gesture is not replaced by a second finger");
+ assert.match(mapPage,/if\(touchDrag\.current\.pointerId>=0&&event\.pointerId!==touchDrag\.current\.pointerId\)return;/,"a finger we are not tracking says nothing about this bus");
+
+ /* The net that does not need a pointerup: the last finger off the glass
+    releases the block however the gesture ended. */
+ assert.match(mapPage,/const lift=\(event:TouchEvent\)=>\{if\(event\.touches\.length===0\)releaseScroll\(\)\}/,"the last finger up frees scrolling");
+ assert.match(mapPage,/document\.addEventListener\("touchend",lift\);document\.addEventListener\("touchcancel",lift\)/);
+ const release=mapPage.match(/const releaseScroll=\(\)=>\{[\s\S]*?\};/);
+ assert.ok(release,"releaseScroll still exists");
+ assert.match(release[0],/document\.removeEventListener\("touchmove",scrollBlock\.current\)/,"the blocker comes off");
+ assert.match(release[0],/document\.removeEventListener\("touchend",touchLift\.current\);document\.removeEventListener\("touchcancel",touchLift\.current\)/,"and so does its net, or the next drag leaks one");
+ const finish=mapPage.match(/const finishTouchDrag=[\s\S]*?return \{active:wasActive,moved\};/);
+ assert.ok(finish,"finishTouchDrag still reports what the gesture was");
+ /* Stated narrowly on purpose. The first version of this line claimed "every
+    end of a touch drag gives scrolling back", which the code made false: the
+    pointerId guard above returns before either call. What is true is that the
+    path which OWNS the gesture releases both, and the touchend net above
+    covers the rest. */
+ assert.match(finish[0],/if\(event\.pointerId!==state\.pointerId\)return \{active:false,moved:false\};cancelHold\(\);releaseScroll\(\);/,"the gesture's own end releases the hold and the scroll block");
+ assert.match(mapPage,/onPointerCancel=\{event=>\{if\(event\.pointerType==="touch"\)finishTouchDrag\(event,true\)\}\}/,"a gesture the browser takes over ends the drag too");
+
+ /* A hold that lifts in place is a look at the bus, not a drop onto its own
+    space: without `moved` the drop target under the finger is the token's own
+    spot and the move is a self-move. */
+ assert.match(finish[0],/const target=cancelled\|\|!moved\?null:touchDropTarget/);
+ assert.match(mapPage,/const drag=finishTouchDrag\(event\);if\(drag\.active\)\{if\(!drag\.moved\)showQuick\(\);return\}/);
+
+ /* The ring is the only confirmation of the hold on iOS, where
+    navigator.vibrate does not exist. Drawn as a pseudo-element because
+    fifteen rules in globals.css set box-shadow on a token and thirteen carry
+    an attribute selector, outweighing any chain of three classes whatever
+    its position: under HIGHLIGHT A/C or any quick filter the first version of
+    this ring measured as the highlight's own glow and the person holding the
+    phone got nothing. Nothing in this repository styles `.token::after`. */
+ assert.match(mapPage,/\(dragArmed\?" drag-armed":""\)/,"the armed token carries the class");
+ assert.match(css,/\.token\.drag-armed::after\{content:"";position:absolute;inset:-3px;border:2px solid/,"the ring is a pseudo-element, not a box-shadow in a fight it loses");
+ assert.doesNotMatch(css,/\.token\.drag-armed\{[^}]*outline:none/,"outline:none erased the multi-select ring on an armed bus");
+
+ /* A Token keyed by nothing kept its refs when the bus under it changed, so a
+    cloud pull mid-gesture dropped the NEW occupant's id. The 400ms hold makes
+    that window longer on every drag, which is what turned a latent bug into
+    one worth fixing here. */
+ assert.match(mapPage,/\{b&&<Token key=\{b\.id\} bus=\{b\} edit=\{edit\}\/>\}/,"a token is identified by its bus");
+
+ /* Three touch gestures share this element and the hold must not have eaten
+    the other two: one tap still shows the quick view, two still open the
+    editor. */
+ assert.match(mapPage,/if\(now-lastTouch\.current<350\)\{lastTouch\.current=0;setQuick\(false\);edit\(bus\)\}else\{lastTouch\.current=now;showQuick\(\)\}/);
+});
+
+test("the offline shell install is all-or-nothing", async () => {
+ const src=await readFile(new URL("../public/sw.js",import.meta.url),"utf8");
+ const cacheName=src.match(/const CACHE_NAME = "([^"]+)"/)?.[1];
+ assert.ok(cacheName,"the cache name is readable from the source rather than pinned here");
+
+ /* THIS ONE RUNS THE REAL FILE rather than reading it, because what it guards
+    is a Promise.all that rejects — invisible to any string match, which is how
+    somebody (me) came to read the rejection as a bug and soften it.
+
+    The rejection IS the retry. A failed install means the worker never
+    activates, and register() runs on every map load, so the browser tries
+    again. Catch per page instead and a worker activates holding a PARTIAL
+    shell that never heals: installs re-run only on a script byte change, and
+    `activate` keeps every cache under CACHE_NAME. The navigate handler is
+    network-first and caches each page as somebody visits it online, so the
+    hole closes for pages they walk to and never for the ones they do not —
+    and the ones they do not are the entire reason this file exists. */
+ const install=async(failing,notOk=[])=>{
+  const listeners={},store=new Map();
+  const cacheApi={
+   open:async name=>{if(!store.has(name))store.set(name,new Map());const held=store.get(name);
+    return {put:async(key,value)=>held.set(typeof key==="string"?key:key.url,value),keys:async()=>[...held.keys()]}},
+   keys:async()=>[...store.keys()],delete:async name=>store.delete(name),match:async()=>undefined,
+  };
+  let activated=false;
+  const worker={addEventListener:(type,fn)=>{listeners[type]=fn},skipWaiting:async()=>{activated=true},
+   clients:{claim:async()=>{}},location:{origin:"http://x"}};
+  const FakeRequest=class{constructor(url){this.url=url}};
+  const fetchStub=async target=>{
+   const url=typeof target==="string"?target:target.url;
+   if(failing.includes(url))throw new TypeError("Failed to fetch");
+   if(notOk.includes(url))return {ok:false,clone(){return this},async text(){return ""}};
+   /* A real Response body reads ONCE, so the stub has to refuse a second read
+      or it protects nothing: an earlier version returned a fresh object from
+      clone() and a mutant that dropped the .clone() call entirely still
+      passed 8/8. bodyUsed is what makes a dropped clone fail here rather than
+      on somebody's phone. */
+   const body='<link href="/assets/x'+url.replace(/\W/g,"")+'.css">';
+   const make=()=>{let used=false;return {ok:true,clone:()=>make(),
+    async text(){if(used)throw new TypeError("body already read");used=true;return body}}};
+   return make();
+  };
+  new Function("self","caches","fetch","Request",src)(worker,cacheApi,fetchStub,FakeRequest);
+  let waited=null;
+  listeners.install({waitUntil:promise=>{waited=promise}});
+  let failed=false;
+  try{await waited}catch{failed=true}
+  const held=store.get(cacheName);
+  return {failed,activated,pages:held?[...held.keys()].filter(key=>!key.startsWith("/assets")&&!key.includes(".")):[]};
+ };
+
+ /* Same harness, but the named pages answer with ok:false instead of throwing. */
+ const installNotOk=async notOk=>install([],notOk);
+
+ const clean=await install([]);
+ assert.equal(clean.failed,false,"a clean install succeeds");
+ assert.equal(clean.activated,true,"and the worker takes over");
+ assert.equal(clean.pages.length,8,"holding every core page");
+
+ /* One page, seven pages, or the root: any of them fails the install, and the
+    worker must NOT activate holding what it managed to get. */
+ for(const failing of [["/shop-talk"],["/"],["/down-sheet","/defect-log","/fixed-repairs","/lists","/incidents","/shop-talk","/settings"]]){
+  const partial=await install(failing);
+  assert.equal(partial.failed,true,failing.length+" unreachable page(s) fails the install, so the browser retries");
+  assert.equal(partial.activated,false,"and no worker activates holding a partial shell");
+ }
+
+ /* A NON-OK RESPONSE IS NOT A THROWN FETCH, and this file does not treat it
+    like one: `if(!page.ok)return` skips the page and the install still
+    resolves. So the all-or-nothing property above holds for a connection that
+    drops and NOT for a 503, a 404 mid-deploy, or a captive portal. Pinned
+    here as the behaviour that is actually in the file, rather than asserted
+    away — and raised in docs/PUBLISH_NEXT.md, because a portal answering 200
+    with a login page would have that page cached AS a core page, which is a
+    worse outcome than a gap and is Curtis's call to fix. */
+ const notOk=await installNotOk(["/shop-talk"]);
+ assert.equal(notOk.failed,false,"a non-ok page does NOT fail the install today");
+ assert.equal(notOk.pages.length,7,"and the worker activates holding seven of eight");
+});
+
+test("Escape closes the map layer that locked the page behind it", async () => {
+ const mapPage=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ const escape=mapPage.match(/const escape=\(event:KeyboardEvent\)=>\{[\s\S]*?\n\};/);
+ assert.ok(escape,"the map closes a layer on Escape");
+
+ /* ONE PRESS CLOSES ONE LAYER, and it must be THESE layers. Counting branches
+    was not enough: swapping `settingsOpen`/`setSettingsOpen` for
+    `holdBoardOpen`/`setHoldBoardOpen` kept the count at five and passed,
+    which is SETTINGS silently losing its Escape in exchange for a layer that
+    locks nothing. The pairs are named now. Chaining is asserted separately,
+    because an earlier version passed if every `else if` became a plain `if` —
+    one press closing all five at once, the thing it exists to prevent. */
+ const closers=[...escape[0].matchAll(/(else )?if\((\w+)\)(set\w+)\(([^)]*)\)/g)];
+ assert.deepEqual(closers.map(branch=>[branch[2],branch[3],branch[4]]),[
+  ["operatorOpen","setOperatorOpen","false"],
+  ["relocateSpot","setRelocateSpot","null"],
+  ["removeSection","setRemoveSection","null"],
+  ["multiLocateOpen","setMultiLocateOpen","false"],
+  ["settingsOpen","setSettingsOpen","false"],
+ ],"exactly the five layers that lock the page, each closing itself");
+ assert.equal(closers[0][1],undefined,"the first is a plain if");
+ for(const branch of closers.slice(1))assert.equal(branch[1],"else ",branch[2]+" is chained, so one press cannot close two layers");
+
+ /* NOT stopPropagation. On `window` in the capture phase it is first in the
+    path, so it silenced every other Escape handler in the app -- the phone
+    command panel, the page menu, the badge menu, the quick-filter menu, the
+    welcome gate -- for as long as a map modal was open. */
+ assert.doesNotMatch(escape[0],/stopPropagation/,"a capture-phase window listener must not swallow everybody else's Escape");
+ assert.match(mapPage,/window\.addEventListener\("keydown",escape,true\)/);
+ assert.match(mapPage,/return\(\)=>window\.removeEventListener\("keydown",escape,true\)/,"and it comes off again");
+
+ /* A dependency array, like the other twenty-three effects in this file. */
+ /* Read from the end of THIS effect rather than from a slice wide enough to
+    catch a neighbour's array. */
+ const tail=mapPage.slice(mapPage.indexOf("const escape=(event:KeyboardEvent)"));
+ const closing=tail.indexOf('window.removeEventListener("keydown",escape,true)');
+ assert.ok(closing>0,"the listener is removed again");
+ assert.match(tail.slice(closing,closing+200),/\},\s*\[modalOpen,operatorOpen,relocateSpot,removeSection,multiLocateOpen,settingsOpen\]\);/,"and this effect declares exactly what it reads");
+
+ /* THE BUS EDITOR IS NOT HERE ON PURPOSE. The other five close on a backdrop
+    click already, so Escape is a second harmless way out; the editor holds
+    typed work and closing it DELETES an unsaved new bus. That keystroke is
+    Curtis's call. HOLD THIS BUS locks nothing, so it traps nobody. */
+ assert.doesNotMatch(escape[0],/closeEditor|setEdit/,"Escape must not discard typed work without being asked for");
+ assert.doesNotMatch(escape[0],/setHoldBoardOpen/);
+
+ /* One close path, so the editor's X and anything added later cannot drift. */
+ assert.match(mapPage,/const closeEditor=\(\)=>\{if\(edit&&draftNewId===edit\.id\)setBuses\(v=>v\.filter\(bus=>bus\.id!==edit\.id\)\);setDraftNewId\(null\);setEdit\(null\)\}/);
+ assert.match(mapPage,/close=\{closeEditor\}/,"the editor's X calls it");
+});
+
+test("PATH TO REPAIR is one component two pages draw, and it carries its own colours", async () => {
+ /* Curtis: "The path to repair should be for everything. Well, you know, to
+    everything that's appropriate for it." It was reachable from ONE control in
+    the whole app — the Defect Log's FOCUS view — and a completed repair is
+    where the knowledge actually exists, because somebody has just done the job.
+
+    So the panel moved out of `app/defect-log/page.tsx` into
+    `src/components/defects/`, which `docs/ARCHITECTURE.md` reserves for React
+    two or more pages draw. Nothing moved on the Defect Log. */
+ const read = async path => readFile(new URL("../" + path, import.meta.url), "utf8");
+ const panel = await read("src/components/defects/path-to-repair-panel.tsx");
+ const panelCss = await read("src/components/defects/path-to-repair-panel.css");
+ const log = await read("app/defect-log/page.tsx");
+ const logCss = await read("app/defect-log/defect-log.css");
+ const fixed = await read("app/fixed-repairs/page.tsx");
+ const fixedCss = await read("app/fixed-repairs/fixed-repairs.css");
+
+ /* BOTH PAGES DRAW THE SAME ONE. A second copy on Fixed Repairs is the thing
+    this project removes everywhere else — five location tables, two theme
+    systems, the organisation's name in four share modules. */
+ for (const [name, source] of [["the Defect Log", log], ["Fixed Repairs", fixed]])
+  assert.match(source, /import PathToRepairPanel from "@\/src\/components\/defects\/path-to-repair-panel"/,
+   name + " must draw the shared panel");
+ assert.equal((log.match(/<PathToRepairPanel/g) || []).length, 1);
+ assert.equal((fixed.match(/<PathToRepairPanel/g) || []).length, 1);
+ /* And the Defect Log kept its own entry point — this is an additional door,
+    not a move. */
+ assert.match(log, /className="ptr-log-focus-defect"/, "the Defect Log's own PTR button must stay where it was");
+
+ /* THE PANEL DOES NOT READ THE LIBRARIES. Both are props, because each host's
+    own PTR button reads the writeups to decide between "PTR" and "PTR +" — a
+    panel holding its own copy would save one while the button behind it still
+    said there was none. */
+ for (const forbidden of ["readPathToRepairs", "readRepairHoursLedger"])
+  assert.ok(!panel.includes(forbidden),
+   "the panel must take the libraries as props, not read " + forbidden);
+ for (const [name, source] of [["the Defect Log", log], ["Fixed Repairs", fixed]]) {
+  assert.match(source, /readPathToRepairs\(/, name + " holds the writeups");
+  assert.match(source, /findPathToRepair\(/, name + "'s own button reads them");
+ }
+
+ /* ITS COLOURS ARE ITS OWN NAMES, mapped by each host. Reading `--log-*`
+    directly was fine while one route loaded that stylesheet; Fixed Repairs does
+    not load it at all, so every variable would resolve to nothing. */
+ /* BOTH PREFIXES, because the failure is symmetric and the first draft of this
+    check was not: a `--fixed-*` read breaks the panel on the Defect Log, which
+    does not load `fixed-repairs.css`, exactly as a `--log-*` read breaks it on
+    Fixed Repairs. A cold read mutated `var(--ptr-accent)` to `var(--fixed-green)`
+    and every test still passed.
+
+    `var(--log-` rather than `--log-`: the file's own comment explains that it
+    used to read those, and a scan blunt enough to trip on prose about a rule is
+    the mistake the feedback-settings tripwire made twice. */
+ for (const prefix of ["var(--log-", "var(--fixed-"])
+  assert.ok(!panelCss.includes(prefix),
+   "the component must not reach for another page's variables — found " + prefix);
+ const names = ["--ptr-text", "--ptr-muted", "--ptr-border", "--ptr-surface", "--ptr-accent", "--ptr-accent-text"];
+ for (const name of names) {
+  assert.ok(panelCss.includes(name + ":"), "the component must declare a default for " + name);
+  assert.ok(logCss.includes(name + ":"), "defect-log.css must map " + name);
+  assert.ok(fixedCss.includes(name + ":"), "fixed-repairs.css must map " + name);
+ }
+ /* Each host's map is scoped under its app root, so it outranks the
+    component's defaults by SPECIFICITY rather than by import order — which
+    nothing in this project controls. */
+ assert.match(logCss, /\.defect-log-app \.ptr-shade\{/);
+ assert.match(fixedCss, /\.fixed-repairs-app \.ptr-shade\{/);
+
+ /* A THEMED INK MAY NOT SIT ON AN UNTHEMED SURFACE, which is the one gate this
+    whole test was missing and the reason a HIGH-severity bug shipped for a
+    commit. Fixed Repairs mapped `--ptr-text` to the themed `--fixed-ink` and
+    left `--ptr-surface` as a literal `#fff`, so the panel painted a white card
+    and wrote Dark's #f3f6fa, Midnight's #e4eeff and Tactical's #f0ecd7 on it.
+    Measured: the writeup at 1.08:1, 1.17:1 and 1.19:1 — invisible, not merely
+    low — and the SHOP TIME box somebody types into the same.
+
+    The invariant is simple and symmetric: within one host's map, the ink and
+    the surface it sits on are BOTH `var()` reads or BOTH literals. Half a
+    mapping is the bug either way round, and a mutation that reverts the fix
+    now fails here. Same rule for the accent and its own ink, which is what
+    lets Fixed Repairs keep a constant green head with a provable white on it. */
+ /* "THEMED" MEANS A NAME A THEME ACTUALLY WRITES, not "a `var()` read" — the
+    first draft of this check used the latter and flagged
+    `--ptr-accent:var(--fixed-green,#087347)`, which reads a `:root` CONSTANT
+    that no theme touches and is therefore a literal in every way that matters.
+    So the themed names are read out of the two places that emit them, which
+    also means a theme gaining a colour cannot leave this check behind. */
+ const themedNames = source => new Set([...source.matchAll(/"(--(?:log|fixed)-[a-z-]+)":/g)]
+  .map(match => match[1]));
+ const themed = {
+  ".defect-log-app": themedNames(log),
+  ".fixed-repairs-app": themedNames(
+   await read("src/components/settings/fixed-repairs-settings.tsx")),
+ };
+ for (const names of Object.values(themed))
+  assert.ok(names.size >= 6, "the themed variable list must be findable, got " + names.size);
+ const mapOf = (source, root) => {
+  const start = source.indexOf(root + " .ptr-shade{");
+  assert.notEqual(start, -1, root + " must map the panel's variables");
+  const block = source.slice(start, source.indexOf("}", start));
+  return Object.fromEntries([...block.matchAll(/(--ptr-[a-z-]+)\s*:\s*([^;]+);/g)]
+   .map(match => [match[1], match[2].trim()]));
+ };
+ for (const [root, source] of [[".defect-log-app", logCss], [".fixed-repairs-app", fixedCss]]) {
+  const map = mapOf(source, root);
+  const follows = value => [...themed[root]].some(name => value.includes("var(" + name));
+  for (const [ink, ground] of [["--ptr-text", "--ptr-surface"], ["--ptr-muted", "--ptr-surface"],
+   ["--ptr-accent-text", "--ptr-accent"]]) {
+   assert.ok(map[ink] !== undefined && map[ground] !== undefined,
+    root + " must map both " + ink + " and " + ground);
+   assert.equal(follows(map[ink]), follows(map[ground]),
+    root + ": " + ink + " is " + map[ink] + " and " + ground + " is " + map[ground] +
+    " — a themed ink on an unthemed surface, or the reverse, is the invisible-text bug");
+  }
+ }
+ /* The rules themselves left defect-log.css. A copy there would win on both
+    pages and quietly undo the point. */
+ for (const moved of [".ptr-panel{", ".ptr-head{", ".ptr-body{", ".ptr-hours{", ".ptr-actions{"]) {
+  assert.ok(panelCss.includes(moved), "the component's stylesheet must own " + moved);
+  assert.ok(!logCss.includes(moved), "defect-log.css must no longer own " + moved);
+ }
+
+ /* FOUR BUTTONS, FOUR COLUMNS. The row was declared at three and adding PTR
+    left DELETE hanging on a second line at the left under a row aligned right.
+    Counted from the source rather than remembered, because the next button
+    added here will have the same problem.
+
+    `countColumns` reads the TRACK count rather than counting `minmax(`, which
+    a cold read pointed out `repeat(4,minmax(0,1fr))` would defeat — a legal
+    four-column spelling that the old check scored as one. */
+ const countColumns = value => {
+  const repeat = value.match(/repeat\((\d+),/);
+  return repeat ? Number(repeat[1]) : value.trim().split(/\s+(?![^(]*\))/).filter(Boolean).length;
+ };
+ const row = fixed.slice(fixed.indexOf('className={"fixed-card-actions"'));
+ const buttons = (row.slice(0, row.indexOf("</div></footer>")).match(/<button /g) || []).length;
+ assert.equal(buttons, 4, "the action row draws four buttons");
+ const grid = fixedCss.match(/\.fixed-repairs-app \.fixed-card-actions\{[^}]*grid-template-columns:([^;}]*)/);
+ assert.ok(grid, "the action row's column list must be findable");
+ assert.equal(countColumns(grid[1]), buttons,
+  "the row declares " + countColumns(grid[1]) + " columns for " + buttons + " buttons");
+ /* AND THREE WHEN UNDO FIX IS ABSENT, which it is on a repair logged straight
+    onto this page. Pinning DELETE to column four instead left a 140px empty
+    column in the middle of a right-aligned row — measured, and it reads as a
+    button that failed to render. */
+ assert.match(fixed, /className=\{"fixed-card-actions"\+\(record\.defect\.source==="fixed-log"\?" without-undo":""\)\}/);
+ const thin = fixedCss.match(/\.fixed-repairs-app \.fixed-card-actions\.without-undo\{\s*grid-template-columns:([^;}]*)/);
+ assert.ok(thin, "the three-button row's column list must be findable");
+ assert.equal(countColumns(thin[1]), buttons - 1, "one fewer column when UNDO FIX is not drawn");
+
+ /* THE PANEL'S PHONE LAYOUT IS PINNED, because nothing did: a cold read deleted
+    both media blocks from the component's stylesheet and 196 tests passed,
+    which is how the layout change in F2 went unnoticed. `stretch` is the value
+    `.log-shade` actually resolved to at <=760 — three rules set it and the LAST
+    one won — so this is the assertion that keeps the extraction a refactor. */
+ assert.match(panelCss, /@media\(max-width:760px\)\{\.ptr-shade\{align-items:stretch;padding:0;height:100dvh\}\}/);
+ assert.ok(!/@media\(max-width:760px\)\{\.ptr-panel\{/.test(panelCss),
+  "the panel itself had no phone override and must not gain one silently");
+ assert.match(logCss, /@media\(max-width:760px\)[^]*?\.log-shade\{align-items:stretch\}/,
+  "which is the rule it is matching");
+
+ /* AND THE PAGE BEHIND IT DOES NOT SCROLL, through the same helper the Defect
+    Log's editor and the part-number prompt use rather than a second answer. */
+ assert.match(panel, /lockPageScroll\("ptr-open"\)/);
+
+ /* AND FIXED REPAIRS DOES NOT MINT A SECOND INITIALS KEY. One person, one
+    phone; a second copy means typing them twice and the two drifting, and
+    CLAUDE.md forbids renaming a key, so there would be two forever. */
+ assert.match(fixed, /readSettings as readDefectLogSettings/);
+ assert.ok(!/pace-fixed[a-z-]*initials/.test(fixed), "no second initials key");
+});
+
+test("the CSS reader the 16px gate stands on cannot be walked past", async () => {
+ /* The first version of that gate was `css.split("}").map(p => p.split("{"))`,
+    and a cold read found twelve ways past it in one sitting — two of them
+    already live in this repo. A guard nobody has attacked is a guard nobody
+    should trust, so the reader has its own tests before the rule does. */
+ const { cssRules, declaredFontSizePx, isTextEntrySelector, stripComments } =
+  await import("./helpers/css-rules.mjs");
+ const sizeOf = css => {
+  const rule = cssRules(css).find(r => isTextEntrySelector(r.selector));
+  return rule ? declaredFontSizePx(rule.body) : null;
+ };
+
+ /* THE SPLIT'S OWN TWO BUGS, both measured against this repo. */
+ /* `media` was set and never cleared, so a desktop-only block made the scan
+    skip every following top-level rule — 87 rules in settings.css. */
+ const after = cssRules("@media(min-width:761px){.a input{font-size:11px}}.b input{font-size:12px}");
+ assert.deepEqual(after.map(r => r.at), [["@media(min-width:761px)"], []],
+  "an at-rule must stop applying when its block closes");
+ /* The prelude and the first nested selector landed in one chunk, so the first
+    rule inside every phone block was invisible — exactly where a phone
+    font-size goes. */
+ assert.equal(sizeOf("@media(max-width:620px){.c input{font-size:9px}}"), 9,
+  "the first rule inside a block must be read");
+
+ /* EVERY BYPASS THE COLD READ FOUND. Each of these was MISSED by the split. */
+ for (const [label, css, expected] of [
+  ["the font shorthand", ".a textarea{font:700 9px/1.3 Arial}", 9],
+  ["rem", ".a input{font-size:0.8rem}", 12.8],
+  ["em", ".a input{font-size:0.9em}", 14.4],
+  ["percent", ".a input{font-size:80%}", 12.8],
+  ["pt", ".a input{font-size:9pt}", 12],
+  ["!important", ".a input{font-size:12px!important}", 12],
+  ["a trailing space before the semicolon", ".a input{font-size: 12px ;}", 12],
+  ["no final semicolon", ".a input{color:red;font-size:12px}", 12],
+  ["capitals", ".a input{FONT-SIZE:12PX}", 12],
+  ["a later, smaller size in the same body", ".a input{font-size:18px;font-size:12px}", 12],
+  ["a commented-out value", ".a input{/* font-size:18px */font-size:12px}", 12],
+  ["a brace inside an attribute string", '.a input[data-x="{"]{font-size:12px}', 12],
+  ["a comment containing a brace", "/* { */ .a input{font-size:12px}", 12],
+  ["@media inside @supports", "@supports(display:grid){@media(max-width:620px){.a input{font-size:12px}}}", 12],
+  ["input not on the last line of the list", ".a input,\n.b span{font-size:12px}", 12],
+  [":is()", ".a :is(input,textarea){font-size:12px}", 12],
+ ]) assert.equal(sizeOf(css), expected, label + " must be read, and was not by the first version");
+
+ /* AND THE ONES IT MUST NOT CLAIM TO KNOW. A value this reader cannot resolve
+    from one file comes back null and the caller treats it as unknown, rather
+    than as safe — the opposite mistake, and the worse one. */
+ for (const [label, css] of [
+  ["clamp()", ".a input{font-size:clamp(10px,2vw,14px)}"],
+  ["a var()", ".a input{font-size:var(--x,12px)}"],
+  ["a viewport unit", ".a input{font-size:3vw}"],
+ ]) assert.equal(sizeOf(css), null, label + " cannot be resolved by reading one file and must not be guessed");
+
+ /* A COMMENTED-OUT VALUE IS NOT A LIVE ONE, in either direction. The naive
+    `/\*[\s\S]*?\*\//g` this replaces is the exact regex CLAUDE.md records as a
+    two-bug mistake: a string holding "https://x/*" opened a pseudo-comment
+    that swallowed real code after it. */
+ assert.equal(sizeOf('.a input{content:"/*";font-size:12px}'), 12,
+  "a string holding a comment opener must not swallow the rest of the rule");
+ assert.equal(sizeOf(".a input{/* font-size:12px was too small */font-size:16px}"), 16,
+  "a commented-out small value must not read as live");
+ assert.ok(stripComments('a{content:"/* kept */"}').includes("/* kept */"),
+  "strings are kept — the scanner is string-aware, not regex-stripped");
+
+ /* A PSEUDO-ELEMENT IS NOT A CONTROL. `input::placeholder` styles the grey
+    text inside a field; nothing focuses it and no keyboard opens for it. The
+    first version of the record carried two such rows and called them fields
+    that still zoom. */
+ assert.equal(isTextEntrySelector(".a input::placeholder"), false);
+ assert.equal(isTextEntrySelector(".a input"), true);
+ assert.equal(isTextEntrySelector(".a select"), true, "a select is in scope — see the gate below");
+ assert.equal(isTextEntrySelector(".a button"), false);
+ assert.equal(isTextEntrySelector(".inputs-row b"), false, "a class merely containing the word is not a control");
+});
+
+test("no text field a touch device can tap is under 16px, outside the dense grids on the record", async () => {
+ /* iOS Safari ZOOMS THE PAGE when it focuses a text field computing under
+    16px, and it does not zoom back out when the field is blurred. Curtis, with
+    screenshots: "as I transition through the steps, the screen tends to get
+    larger and a lot of times it places certain controls halfway off the
+    screen."
+
+    MEASURED FIRST: no page in this app overflows at 1x, and a separate audit
+    of every route at 320 and 390 for controls clipped by an ancestor
+    `overflow:hidden` came back empty. That second audit matters — `scrollWidth
+    === clientWidth` cannot see a clipped control, so it was never evidence for
+    the claim the first version of this comment used it for, and raising this
+    very form to 16px then clipped WHAT KIND at 320 while the document still
+    reported 320 against 320.
+
+    A SELECT IS IN SCOPE. The first version excluded selects, on the belief
+    that iOS opens a native wheel without zooming. No primary source was found
+    either way and the developer sources all say the canonical fix is
+    `input, select, textarea`, so the generous reading is the unsafe one here
+    and the strict one costs nothing. The change had already raised the selects
+    in Incidents and Shop Talk, so excluding them from the gate was also the
+    diff contradicting itself.
+
+    TOUCH, NOT PHONE. An iPad zooms the same way, and this garage has one, so a
+    block is only out of scope above 1180.
+
+    A BLANKET RULE WAS THE OBVIOUS FIX AND IS WRONG. `.log-form
+    .type-bus-number>input` is deliberately 26px, 27px on a phone, because it
+    is the box somebody types a fleet number into with gloves on, and
+    `.part-prompt input` is 17px. A global `input{font-size:16px}` shrinks
+    both. So declarations are fixed one at a time and this list is the record
+    of what is left. */
+ const { readdir } = await import("node:fs/promises");
+ const { cssRules, declaredFontSizePx, isTextEntrySelector, splitSelector } =
+  await import("./helpers/css-rules.mjs");
+ const files = [];
+ const walk = async dir => {
+  for (const entry of await readdir(new URL("../" + dir, import.meta.url), { withFileTypes: true })) {
+   if ([".next", "node_modules", "dist"].includes(entry.name)) continue;
+   const path = dir + "/" + entry.name;
+   if (entry.isDirectory()) await walk(path); else if (path.endsWith(".css")) files.push(path);
+  }
+ };
+ await walk("app"); await walk("src");
+ assert.ok(files.length >= 8, "the stylesheets must be findable, got " + files.length);
+ const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
+
+ const found = [];
+ for (const file of files.sort()) {
+  const css = await readFile(new URL("../" + file, import.meta.url), "utf8");
+  for (const rule of cssRules(css)) {
+   if (!isTextEntrySelector(rule.selector)) continue;
+   const px = declaredFontSizePx(rule.body);
+   if (px === null || px >= 16) continue;
+   if (rule.at.some(at => { const m = at.match(/min-width:\s*(\d+)px/); return m && Number(m[1]) > 1180; })) continue;
+   found.push(file + "  " + px + "px  " + splitSelector(rule.selector).find(isTextEntrySelector));
+  }
+ }
+
+ /* WHAT IS LEFT, AND WHY IT IS LEFT. Most are fields inside a DENSE GRID — a
+    scan-review row, a sweep row, a Fleet Campaigns cell — where 16px does not
+    fit the column, so each needs layout work rather than a number change.
+
+    SOME OF THESE DO NOT BITE A PHONE, and the first version of this note said
+    they all did. A later rule in the same file's phone block already lifts
+    `.log-search input`, `.log-form input`, `.sweep-notes textarea`,
+    `.repair-form input`, `.down-settings-body input`, `.scan-notes textarea`,
+    `.fixed-controls input`, `.fixed-editor-body input`, `.cloud-fields input`,
+    `.locate-command input` and `.switch-grid input` to 16px; they stay listed
+    because this reads DECLARATIONS, and a declaration saved only by another
+    rule's order is one refactor from biting. Measuring is what told the two
+    apart. `.shop-notes-column textarea` is hidden outright below 760, so it
+    bites an iPad and not a phone.
+
+    The list may SHRINK freely and may not GROW. */
+ const KNOWN = [
+  "app/defect-log/defect-log.css  10px  .log-search input",
+  "app/defect-log/defect-log.css  11px  .log-feed-window select",
+  "app/defect-log/defect-log.css  10px  .log-form input",
+  "app/defect-log/defect-log.css  9px  .shop-notes-column textarea",
+  "app/defect-log/defect-log.css  12px  .extend-deferral-field input",
+  "app/defect-log/defect-log.css  15px  .log-form .diag-light-picker .diag-alarm-code input",
+  "app/defect-log/defect-log.css  11px  .sweep-notes textarea",
+  "app/defect-log/defect-log.css  9px  .sweep-row input",
+  "app/down-sheet/down-sheet.css  10px  .repair-form input",
+  "app/down-sheet/down-sheet.css  10px  .down-settings-body input",
+  "app/down-sheet/down-sheet.css  13px  .estimate-grid label>span input",
+  "app/down-sheet/down-sheet.css  11px  .scan-notes textarea",
+  "app/down-sheet/down-sheet.css  9px  .scan-row input",
+  "app/down-sheet/down-sheet.css  9px  .down-view-controls input",
+  "app/fixed-repairs/fixed-repairs.css  12px  .fixed-controls input",
+  "app/fixed-repairs/fixed-repairs.css  12px  .fixed-editor-body input",
+  "app/fixed-repairs/fixed-repairs.css  13px  .fixed-new-bus select",
+  "app/globals.css  10px  .locate-command input",
+  "app/globals.css  12px  .cloud-fields input",
+  "app/globals.css  13px  .native-repair-picker select",
+  "app/globals.css  10px  .multi-bus-fields input",
+  "app/globals.css  9px  .bulk-relocation select",
+  "app/globals.css  9px  .bulk-operability select",
+  "app/globals.css  9px  .fleet-create-row input",
+  "app/globals.css  9px  .switch-grid input",
+  "app/globals.css  12px  .operator-compose input",
+  "app/globals.css  9px  .quick-filter-window select",
+  "app/globals.css  12px  .service-interval-settings input",
+  "app/lists/_components/work-time.css  12px  .work-time-head select",
+  "app/lists/lists.css  12px  .lists-new input",
+  "app/lists/lists.css  12px  .list-add textarea",
+  "app/lists/lists.css  10px  .list-cell input",
+  "app/lists/lists.css  11px  .list-column-fields input",
+  "app/lists/lists.css  12px  .lists-new select",
+  "app/settings/settings.css  11px  .master-font-grid select",
+ ];
+ const extra = found.filter(row => !KNOWN.includes(row));
+ assert.deepEqual(extra, [],
+  "a text field under 16px that is not on the record — iOS will zoom the page when somebody taps it and will not zoom back:\n  " +
+  extra.join("\n  "));
+
+ /* AND THE FOUR THAT WERE FIXED STAY FIXED. These are the flows the
+    screenshots came from, and each is a full-width form field. */
+ for (const [file, selector] of [
+  ["app/globals.css", ".move-here-body input"],
+  ["app/incidents/incidents.css", ".incident-form input"],
+  ["app/shop-talk/shop-talk.css", ".talk-post textarea"],
+  ["src/components/defects/path-to-repair-panel.css", ".ptr-edit textarea"],
+ ]) assert.ok(!found.some(row => row.startsWith(file + "  ") && row.endsWith("  " + selector)),
+  selector + " in " + file + " must stay at 16px or above");
+
+ /* THE TWO THAT ARE DELIBERATELY LARGER, which is why there is no blanket
+    rule. If either ever falls to 16, somebody has reached for one. */
+ const log = await read("app/defect-log/defect-log.css");
+ assert.match(log, /\.log-form \.type-bus-number>input\{[^}]*font-size:26px/);
+ assert.match(log, /\.log-form \.type-bus-number>input\{font-size:27px/);
+ assert.match(log, /\.part-prompt input\{[^}]*font-size:17px/);
+
+ /* AND NOTHING MAY BE CLIPPED BY AN ANCESTOR, which is the failure raising
+    this very form to 16px caused once: a select is sized by its longest
+    option, and WHAT KIND went 270px to 313px inside a 270px cell under an
+    `overflow:hidden` shell. Both forms carry the guard now. */
+ for (const [file, row] of [["app/incidents/incidents.css", ".incident-row"],
+  ["app/shop-talk/shop-talk.css", ".talk-row"]]) {
+  const css = await read(file);
+  assert.match(css, new RegExp("\\" + row + "[^{]*\\{[^}]*min-width:0;max-width:100%"),
+   file + " must stop a field pushing past its column — a select is as wide as its longest option");
+ }
+});
+
+test("nothing in app/ or src/ names an identifier that does not exist", async () => {
+ /* THIS SHIPPED, AND IT TOOK THE DEFECT LOG'S MAIN FORM DOWN. Extracting the
+    PATH TO REPAIR panel narrowed an import in `app/defect-log/page.tsx` from
+    `{findRepairMinutes,readRepairHoursLedger,saveRepairMinutes,
+    writeRepairHoursLedger}` to `{readRepairHoursLedger}` — and one call to
+    `findRepairMinutes` was still there, 1,355 lines away, feeding the estimate
+    badge. Pressing + LOG DEFECT threw `ReferenceError: findRepairMinutes is
+    not defined` and the form simply did not open. Two cold reads and three
+    pushes went past it.
+
+    EVERY GATE THIS PROJECT HAS WAS GREEN. `npm test` passes because nothing
+    renders that editor; `npm run lint` passes because the TypeScript rule for
+    undefined names is off where the compiler owns it; `npm run build` passes
+    because vinext does not typecheck. And `npx tsc --noEmit` DID report it —
+    I compared the error COUNT, 214 against 214, instead of the error LIST, and
+    an unrelated error had gone away in the same change. A count against a dirty
+    baseline hides exactly the error you just added.
+
+    So this asserts the one error class that means "this will throw the moment
+    somebody opens it": TS2304 and its relatives, a name that is not there. Not the whole of
+    `tsc` — this repo carries 213 other errors and fixing them is its own job —
+    just the class that is a crash rather than a type quibble. */
+ /* IT ASKS THE COMPILER, IN THIS PROCESS, RATHER THAN READING WHAT `tsc` PRINTS.
+    It used to run `npx tsc --noEmit` and filter the output, and three things
+    were wrong with that, each of them measured.
+
+    It did not run on Windows at all. `execFile("npx")` is `spawn npx ENOENT`
+    there, and a URL's `.pathname` for a drive path is `/C:/Users/…`, which as a
+    `cwd` is ENOENT too. The test reported "tsc produced no output at all" and
+    the one gate written for the crash above was simply off on that machine.
+
+    ONE UNRELATED SYNTAX ERROR SWITCHED IT OFF EVERYWHERE. `tsc` runs its checker
+    only when there is no syntactic, option or global diagnostic to report
+    first, so a stray `export const x = ;` in any file, or one conflicting line
+    in tsconfig, makes it print that and nothing about names. Re-create the
+    incident above, add that file, and the old test passed. Asking the program
+    for its semantic diagnostics directly has no such precondition.
+
+    And it needed the repo to stay broken: a clean `tsc` prints nothing, which
+    the old test read as "proves nothing" and failed on. */
+ const ts = (await import("typescript")).default;
+ const path = await import("node:path");
+ const { fileURLToPath } = await import("node:url");
+ const slashed = name => name.split(path.sep).join("/");
+ const root = fileURLToPath(new URL("../", import.meta.url));
+ const parsed = ts.getParsedCommandLineOfConfigFile(path.join(root, "tsconfig.json"), { noEmit: true }, {
+  ...ts.sys,
+  onUnRecoverableConfigFileDiagnostic: diagnostic => {
+   throw new Error("tsconfig.json could not be read: " + ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
+  },
+ });
+ assert.ok(parsed, "tsconfig.json was not found beside the tests, so nothing was checked");
+ const covered = prefix => parsed.fileNames.filter(name => slashed(path.relative(root, name)).startsWith(prefix)).length;
+ assert.ok(covered("app/") && covered("src/"),
+  "tsconfig.json no longer includes app/ and src/ (" + covered("app/") + " and " + covered("src/") + " files), so this test would pass over code it never read");
+
+ /* A NAME PLANTED IN MEMORY, SO A PASS CANNOT BE AN EMPTY ONE. The check below
+    is "no line survives the filter", and every way of breaking it — the checker
+    not running, the code list emptied, the prefix filter matching nothing —
+    also leaves no line. So one file that exists only in this process names
+    identifiers defined nowhere, and the test demands exactly those reports
+    back. It is under `src/` on purpose: it has to travel the same filter the
+    real ones do. Nothing is written to disk. */
+ const canary = slashed(path.join(root, "src", "__undefined-name-canary__.ts"));
+ /* TWO LINES, because the first proved only its own code. With TS2304 alone
+    planted, deleting 18004 from the list below left this test green — and
+    18004 is the code the comment under it calls the one that matters most:
+    the shorthand `{name}` left behind by a narrowed import. Each line is the
+    smallest thing that produces its code, and both must come back. */
+ const canaryText = "export const canary = thisNameIsDefinedNowhere;\nexport const shorthand = { thisShorthandIsDefinedNowhere };\n";
+ const host = ts.createCompilerHost(parsed.options);
+ const isCanary = name => slashed(path.resolve(name)) === canary;
+ const fromDisk = host.getSourceFile.bind(host);
+ host.getSourceFile = (name, options, ...rest) => isCanary(name) ? ts.createSourceFile(name, canaryText, options) : fromDisk(name, options, ...rest);
+ const program = ts.createProgram({ rootNames: [...parsed.fileNames, canary], options: parsed.options, host });
+
+ /* THE COMPILER HAS MORE THAN ONE CODE FOR "THAT NAME IS NOT THERE", and the
+    old test knew one. Each line below was planted under src/ and reported
+    back before it was listed here; a code that could not be driven on this
+    tsconfig is not in the list.
+
+    The one that matters most is TS18004. The incident above was a narrowed
+    import with a CALL left behind, which is TS2304. Leave `{findRepairMinutes}`
+    behind instead — a shorthand property — and the same mistake is TS18004,
+    which the TS2304 test passed. TS2552 is the other near miss: a leftover name
+    that resembles one still imported gets "Did you mean …?" and its own code.
+
+    NOT EVERY ONE OF THESE IS A CRASH, and the failure message does not say so.
+    TS2304 and TS2552 also fire for a name in a TYPE position, which is erased
+    before the code runs — `worker/index.ts` trips both that way, on
+    Cloudflare's `Fetcher` and `D1Database`, types from an ambient package this
+    tsconfig does not pull in. That file is not app code, which is why only
+    app/ and src/ are asked. Telling a value from a type here would take the
+    compiler's internals, so a missing type under app/ or src/ fails this too:
+    the file names something it cannot see, and the fix is the same import. */
+ const NAME_NOT_THERE = new Set([
+  2304,  // Cannot find name 'x'.
+  2552,  // Cannot find name 'x'. Did you mean 'y'?
+  2662,  // Cannot find name 'x'. Did you mean the static member 'C.x'?
+  2663,  // Cannot find name 'x'. Did you mean the instance member 'this.x'?
+  18004, // No value exists in scope for the shorthand property 'x'.
+  2581,  // Cannot find name '$'. Do you need to install type definitions for jQuery?
+  2582,  // Cannot find name 'test'. Do you need to install type definitions for a test runner?
+  2693,  // 'X' only refers to a type, but is being used as a value here.
+  2708,  // Cannot use namespace 'N' as a value.
+  1361,  // 'x' cannot be used as a value because it was imported using 'import type'.
+  1362,  // 'x' cannot be used as a value because it was exported using 'export type'.
+  2448,  // Block-scoped variable 'x' used before its declaration.
+  2449,  // Class 'X' used before its declaration.
+ ]);
+ /* WHAT THIS STILL CANNOT SEE, so nobody reads a pass as more than it is. A
+    line under `@ts-ignore`, `@ts-expect-error` or `@ts-nocheck` reports
+    nothing — there are none in app/ or src/ today. A `.js` file is not in this
+    program at all. `worker/` and `db/` are not asked. And the name planted
+    above proves the checker ran and that TS2304 and TS18004 come back through
+    the filter; it does not prove the other eleven codes, which were driven by
+    hand. */
+ const undefined_names = program.getSemanticDiagnostics()
+  .filter(diagnostic => diagnostic.file && NAME_NOT_THERE.has(diagnostic.code))
+  .map(diagnostic => {
+   const at = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+   return slashed(path.relative(root, diagnostic.file.fileName)) + "(" + (at.line + 1) + "," + (at.character + 1) + "): error TS" + diagnostic.code + ": " + ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
+  })
+  .filter(line => line.startsWith("app/") || line.startsWith("src/"));
+ const planted = undefined_names.filter(line => line.startsWith("src/__undefined-name-canary__.ts("));
+ assert.deepEqual(planted, [
+  "src/__undefined-name-canary__.ts(1,23): error TS2304: Cannot find name 'thisNameIsDefinedNowhere'.",
+  "src/__undefined-name-canary__.ts(2,28): error TS18004: No value exists in scope for the shorthand property 'thisShorthandIsDefinedNowhere'. Either declare one or provide an initializer.",
+ ], "the two names planted in memory did not come back as one TS2304 and one TS18004, so the checker did not run, the filter is broken or a code fell out of the list, and this test proves nothing");
+ const real = undefined_names.filter(line => !planted.includes(line));
+ assert.deepEqual(real, [],
+  "a name that is not there — if it is used as a value, that line throws the moment it runs:\n  " + real.join("\n  "));
+});
+
+test("the bus generation chips are sized for their label, not for the box", async () => {
+ /* Curtis: "I want this strip of bus drop downs to be slimmer because it's more
+    than wide enough for the bus numbers. Then move it slightly to the right."
+
+    Measured before: `repeat(4,minmax(0,1fr))` stretched each chip to fill the
+    fieldset — 177px apiece at 820 and 1180, 169px at 390 — for a label three
+    characters long ("15s"). After: 64px at every width, with the spare space on
+    the left, which is the nudge right. The chips start at 93 rather than 23 at
+    390, and at 679 rather than 47 at 1180. */
+ const css = await readFile(new URL("../src/components/shared/bus-selector.css", import.meta.url), "utf8");
+ assert.match(css, /\.bus-generations\{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px\}/,
+  "the spare width goes on the left, and the strip wraps rather than overflowing");
+ assert.match(css, /\.bus-generations button\{flex:0 0 64px\}/,
+  "64px fits the label and still clears a 44px thumb target");
+ assert.equal(/\.bus-generations\{[^}]*1fr/.test(css), false,
+  "a 1fr track is what stretched a 3-character chip to 177px");
+
+ /* FLEX RATHER THAN FOUR FIXED COLUMNS, because the count is not four: the
+    chips are the four standard generations plus any other first-two-digits
+    present in the fleet, so one 16xxx bus makes it five. Measured with five:
+    two rows at 320 and 360, one row from 390 up. */
+ const selector = await readFile(new URL("../src/components/shared/bus-selector.tsx", import.meta.url), "utf8");
+ assert.match(selector, /STANDARD_GENERATIONS,\s*\.\.\.available\.filter/,
+  "the chip list is the standard four plus whatever else the fleet holds");
+ assert.equal(/grid-template-columns:repeat\(4/.test(css), false,
+  "a four-column grid would drop the fifth chip onto a row of its own");
 });

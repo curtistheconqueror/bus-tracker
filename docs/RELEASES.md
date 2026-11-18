@@ -4,7 +4,13 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 187 / application release 191 | Live | b33775685b61acafdf4325807c82e92281c9fc2c | FOCUS shares one bus as text or a self-contained HTML page, including records hidden by board filters and accessible action outcomes. |
+| 194 / application release 197 | Live | 12822f60c7e5d76d3702108b33711cc116ca4f61 | Safe installed-app last-page restoration and Doors group display mark. |
+| 192, 193 | Saved only; never deployed | Superseded review candidates | Do not deploy; use reviewed194. |
+| 191 / application release 196 | Previous live; rollback | a9f610d42123cd6cfaaf32b61d8c78048d585c82 | Defect Log starts Advanced Actions collapsed; Detailed card view is default and appears before Compact. Explicit saved card choices remain. |
+| 190 / application releases 194 and 195 | Previous live; rollback | a1d90e85a6489ab9c6ff636e50ed813d98363978 | Preserves queued maintenance/scanner work; adds shared compact mobile navigation, grouped map controls, visible shifts and remembered Compact / Detailed defect cards. |
+| 189 / application release 193 | Previous live; rollback | a009c08fad02aa6859ec6445784f744c6e269c8d | ADVANCED ACTIONS drawers take their button colours; larger openers and reshaped DAILY STATS; service worker unchanged. |
+| 188 / application release 192 | Previous live; rollback | 2ddc026c139c45acec7c24128633841d96e7dee3 | Device-local Incidents and Shop Talk, wrapping navigation, grouped HVAC Heating and No Heat Buses, with preserved estimates and operator aliases. |
+| 187 / application release 191 | Previous live; rollback | b33775685b61acafdf4325807c82e92281c9fc2c | FOCUS shares one bus as text or a self-contained HTML page, including records hidden by board filters and accessible action outcomes. |
 | 186 / application release 190 | Previous live; rollback, includes 189 | c9c03d661177c04706f7beb33f2e4c24bf728e58 | Defect Log AI OPERATOR confirms before leaving for Facility Map; grouped defect and Down Sheet repair browsing; smoother typing through stable bus-picker rendering. |
 | 186 / application release 189 | Previous live, shipped with 190 | c9c03d661177c04706f7beb33f2e4c24bf728e58 | DEFECTS LOGGED count and drawer share a selected time span, with a count that updates while the menu stays open. |
 | 185 / application release 188 | Previous live; rollback | 3b19e339446a9784898aa1cdd1f37b514c3a9d7d | Adds WHEN LOGGED feed windows with an advancing shared clock, correct local-midnight TODAY boundary, search bypass and always-reachable SHOW ALL DATES. |
@@ -161,3 +167,119 @@ When a release is published, update this table and PROJECT_HANDOFF.md in the sam
 - Limits: no browser-control tools were available; fresh hydration/layout, native phone sharing, VoiceOver announcements, Safari/Home Screen and offline-device acceptance are not claimed. Follow the five device checks in the [preserved handoff](archive/PUBLISH_RELEASE_191.md). A late async share completion can label a newly focused bus with the earlier action's status; the payload remains scoped to the original bus. CodeRabbit classifies the release as minimal merge risk; this minor status race is recorded rather than treated as a data leak.
 - Rollback: application 189/190 / Sites 186, source `c9c03d661177c04706f7beb33f2e4c24bf728e58` (`sites-v186`), saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_3a17719e51808191bed75bc71024bd47`. No storage keys, schema, dependencies, hosting configuration or public assets changed; no production records, imports, browser data, access settings or unrelated services were touched.
 - New rollback tag `sites-v187` and application alias `sites-release191` identify the deployed source. The divergent `claude-contributions` mirror branch cannot fast-forward to main and was preserved without rewriting history. Canonical computer checkout remains untouched; release work used an isolated task checkout.
+
+## Application 192 / Sites 188 evidence
+
+- PR40 head: `0ba8e5c7d27677c1998303f9f45be73f6b2e426e`.
+- Merge: `cc495d5a3f4fd0f6eacde35d4e2b58527a8792a3`.
+- Frozen pushed source: `2ddc026c139c45acec7c24128633841d96e7dee3`.
+- Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_48672032f2d88191bbba69e7e67e598f`.
+- Deployment: `appgdep_6adac5df4e6481918503d1b79946ede2`, succeeded
+  2026-10-23 02:26:48.844011 UTC; existing public URL unchanged.
+- Archive SHA256: `daccddeb71516cb44b37c75d7c7da16413debfcecd32a0deca8e717f03d0c6ad`.
+- Exact-source [CI 39889311395](https://github.com/curtistheconqueror/bus-tracker/actions/runs/39889311395)
+  passed install/lint/build and 388 tests, zero failures/skips. Fresh local
+  lint/build/388 tests also passed on the identical feature tree.
+- Live HTTP: `/`, `/down-sheet`, `/defect-log`, `/fixed-repairs`, `/lists`,
+  `/settings`, `/incidents`, `/shop-talk` all 200 with both new nav links.
+  Forty built assets matched production byte-for-byte. Service-worker v7
+  contains both new routes. POST `/api/mcp` is 404, confirming no MCP route.
+- Existing generated preload `/assets/defect-log-Dho7tEB9.js` is absent from
+  local build output. The actual manifest assets were available and matched.
+  This is a retained verification limitation, not a claim of browser success.
+- Fresh browser interaction, device-local persistence/refused-write flows,
+  phone/iPad layout, Safari/Home Screen and offline-device checks were not
+  performed in this publishing environment. Relevant domain regressions passed
+  in the automated suite; earlier browser/mutation claims remain author evidence.
+- New device-local keys `pace-incidents-v1` and `pace-shop-talk-v1` do not sync
+  or ride MASTER EXPORT/IMPORT. A/C Buses includes Heating in the HVAC category.
+  These disclosed behaviors remain approved as-is. No nav badge was added.
+- Rollback: application 191 / Sites 187, `sites-v187` at
+  `b33775685b61acafdf4325807c82e92281c9fc2c`; release-192 tags point to the
+  frozen source, not the later documentation commit.
+- PR39 remains separate at `17b7b2a07f790cbf4aefdeeaf800057efd0165d2`.
+  No Supabase migration, credential, policy or runtime environment change was
+  performed by this publication. The platform reported environment revision 2.
+
+## Application 193 / Sites 189 evidence
+
+- PR41 merge and frozen source: `a009c08fad02aa6859ec6445784f744c6e269c8d`.
+- Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_51161d3c95308191a9ae49b7cda6e080`.
+- Deployment: `appgdep_6ade786b63a4819182e9ac72d32f1494`, succeeded
+  2026-10-25 21:45:24.014279 UTC; existing public site/audience unchanged.
+- Local gzip archive SHA256: `e25f359b9e4ff7c598b5fc8aef88903fc221176e0ad33dc93be4fb984731c520`.
+  Separately, Sites reports saved archive content hash
+  `0a5e22d09b13c49ab90c1f4085f73279e5912af52bd4fbc098f8b71e125746be`
+  with format `tar`; this is not asserted to equal the local gzip file hash.
+- Exact-source [CI 40232970655](https://github.com/curtistheconqueror/bus-tracker/actions/runs/40232970655)
+  passed lint/build and 388 tests, zero failures/skips. Fresh local lint/build
+  and 388 tests also passed. Dual-timezone/browser measurements in the archived
+  handoff are author claims, not new publishing-session measurements.
+- Independent cold review of the whole release diff, markup, cascade/themes and
+  tests found no actionable defect. The two affected named tests passed 2/2.
+  Test limits: CSS source-pattern assertions do not establish computed styles,
+  focus/contrast or responsive geometry, and DAILY STATS has no new dedicated
+  automated styling guard. Those limits were retained, not presented as proof.
+- Eight live routes returned 200 with navigation: `/`, `/down-sheet`,
+  `/defect-log`, `/fixed-repairs`, `/lists`, `/settings`, `/incidents`,
+  `/shop-talk`. Forty built assets matched production byte-for-byte.
+- Delivered CSS contracts passed for navy/purple drawers, transparent inner
+  bodies, 52px openers and 52px DAILY STATS. The minifier uses `background:0 0`
+  for transparent: an initial smoke matcher rejected that spelling; inspecting
+  the byte-matched CSS established the harness mismatch, then the corrected
+  smoke passed. No product source was changed to satisfy the check.
+- Service-worker v7 is byte-identical to 192, with no bump. POST `/api/mcp`
+  returns 404; PR39 remains excluded. Runtime environment revision remains 2.
+- Existing generated Defect Log preload is absent from the build; actual
+  manifest assets passed byte comparison. The prior release had the same
+  generated-preload limitation. A separate HTTP check returned 404 for
+  `/assets/defect-log-BSq6YvO5.js`. No browser-success claim is made.
+- Manual checks remain: open both ADVANCED ACTIONS drawers and inspect their
+  controls, DAILY STATS, all dark themes, keyboard focus/contrast, one-line
+  Down Sheet opener/no horizontal scroll on shop computer/iPad, and physical
+  phone/Safari/Home Screen/offline behavior. No supported browser tool was
+  exposed in this publishing environment; no physical-shop testing occurred.
+- Rollback: application 192 / Sites 188, `sites-v188` at
+  `2ddc026c139c45acec7c24128633841d96e7dee3`. Tags `sites-v189` and
+  `sites-release193` point to the frozen published source, not this later record.
+- Release bookkeeping starts from latest main `6681407f77e9dfc6937499ea26ad6d965253ea73`,
+  retaining its CLAUDE.md, NEXT_SESSION and review-skill documentation. No
+  application refactor, storage, dependency, Supabase, credential or audience
+  change was performed. PR39 remains separately held and unmerged.
+- Release-record cold review caught a mislabelled saved-content hash, damaged
+  Unicode in an initial handoff copy, and tags described before creation.
+  Corrected in this release-record change: file and saved-content hashes are
+  distinguished, the archive is extracted byte-for-byte from the Git handoff,
+  and both tags were created and verified at the pinned source before commit.
+
+
+## Sites 190 / application releases 194 and 195 - 2026-11-17
+
+- Curtis approved making the redesign live. PR48 merged as `a1d90e85a6489ab9c6ff636e50ed813d98363978`; merged tree is byte-identical to reviewed head `05ea7aaba28938c1ecec4013f9c54072994fd423`. Main had no concurrent changes beyond the queued baseline `103f00d`.
+- The entire queued 194 is included, not replaced. Its full original handoff is preserved in `docs/archive/PUBLISH_RELEASE_194_195.md`. Release 195 is the compact mobile redesign described in `docs/MINIMALIST_REDESIGN.md`.
+- Sites saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_e0501aa6b2688191a9cd97138a1f23b0` (Version 190). Deployment `appgdep_6afbeff994c88191b85ab2cc4cb588e6` succeeded at 2026-11-17 06:11:14.623645 UTC. Existing public URL and audience unchanged. Runtime environment revision 2 unchanged.
+- Local production build, full lint and 468 tests passed. CI run 44026319502 passed on the exact PR head. CodeRabbit's latest summary covers `05ea7aa` with no actionable comments; both original findings were fixed and browser-rechecked. Standalone TypeScript diagnostics remain identical to the pre-existing baseline, not a clean standalone tsc pass.
+- All eight live routes returned HTTP 200. All 76 emitted browser/static assets matched the approved build bytes. Chromium passed 24 route/viewport checks (390, 800 and 1180px) plus compact/full actions, view persistence/refused-write notice, unchanged synthetic fleet data, More/Escape, Back/Forward, top selector and repeated Advanced flows. The longer browser run produced four recoverable React #418 text-hydration warnings on Settings. The existing hidden SHIFT ENDS IN display renders independent server/client minute counts, and its component and clock module are byte-unchanged from the pre-redesign baseline. Fresh core-route checks in UTC and Chicago produced none; a fresh Settings check can reproduce it without service workers, so no cache cause is claimed. No functional failure or record loss was observed; a clean console in every cached/history path is not claimed.
+- Independent comparison reproduced the same Settings hydration mismatch on detached pre-redesign `103f00d` in development mode (server/client shift names differed). `shift-settings.tsx` and `shift-clock.ts` are byte-identical across previous live `a009c08`, pre-redesign baseline and release `a1d90e8`. It is a pre-existing clock/timezone-rendering issue, not a redesign or service-worker regression. Baseline production browser comparison was limited by an asset-serving error; no such production comparison is claimed. Settings recovered by client-rendering, with no observed fleet-data harm. A separate deterministic-initial-clock fix is appropriate.
+- Physical iPhone/Safari/Home Screen, hardware safe areas, VoiceOver and native share-sheet acceptance remain unperformed. Real-photo heat scanning and sheet identification remain unverified. No production fleet records were touched by validation.
+- Previous-live rollback: Sites 189 / `sites-v189` at `a009c08fad02aa6859ec6445784f744c6e269c8d`. Pre-redesign checkpoint: `legacy/pre-minimalist-20261117-103f00d` at `103f00d15e73d09642720963043b16b05347c440`. PR39 MCP remains unmerged and excluded; no schema or credential change.
+
+
+## Sites 191 / application 196 — 2026-11-17
+
+- Source: `a9f610d42123cd6cfaaf32b61d8c78048d585c82`; PR49 reviewed head `50810e726cd5ad5751f14b77e3d1e18306e86eca` has an identical tree.
+- Deployment: `appgdep_6afbfe5ea1b48191a676e0bc92d2c087`, succeeded at 07:12:36.997726 UTC. Public audience unchanged.
+- CodeRabbit exact-head review: no actionable comments, minimal merge/security risk. CI 44035855706 passed.
+- Local production build, 469 tests, whitespace check pass. Lint zero errors, one pre-existing .remember tool-file warning.
+- Standalone TypeScript: same 238 baseline diagnostics, not a clean typecheck. Fresh browser interaction/physical iPhone checks unavailable.
+- No operational-data, schema, credentials, editor-details, Down Sheet or audience changes. The legacy Advanced Actions storage value is untouched but no longer read or written; card-view preferences are still honored.
+- Rollback: Sites 190 / `sites-v190`, `a1d90e85a6489ab9c6ff636e50ed813d98363978`.
+
+Live verification: home, Defect Log and Down Sheet returned HTTP 200; Defect Log server output starts Detailed with Advanced Actions collapsed and drawer absent; all 27 referenced emitted JavaScript assets matched the release build byte-for-byte. This is HTTP/source verification, not fresh browser interaction.
+
+
+## 2026-11-18: application197 / Sites194
+
+Sites Version 194 / application release 197 deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Installed copies reopen the remembered page after safe document/hydration readiness; Doors picker receives its display-only emoji. PR50 CodeRabbit final review covered this exact SHA with no actionable comments; CI451 (44229747699) passed. Production build and 470 tests passed; ESLint zero errors and one preexisting warning. Browser loopback regression proved delayed-script/stalled-destination recovery; live HTTP200 and exact corrected inline script verified on Map, Defect Log, Down Sheet and Settings. Live Defect Log rendering checked. Physical iOS/Home Screen and real garage network behavior remain unverified. The initial service-worker document request remains unbounded; readiness taking more than the 2.5-second script budget falls back to map for that run. Sites192 and193 were saved candidates, never deployed. Rollback: Sites191 at a9f610d42123cd6cfaaf32b61d8c78048d585c82.
+
+Deployment: `appgdep_6afd1b66b3288191956117ec62aff973`. Rollback tag for new release: `sites-v194`.

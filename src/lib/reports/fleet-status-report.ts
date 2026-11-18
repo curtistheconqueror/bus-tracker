@@ -12,6 +12,8 @@
    sheet sends them, and neither one gets to decide what a downed bus is. */
 
 import {downSheetAvailability,isSoftDownEntry,isEntryInService} from "../down-sheet/down-sheet-availability.ts";
+/* The report takes its heading as an option; this is only the fallback. */
+import {SITE_ORGANIZATION_CAPS} from "../settings/site-identity.ts";
 import {mysteryBusIds} from "../fleet/mystery-buses.ts";
 import {standingRoadCalls} from "../fleet/road-calls.ts";
 import {defectLabel,type StructuredDefect} from "../defects/repair-catalog.ts";
@@ -207,9 +209,31 @@ export function buildFleetStatusReport(
   }
   /* The flags last, and only where the repairs said nothing. A bus with a
      CUBIC Screen - MV ER written up and the IBS/Ventra flag still ticked is
-     counted once, under the device the repair actually names. */
+     counted once, under the device the repair actually names.
+
+     `ibs` IS DELIBERATELY NOT IN THAT LIST, and taking it out was a fix.
+     `techSections` prints three sections, because three is what Curtis asked
+     for, so `tech.ibs` is computed and rendered NOWHERE — which made "already
+     counted under the device the repair names" mean "counted nowhere at all"
+     for the one group that is not printed. Measured, with the IBS/Ventra flag
+     ticked and no other tech defect:
+
+       no tech defect             VENTRA=1
+       a Ventra defect            VENTRA=1
+       an IBS Screen defect       VENTRA=0, and no other section  <- gone
+       an IBS and a Ventra one    VENTRA=1
+
+     So writing up an IBS screen fault REMOVED the bus from a report somebody
+     sends to a superintendent. Pre-existing — `IBS Screen - INOP (general)`
+     and `Screen black` do it too — and found while adding a third wording that
+     reaches it.
+
+     The day an IBS SCREENS line is offered, `ibs` goes back into this list, or
+     a flagged bus with an IBS defect is counted in two sections at once. The
+     test holds the measured table above so that is a failure rather than a
+     surprise. */
   if(bus.farebox&&!groups.has("farebox"))groups.add("farebox");
-  if(bus.ibsVentra&&!groups.has("ventra")&&!groups.has("cubic")&&!groups.has("ibs"))groups.add("ventra");
+  if(bus.ibsVentra&&!groups.has("ventra")&&!groups.has("cubic"))groups.add("ventra");
   for(const group of groups)tech[group].push(busLine(bus,""));
  }
  for(const key of Object.keys(tech) as Exclude<TechServicesGroup,null>[])tech[key].sort(byNumber);
@@ -349,7 +373,7 @@ export function statusReportText(
     reader should be able to see which block is set apart without reading it. */
  const band="=".repeat(STATUS_REPORT_WIDTH-8);
  const rule="-".repeat(STATUS_REPORT_WIDTH-8);
- lines.push(clean(options.title)||"PACE SOUTH");
+ lines.push(clean(options.title)||SITE_ORGANIZATION_CAPS);
  const stamp=statusReportStamp(board.at);
  if(stamp)lines.push(stamp);
  /* THE NUMBERS THAT ARE NOT LIKE THE OTHERS, fenced off so nobody has to be

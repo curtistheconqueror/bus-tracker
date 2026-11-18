@@ -12,9 +12,31 @@
 
    The .log-form overrides stayed in defect-log.css, because they are scoped to
    that form and are genuinely the Defect Log's. */
-.bus-picker{grid-column:1/-1;display:flex;min-width:0;flex-direction:column;gap:7px;margin:0;border:1px solid var(--log-border,#b7c3d5);border-radius:8px;background:color-mix(in srgb,var(--log-accent,#0b64bd) 4%,var(--log-surface,#fff));padding:10px}.bus-picker legend{padding:0 5px;color:var(--log-accent,#0b64bd);font-size:8px;font-weight:900}.bus-generations{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.bus-generations button{min-height:34px;border:1px solid var(--log-border,#b7c3d5);border-radius:6px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);font-size:9px;font-weight:900;cursor:pointer}.bus-generations button.active{border-color:var(--log-accent,#0b64bd);background:var(--log-accent,#0b64bd);color:var(--log-header-text,#fff)}.bus-picker-fields{display:grid;grid-template-columns:minmax(140px,.7fr) minmax(220px,1.3fr);gap:8px}.bus-picker>small{color:var(--log-muted,#5b6b85);font-size:8px;font-weight:800}.bus-picker-generations{margin-bottom:-2px}.bus-picker-number .bus-picker-fields{grid-template-columns:1fr}
+.bus-picker{grid-column:1/-1;display:flex;min-width:0;flex-direction:column;gap:7px;margin:0;border:1px solid var(--log-border,#b7c3d5);border-radius:8px;background:color-mix(in srgb,var(--log-accent,#0b64bd) 4%,var(--log-surface,#fff));padding:10px}.bus-picker legend{padding:0 5px;color:var(--log-accent,#0b64bd);font-size:8px;font-weight:900}/* SIZED FOR "15s", NOT FOR THE BOX IT SITS IN. Curtis: "I want this strip of
+   bus drop downs to be slimmer because it's more than wide enough for the bus
+   numbers. Then move it slightly to the right."
 
-@media(max-width:390px){.bus-generations{grid-template-columns:repeat(2,minmax(0,1fr))}}
+   Measured before: `repeat(4,minmax(0,1fr))` stretched each chip to fill the
+   fieldset — 177px apiece at 820 and 1180, 169px at 390 — for a label three
+   characters long. A capped track sizes them to the content instead, and
+   `justify-content:end` puts the spare width on the LEFT, which is the nudge
+   right he asked for.
+
+   64px keeps a thumb target: the phone block gives these 44px of height, and
+   64 wide clears Apple's 44 comfortably while still being a quarter of what
+   they were. */
+.bus-generations{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+/* FLEX RATHER THAN FOUR FIXED COLUMNS, because the count is not four. The chip
+   list is the four standard generations PLUS any other first-two-digits
+   actually present in the fleet — a single 16xxx bus makes it five — so a
+   `repeat(4,…)` grid would drop the fifth onto a row of its own. Flex wraps
+   only when it has to. */
+.bus-generations button{flex:0 0 64px}.bus-generations button{min-height:34px;border:1px solid var(--log-border,#b7c3d5);border-radius:6px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);font-size:9px;font-weight:900;cursor:pointer}.bus-generations button.active{border-color:var(--log-accent,#0b64bd);background:var(--log-accent,#0b64bd);color:var(--log-header-text,#fff)}.bus-picker-fields{display:grid;grid-template-columns:minmax(140px,.7fr) minmax(220px,1.3fr);gap:8px}.bus-picker>small{color:var(--log-muted,#5b6b85);font-size:8px;font-weight:800}.bus-picker-generations{margin-bottom:-2px}.bus-picker-number .bus-picker-fields{grid-template-columns:1fr}
+
+/* AND ONE ROW AT EVERY WIDTH NOW. This dropped to two-up below 390 because
+   four full-width chips did not fit; four 64px ones do — 274px including the
+   gaps, inside a 296px box at 320 — so the strip is one line everywhere and
+   the form is a row shorter on a phone. */
 /* The typed number is the way in that gets used, so it is the biggest thing in
    the form on either surface. The Defect Log keeps a heavier override of its
    own at phone width; this is the floor under both. */

@@ -1,3 +1,4 @@
+import type {DefectPart} from "./defect-parts.ts";
 export type DefectState="open"|"in-progress"|"deferred"|"completed";
 export type DefectOperability="service"|"down";
 export type DefectSource="tracker"|"down-sheet"|"defect-log"|"operator"|"scan";
@@ -87,6 +88,9 @@ export type StructuredDefect={
  state:DefectState;
  createdAt?:string;
  updatedAt?:string;
+ /* Set by PUT BACK on a scan record, to the stamp PUT BACK gave `updatedAt`.
+    scan-batches.ts owns what it means. */
+ scanRestoredAt?:string;
  completedAt?:string;
  completedBy?:string;
  conditionNotDuplicated?:boolean;
@@ -100,6 +104,13 @@ export type StructuredDefect={
     PartUsage in domain.ts for Stage 7. */
  partsUsed?:boolean;
  partName?:string;
+ /* MORE THAN ONE PART. `partNumber` and `partName` above are the FIRST part,
+    kept and still written so a device on an older release shows one instead of
+    none - the Shop Cloud carries every field it has no column for through the
+    row's `detail` blob, and an older build cannot read this array. A one-part
+    repair stores no `parts` at all. The read, the write and the rules are in
+    src/lib/defects/defect-parts.ts; nothing here decides anything about them. */
+ parts?:DefectPart[];
  /* Billable time on this repair, in decimal hours: .5 is half an hour.
     Diagnostic time is kept apart from repair time because they are different
     work and often different visits. A bus can be diagnosed on one shift and
@@ -108,6 +119,19 @@ export type StructuredDefect={
     recorded rather than none spent. */
  repairHours?:number;
  diagnosticHours?:number;
+ /* HOW LONG THIS REPAIR IS EXPECTED TO TAKE, in the same decimal hours, and
+    deliberately NOT one of the two above. Those record time that has been
+    worked and is being billed — `work-time.ts` sums them per person per day —
+    so a figure written there before anybody turns a wrench would arrive on
+    somebody's work ledger as hours they never spent.
+
+    This is the estimate for THIS bus on THIS day, and it is the most specific
+    answer there is: `defect-estimates.ts` asks it before the shop's own ledger
+    and before the catalog's guess, and a card built for the Down Sheet is
+    seeded from it rather than from the catalog. Blank means nobody has
+    estimated this one, which is the normal state of a defect read off a
+    photographed sheet. */
+ estimateHours?:number;
  /* An absent key means not ticked. The stamp carries who and when, filled in
     where the settings ask for initials and left empty where they do not. */
  workStates?:Partial<Record<WorkStateKey,WorkStateStamp>>;
@@ -230,6 +254,12 @@ export function recordReportAttempt(defect:StructuredDefect,at:string,by=""):Str
 export function reportAttemptCount(defect:{reportAttempts?:ReportAttempt[]}){
  return normalizeReportAttempts(defect.reportAttempts).length;
 }
+/* When the bus last came back, for the card that says so. Null when it never
+   has, which is how the chip knows not to draw itself. */
+export function lastReportAttemptAt(defect:{reportAttempts?:ReportAttempt[]}){
+ const attempts=normalizeReportAttempts(defect.reportAttempts);
+ return attempts.length?attempts[attempts.length-1].at:null;
+}
 /* MERGED, NEVER REPLACED, when a record is saved.
 
    An editor opened before a return was stamped holds the older, shorter list,
@@ -247,9 +277,9 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
     loses that the moment it is saved. "Semi cold air" sits between No cooling
     and nothing at all: the unit runs, the air is not cold enough, and that is
     what a driver actually reports. */
- "A/C and HVAC":["No cooling","Semi cold air","Compressor","A/C belt","A/C compressor pulley misaligned","Evaporator core","Condenser core","Condenser fan INOP - 1 fan","Condenser fans INOP - both fans","Evaporator fan / motor INOP - 1","Evaporator fans / motors INOP - both","Blower motor","Operator A/C blower","Refrigerant / Freon leak","Bad connection / wiring","Controls / electrical","IntelligAIRE III control panel - screen blank / black","Heater / defroster","Other A/C repair"],
+ "A/C and HVAC":["Heating - No heat","Heating - No heat at front dash","Heating - Floor heat INOP","Heating - Heater boost pump","Heating - Heater / defroster","Heating - Other heating repair","Cooling - No cooling","Cooling - Semi cold air","Cooling - Compressor","Cooling - A/C belt","Cooling - A/C compressor pulley misaligned","Cooling - Evaporator core","Cooling - Condenser core","Cooling - Condenser fan INOP - 1 fan","Cooling - Condenser fans INOP - both fans","Cooling - Evaporator fan / motor INOP - 1","Cooling - Evaporator fans / motors INOP - both","Cooling - Refrigerant / Freon leak","Cooling - Other A/C repair","Controls and Blowers - Blower motor","Controls and Blowers - Operator A/C blower","Controls and Blowers - Bad connection / wiring","Controls and Blowers - Controls / electrical","Controls and Blowers - IntelligAIRE III control panel - screen blank / black"],
  "Engine":["Check engine light","Stop engine light","Check engine and stop engine light","Engine runs hot (207F+)","Overheating","Overheat shutdown (235-240F)","Coolant leak","Misfire","Loss of power","Oil leak","Rear main seal","Coolant level sensor","Water pump belt","Alternator belt","Water pump pulley","Tensioner pulley","Fan drive pulley","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
- "Cooling System":["Overheating","Coolant leak","Surge tank - engine side low","Surge tank - heating side low","Surge tank - both sides low","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
+ "Cooling System":["Overheating","Coolant leak","Coolant leak - heating side","Surge tank - engine side low","Surge tank - heating side low","Surge tank - both sides low","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission and Drivetrain":["Check transmission light","Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
  "Suspension and Steering":["NVH (noise, vibration, harshness)","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
  /* A sticking brake had no wording at all, so the only way to log one was to
@@ -272,7 +302,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
     "Group - Item", so they keep their stored identity exactly and the twelve
     live records under them are untouched. Nothing is retired: every old wording
     reads as its new home. */
- "Tech Services":["Farebox - INOP (general)","Farebox - No power","Farebox - Blank / black screen","Farebox - Bill transport INOP","Farebox - Coin mech INOP","Farebox - Coin off line","Farebox - Coin bin missing","Farebox - Unlocked / won't lock","Farebox - Can't unlock top / coin bypass reset","Farebox - Won't probe & open","Farebox - Loose from floor mounts","Farebox - Other farebox defect","Ventra - INOP (general)","Ventra - Other Ventra defect","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","CUBIC Screen - Screen black","IBS Screen - INOP (general)","IBS Screen - Screen black","Signs, Cameras and Other - Destination Sign","Signs, Cameras and Other - Dash cam","Signs, Cameras and Other - Camera / DVR system","Signs, Cameras and Other - Other Tech Services"],
+ "Tech Services":["Farebox - INOP (general)","Farebox - No power","Farebox - Blank / black screen","Farebox - Bill transport INOP","Farebox - Coin mech INOP","Farebox - Coin off line","Farebox - Coin bin missing","Farebox - Unlocked / won't lock","Farebox - Can't unlock top / coin bypass reset","Farebox - Won't probe & open","Farebox - Loose from floor mounts","Farebox - Other farebox defect","Ventra - INOP (general)","Ventra - Other Ventra defect","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","CUBIC Screen - Screen black","IBS Screen - INOP (general)","IBS Screen - Screen black","IBS Screen - Run box no display","Signs, Cameras and Other - Destination Sign","Signs, Cameras and Other - Dash cam","Signs, Cameras and Other - Camera / DVR system","Signs, Cameras and Other - Other Tech Services"],
  "Amerex":["Fire Suppression - FIRE alarm (system discharged)","Fire Suppression - Heat sensor communication fault","Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 1 Roof 2","Fire Suppression - Trouble Mod 1 Engine","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Trouble Mod 2 Roof 2","Fire Suppression - Trouble Mod 2 Engine","Fire Suppression - Control head no power","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert","CNG - Check CNG valves light","CNG - PRD cap missing","CNG - PRD leaking","CNG - Other CNG defect"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
  "Bus Accessories":["Doors - Front door","Doors - Front door will not open","Doors - Front door will not close","Doors - Front door opens / closes slowly","Doors - Rear door","Doors - Rear door will not open","Doors - Rear door will not close","Doors - Rear door opens / closes slowly","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Ramp not working","Ramp, Lift and Kneeler - Ramp no power","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Ramp will not lock","Ramp, Lift and Kneeler - Ramp does not fully cycle","Ramp, Lift and Kneeler - Kneeler","Ramp, Lift and Kneeler - Kneeler not functioning correctly","Ramp, Lift and Kneeler - Kneeler sits too high","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request INOP (curbside)","Stop Request - Stop request INOP (roadside)","Stop Request - Stop request INOP (wheelchair area - curbside)","Stop Request - Stop request INOP (wheelchair area - roadside)","Stop Request - Stop request pull cord / line - broken (curbside)","Stop Request - Stop request pull cord / line - broken (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect","Bike Rack - Arm replacement","Bike Rack - Loose / pivots","Wipers and Washers - Wiper blade (curbside)","Wipers and Washers - Wiper blade (roadside)","Wipers and Washers - Wiper motor (curbside)","Wipers and Washers - Wiper motor (roadside)","Wipers and Washers - Washer not spraying","Wipers and Washers - Washer nozzle (curbside)","Wipers and Washers - Washer nozzle (roadside)","Wipers and Washers - Washer pump","Wipers and Washers - Washer reservoir / leaking","Wipers and Washers - Other wiper or washer defect"],
@@ -302,7 +332,13 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
 };
 
 export const REPAIR_CATEGORY_EMOJI:Record<string,string>={
- "A/C and HVAC":"❄️",
+ /* Two glyphs, because the category holds both halves now. The heating group
+    arrived in winter and a snowflake on its own said the opposite of what a
+    no-heat bus needs. Curtis picked the pair. The thermometer and the puff of
+    air were not available to pair with it - they name Cooling System and
+    Pneumatic System, and two tables that must agree about a glyph are two
+    tables that will eventually disagree. */
+ "A/C and HVAC":"❄️+♨️",
  Engine:"⚙️",
  "Cooling System":"🌡️",
  Transmission:"🕹️",
@@ -339,6 +375,12 @@ export function repairCategoryEmoji(category:string){return REPAIR_CATEGORY_EMOJ
    language the shop already reads off the panel; every other grouped category
    (Bus Controls today) gets the plain version. Both native pickers call these,
    so the bus editor and the multi-bus tool cannot drift apart again. */
+/* Does this category ask for a system before the fault? A/C and HVAC does;
+   Brakes goes straight to the repair. Read off the table the picker draws
+   from, so nothing keeps a second list of which categories are grouped. */
+export function isGroupedCategory(category:unknown){
+ return Object.keys(REPAIR_OPTION_GROUPS[String(category??"")]||{}).length>0;
+}
 export function repairGroupStepLabel(category:string){
  return category==="Amerex"?"CHOOSE THE SYSTEM":"CHOOSE THE GROUP";
 }
@@ -375,6 +417,13 @@ export const ADA_MECHANICAL_MARK="♿ ⚙️ ";
 const ADA_GROUPS=new Set(["Door, Ramp and Kneeler Failures","Ramp, Lift and Kneeler","Wheelchair Securement"]);
 const ADA_ISSUE=/wheelchair|kneeler|q'straint|securement|\bramp\b/i;
 const ISSUE_DISPLAY_MARKS:Record<string,string>={"Fire extinguisher missing":"🧯 "};
+/* A group that is drawn with a glyph of its own. Curtis asked for the door on
+   Doors: it leads the Bus Accessories groups, directly above the two that carry
+   the chair, and had nothing. Display only, like the chair - the group is still
+   stored as "Doors". Nothing here keeps a mark off its options the way
+   ADA_GROUPS does; they are plain because none of them matches a marked
+   wording, and a test walks the group to say so. */
+const GROUP_DISPLAY_MARKS:Record<string,string>={"Doors":"🚪 "};
 
 /* What somebody standing at the bus needs to know at the moment they pick this
    defect, rather than what a manual would say about it afterwards.
@@ -385,12 +434,37 @@ const ISSUE_DISPLAY_MARKS:Record<string,string>={"Fire extinguisher missing":"�
    really a way of moving the bus. */
 const DEFECT_NOTES:Record<string,Record<string,string>>={
  "A/C and HVAC":{
-  "A/C compressor pulley misaligned":"Lay a straight edge across the crank pulley and the compressor pulley before you order a belt. A pulley out of line is what eats belts, so a belt fitted to a misaligned pulley comes back. Note in the description how far out and which way.",
+  "Cooling - A/C compressor pulley misaligned":"Lay a straight edge across the crank pulley and the compressor pulley before you order a belt. A pulley out of line is what eats belts, so a belt fitted to a misaligned pulley comes back. Note in the description how far out and which way.",
+  /* The one heating fault where the obvious reading is wrong often enough to
+     be worth a line: no hot air and a full tank is usually the pump, not the
+     core, and the two repairs share no parts. */
+  "Heating - Heater boost pump":"Check the heating side of the surge tank before you condemn the pump — an empty side gives you the same no-hot-air complaint and is the cheaper find. A pump that is getting power and not moving coolant is the pump; log it here. Say in the description whether the hoses were hot at the core.",
+  /* THE SYMPTOM, BEFORE ANYBODY KNOWS THE CAUSE. Curtis: "I cannot always
+     confirm why there is not heat on the spot, but I can confirm the heat
+     doesn't work immediately. This is for convenience."
+
+     Every other entry under Heating names a place or a part — the front dash,
+     the floor, the boost pump, the defroster — so a foreman who can only say
+     the heat is dead had nowhere honest to put it and either guessed at a
+     cause or reached for "Other heating repair", which says nothing. Cooling
+     has had "No cooling" in that slot since the catalog was written; this is
+     the heating side of the same idea, and it sits first for the same reason.
+
+     Narrowing it later is an edit to the same defect, and the rename maps
+     carry a record through a change of wording. */
+  "Heating - No heat":"Log this the moment the heat is dead, without guessing why. If you get a chance to narrow it, the two first checks are the heating side of the surge tank and the boost pump, and whether the FLOOR heat still works separates a dash problem from a whole-bus one.",
+  "Heating - No heat at front dash":"Say whether the FLOOR heat still works, because that is what separates a dash duct or blower problem from a whole-bus heating fault. If neither works, the heating side of the surge tank and the boost pump are the first two checks.",
+  "Heating - Floor heat INOP":"Try the floor heat switch before the heat itself — that switch is logged separately under Operator/Driver Controls → System Switches → Floor heat switch, and a dead switch is not a dead heater. Note in the description whether dash heat still works.",
  },
  /* The surge tank on the 17s, 18s and 20s is split, and the two halves do not
     talk to each other. Somebody who does not know that tops up the side they
     can see and walks away from a bus that will have no heat in December. */
  "Cooling System":{
+  /* Named apart from the plain Coolant leak because WHICH side is leaking is
+     the whole question in winter: the engine side losing glycol is a shutdown
+     risk, and this side losing it is a bus with no heat and an engine that
+     reads perfectly normal. Both are on the No Heat Buses list. */
+  "Coolant leak - heating side":"A leak on the heating circuit — heater hoses, the core, the boost pump or the heating half of the surge tank. The engine side can read full and the engine temperature normal while this one empties, so a bus can get through a pre-trip and still have no heat by the afternoon. Say where the wet spot is.",
   "Surge tank - heating side low":"This side feeds cabin heat only, and it is independent of the engine side — a full engine side says nothing about this one. Empty here means no cabin heat when the weather turns. The winter list is QUICK FILTERS → No Heat Buses.",
   "Surge tank - both sides low":"Two halves that cannot drain into each other went down together, which points at a leak somewhere they share rather than two separate ones. Worth finding before either side is topped up again.",
  },
@@ -546,13 +620,14 @@ export function normalizeRepairCount(value:unknown,category:unknown,issue:unknow
 
 export function repairGroupDisplayLabel(group:string){
  if(group==="Door, Ramp and Kneeler Failures")return ADA_MECHANICAL_MARK+group;
+ if(Object.prototype.hasOwnProperty.call(GROUP_DISPLAY_MARKS,group))return GROUP_DISPLAY_MARKS[group]+group;
  return ADA_GROUPS.has(group)?ADA_MARK+group:group;
 }
 /* Inside a group that already carries the mark every option would repeat it, so
    the group speaks for its contents and the options stay clean. */
 export function repairIssueDisplayLabel(issue:string,group=""){
  if(ADA_GROUPS.has(group))return issue;
- if(ISSUE_DISPLAY_MARKS[issue])return ISSUE_DISPLAY_MARKS[issue]+issue;
+ if(Object.prototype.hasOwnProperty.call(ISSUE_DISPLAY_MARKS,issue))return ISSUE_DISPLAY_MARKS[issue]+issue;
  return ADA_ISSUE.test(issue)?ADA_MARK+issue:issue;
 }
 
@@ -681,6 +756,32 @@ export function loggedMinutesElapsed(defect:StructuredDefect,now=new Date()){
  const started=Date.parse(String(defect.createdAt||""));
  return Number.isNaN(started)?null:(now.getTime()-started)/60000;
 }
+/* HOW LONG AGO THIS REPAIR WAS FINISHED.
+
+   The sibling of `loggedMinutesElapsed`, and it asks the opposite question.
+   Curtis, on Fixed Repairs: "any repairs I fixed in the past day or two." A
+   repair reported on Monday and finished this morning was FINISHED this
+   morning, so a history window keyed off `createdAt` would hide exactly the
+   work somebody is trying to show.
+
+   `completedAt` first, `updatedAt` second, and the fallback exists because
+   this page already sorts and dates its cards that way — one rule for the sort,
+   the card and the window, or a card prints one date and filters on another.
+
+   WHAT THE FALLBACK IS ACTUALLY FOR, corrected: a LEGACY or imported record
+   written before the field was filled in. An earlier version of this comment
+   said a record cleared from the Down Sheet carries only `updatedAt`, and a
+   cold read checked — `down-sheet-sync.ts` writes
+   `completedAt:completed?(linked?.completedAt||now):""` and `defect-log-sync.ts`
+   does the same, so every current path that completes a repair stamps it. No
+   live path produces `state:"completed"` without a `completedAt`.
+
+   A record thin enough to carry neither has no age, reads as null, and falls
+   out of every narrowed window exactly like an undated deferral. */
+export function completedMinutesElapsed(defect:StructuredDefect,now=new Date()){
+ const finished=Date.parse(String(defect.completedAt||defect.updatedAt||""));
+ return Number.isNaN(finished)?null:(now.getTime()-finished)/60000;
+}
 export function setDownSheetRecommendation(defect:StructuredDefect,on:boolean,at:string,by=""):StructuredDefect{
  const stamp=stampFor(on,at,by),next={...defect,downSheetRecommendation:stamp};
  if(!stamp)delete next.downSheetRecommendation;
@@ -771,6 +872,28 @@ function normalizedSymptoms(value:unknown){
 }
 
 export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
+ /* ONE CATEGORY, THREE GROUPS, because the unit is one unit. IntelligAIRE III
+    runs the heat and the cooling off the same panel, so a separate top-level
+    Heating category would have put two halves of one box in two places and
+    left the shared wiring belonging to neither.
+
+    HEATING IS FIRST, and that is a seasonal choice rather than an alphabetical
+    one. Curtis asked for this in December against a paper heat sheet, and the
+    five entries under it are what gets picked every morning until spring. Flip
+    the order here when that stops being true; nothing else depends on it.
+
+    The category was FLAT until this change, so every wording in it moved into
+    a group. That is a read-time move through CATEGORY_ISSUE_RENAMES below -
+    the same conversion Bus Controls and Tech Services already went through -
+    and nothing in storage is rewritten. */
+ "A/C and HVAC":{
+  "Heating":["No heat","No heat at front dash","Floor heat INOP","Heater boost pump","Heater / defroster","Other heating repair"],
+  "Cooling":["No cooling","Semi cold air","Compressor","A/C belt","A/C compressor pulley misaligned","Evaporator core","Condenser core","Condenser fan INOP - 1 fan","Condenser fans INOP - both fans","Evaporator fan / motor INOP - 1","Evaporator fans / motors INOP - both","Refrigerant / Freon leak","Other A/C repair"],
+  /* The parts that serve both sides. A blower motor moves whatever the unit
+     has made, hot or cold, so filing it under either one would have it missing
+     from the other half of the year. */
+  "Controls and Blowers":["Blower motor","Operator A/C blower","Bad connection / wiring","Controls / electrical","IntelligAIRE III control panel - screen blank / black"],
+ },
  "Operator/Driver Controls":{
   "Driver Seat":["Seat belt","Leaking air","Will not lock","Adjustment / locking bar","Controls / buttons"],
   "Gauges and Dash":["Fuel gauge INOP / false reading","Speedometer","Other gauge / indicator","Front dash damage","Front instrument dash damaged / replacement"],
@@ -818,7 +941,15 @@ export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
   "Farebox":["INOP (general)","No power","Blank / black screen","Bill transport INOP","Coin mech INOP","Coin off line","Coin bin missing","Unlocked / won't lock","Can't unlock top / coin bypass reset","Won't probe & open","Loose from floor mounts","Other farebox defect"],
   "Ventra":["INOP (general)","Other Ventra defect"],
   "CUBIC Screen":["BUS ER","MV ER","Screen black"],
-  "IBS Screen":["INOP (general)","Screen black"],
+  /* RUN BOX NO DISPLAY, Curtis's own wording: "we need to add a run box defect
+     to the tech services portion and it will go in the fourth sub category...
+     I think run box no display might be the best one." He named a POSITION,
+     and IBS Screen is the fourth group this category draws — measured in both
+     render paths, the native three-step select and the combo field, neither of
+     which sorts or filters the group keys. Why that group is the fourth is not
+     something he said and not something the code can show, so it is not
+     claimed here. */
+  "IBS Screen":["INOP (general)","Screen black","Run box no display"],
   "Signs, Cameras and Other":["Destination Sign","Dash cam","Camera / DVR system","Other Tech Services"],
  },
  "Amerex":{
@@ -980,7 +1111,31 @@ const CATEGORY_ISSUE_RENAMES:Record<string,Record<string,string>>={
     so either search hits it. Records logged under the old name read as the new
     one; nothing stored is rewritten. */
  "A/C and HVAC":{
-  "Refrigerant leak":"Refrigerant / Freon leak",
+  /* A/C and HVAC became a grouped category, so every flat wording it had moves
+     to its group. This map is applied ONCE, so "Refrigerant leak" names its
+     final grouped home directly rather than chaining through the Freon rename
+     below it - a two-step chain here would stop at the ungrouped name and then
+     never match the picker again, silently. */
+  "No cooling":"Cooling - No cooling",
+  "Semi cold air":"Cooling - Semi cold air",
+  "Compressor":"Cooling - Compressor",
+  "A/C belt":"Cooling - A/C belt",
+  "A/C compressor pulley misaligned":"Cooling - A/C compressor pulley misaligned",
+  "Evaporator core":"Cooling - Evaporator core",
+  "Condenser core":"Cooling - Condenser core",
+  "Condenser fan INOP - 1 fan":"Cooling - Condenser fan INOP - 1 fan",
+  "Condenser fans INOP - both fans":"Cooling - Condenser fans INOP - both fans",
+  "Evaporator fan / motor INOP - 1":"Cooling - Evaporator fan / motor INOP - 1",
+  "Evaporator fans / motors INOP - both":"Cooling - Evaporator fans / motors INOP - both",
+  "Operator A/C blower":"Controls and Blowers - Operator A/C blower",
+  "Refrigerant / Freon leak":"Cooling - Refrigerant / Freon leak",
+  "Other A/C repair":"Cooling - Other A/C repair",
+  "Heater / defroster":"Heating - Heater / defroster",
+  "Blower motor":"Controls and Blowers - Blower motor",
+  "Bad connection / wiring":"Controls and Blowers - Bad connection / wiring",
+  "Controls / electrical":"Controls and Blowers - Controls / electrical",
+  "IntelligAIRE III control panel - screen blank / black":"Controls and Blowers - IntelligAIRE III control panel - screen blank / black",
+  "Refrigerant leak":"Cooling - Refrigerant / Freon leak",
  },
  /* Tech Services became a grouped category. Every flat wording it had moves to
     its group; the two CUBIC Screen wordings already carried their group and are
@@ -1140,7 +1295,7 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
      a number on its own has nothing to belong to and would sit in storage where
      no screen ever displays it. */
   const diagLight=hasDiagLightField(category)?normalizeDiagLight(defect.diagLight):undefined;
-  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:typeof defect.details==="string"?defect.details:defect.details==null?"":String(defect.details),operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),...fluidsPatch(defect,category,issue),...reportAttemptsPatch(defect),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
+  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:typeof defect.details==="string"?defect.details:defect.details==null?"":String(defect.details),operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),...fluidsPatch(defect,category,issue),...reportAttemptsPatch(defect),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),estimateHours:normalizeRepairHours(defect.estimateHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];
@@ -1166,6 +1321,28 @@ export function deferredMinutesElapsed(defect:StructuredDefect,now=new Date()){
 export function hasDeferredHistory(defect:StructuredDefect,onDownSheet:boolean){
  return Boolean(defect.deferredReturnedAt)&&defect.state!=="deferred"&&isUnresolved(defect)&&!onDownSheet;
 }
+/* DID A PERSON WRITE THIS DOWN, or did it come off a photographed sheet?
+
+   A defect born from a scanned Down Sheet row is stamped `source:"down-sheet"`
+   and carries a `createdAt` of WHEN THE SCAN RAN, which is not when anybody
+   logged anything - importing yesterday's paper at 20:00 drops that whole sheet
+   into "the last 24 hours" at once. Curtis, looking at a share that had: "I
+   have no reason to share something off the down sheet because the down sheet
+   is already coming from the source... for this particular function, no, just
+   things that were logged by hand."
+
+   ONLY THE PAPER IS EXCLUDED. Typing into the Defect Log, the map's bus editor,
+   the AI operator and a defect swept off a photographed defect sheet are all
+   somebody putting a defect down, and none of those carries that source. The
+   exclusion is the paper's, not the app's.
+
+   AND A DEFECT KEEPS THE SOURCE IT WAS BORN WITH. `applyDownEntryToFleet`
+   writes `linked?.source||"down-sheet"`, so a defect logged by hand that LATER
+   appears on a sheet stays `defect-log`. Somebody logged it; the paper catching
+   up does not take that away. */
+export function loggedByHand(defect:{source?:string}){
+ return String(defect?.source||"")!=="down-sheet";
+}
 /* A part went on the bus and nobody has written down which one.
 
    This is not a new field. PARTS USED ticked with the number left blank has
@@ -1176,7 +1353,14 @@ export function hasDeferredHistory(defect:StructuredDefect,onDownSheet:boolean){
    button for it.
 
    Ticked with a number is complete. Not ticked means no part was used, which is
-   a different thing from an unknown one and must never be flagged. */
+   a different thing from an unknown one and must never be flagged.
+
+   THE FIXED REPAIRS CARD NO LONGER CALLS THIS. A repair can carry more than one
+   part now, and this reads the mirrored FIRST one, so a name-only first part
+   beside a numbered second showed MISSING PART # over a number that had been
+   recorded. `defectPartsMissing` in defect-parts.ts asks the whole list and is
+   what the card reads. This stays as the single-part question, which is still
+   the right one to ask of a record that holds a single part. */
 export function partNumberMissing(defect:{partsUsed?:boolean;partNumber?:string}){
  return defect.partsUsed===true&&!String(defect.partNumber??"").trim();
 }
@@ -1202,3 +1386,86 @@ export function defectLabel(defect:StructuredDefect){
  return [defect.category,defect.issue,quantity,findingLabel(defect.finding),defectSupportingDetails(defect)].map(value=>String(value).trim()).filter(Boolean).join(" — ")
 }
 export function defectSummary(defects:StructuredDefect[]){return defects.filter(isUnresolved).map(defectLabel).join("; ")}
+
+/* THE SHORTEST HONEST NAME FOR A REPAIR: the category and the issue, nothing
+   else. `defectLabel` above adds the quantity, the finding, the diag light,
+   the symptoms and whatever the mechanic typed, which is right on a Down Sheet
+   row and wrong anywhere somebody is glancing. */
+export function defectShortLabel(defect:StructuredDefect){
+ const identity=migrateRepairIdentity(defect.category,defect.issue);
+ /* WHERE THE NAME CARRIES NOTHING, THE WORDS ARE THE DEFECT. "Manual entry"
+    and "Driver-reported defect" are both placeholders — `defectLabel` already
+    special-cases the first and returns the details instead, and
+    `migrateRepairIdentity` mints the second for any record that lost its
+    wording, which is most of what arrives off a photographed sheet.
+
+    Found by a cold read: a legacy bus with 166 characters of driver report and
+    no structured defect came out as "1 OPEN / Miscellaneous — Driver-reported
+    defect". Before the glance existed the card printed the whole thing, so the
+    change went from all of the information to none of it on exactly the
+    records where the issue name says nothing at all.
+
+    Trimmed to one line's worth, because this is still a glance and the rest is
+    a double-tap away. */
+ if(PLACEHOLDER_ISSUES.has(identity.issue.trim().toLowerCase())){
+  const words=defect.details.trim();
+  if(words)return words.length>72?words.slice(0,71).trimEnd()+"…":words;
+ }
+ return [identity.category,bareIssueLabel(identity.category,identity.issue)]
+  .map(value=>String(value).trim()).filter(Boolean).join(" — ");
+}
+/* The two issue names that are not the name of a repair. */
+const PLACEHOLDER_ISSUES=new Set(["manual entry","driver-reported defect"]);
+
+/* "A/C and HVAC — No cooling", not "A/C and HVAC — Cooling - No cooling". A
+   grouped identity is stored as "Group - Item" and the group is usually a
+   restatement of the category once the category is on the line beside it.
+
+   MATCHED AGAINST THE GROUP TABLE, never by splitting on " - ". The example
+   that shows why is "Outside rear view mirror - R/S": a flat category with no
+   groups at all, where a blind split throws away the mirror and leaves "R/S".
+   (Two others named here in an earlier draft — "Gauges and Dash - Fuel gauge"
+   and "Stop Request - Stop request INOP (curbside)" — ARE group-prefixed, so
+   splitting happens to give the same answer on those; they were evidence for
+   nothing.) Only a prefix that IS one of this category's groups comes off. */
+function bareIssueLabel(category:string,issue:string){
+ const groups=REPAIR_OPTION_GROUPS[category];
+ if(groups)for(const group of Object.keys(groups)){
+  const prefix=group+" - ";
+  if(issue.startsWith(prefix))return repairIssueDisplayLabel(issue.slice(prefix.length),group);
+ }
+ return repairIssueDisplayLabel(issue);
+}
+
+/* WHAT A GLANCE AT A BUS SHOWS, and it is a count before it is a list.
+
+   Curtis, on the Facility Map's quick view: "it looks like a mess and what I
+   come to find out is that we really don't need all of the details showing
+   like this." It was printing `pendingRepair` whole — `defectSummary`, every
+   unresolved defect's full label joined with semicolons. Measured on a bus built from his
+   15519 with twelve open — the same fixture the test ships — 849 characters in
+   one blob, rendering as 128. The card was 628px tall with its top 227px above
+   a 390x844 screen.
+
+   So: how many, then the first few NAMES, then how many are left. The free
+   text, the findings and the symptoms are all still one double-tap away on the
+   bus itself, which is where somebody goes when the glance says to.
+
+   IT LIVES HERE RATHER THAN IN THE CARD because a count shown on a screen is a
+   question an agent can be asked — "what is open on 15519" — and
+   `docs/ARCHITECTURE.md` is explicit that a rule computed inline in a
+   `page.tsx` has to be reimplemented in the MCP route to be answerable, and
+   then there are two of it.
+
+   `limit` is the number of names, not the number of defects: `more` is what is
+   left after them, so nothing is ever silently dropped. */
+export function defectGlance(defects:StructuredDefect[],limit=3){
+ const open=defects.filter(isUnresolved);
+ /* The id travels with the name because the card draws a list and React needs
+    a stable key: a bus carrying four identical `Brakes / ABS warning` records
+    — which this app has a whole merge-duplicates flow for — rendered the same
+    key three times when the name was used. */
+ return {open:open.length,
+  names:open.slice(0,limit).map(defect=>({id:defect.id,name:defectShortLabel(defect)})),
+  more:Math.max(0,open.length-limit)};
+}

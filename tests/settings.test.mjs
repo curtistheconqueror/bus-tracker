@@ -59,8 +59,47 @@ test("confirmation prompts are per-device settings that default to on", async ()
   // Preferences persist, restore safely, and travel with backup export/import.
   assert.match(page, /setConfirmMoves\(confirmationPreference\(ui\.confirmMoves\)\)/);
   assert.match(page, /setConfirmDefects\(confirmationPreference\(ui\.confirmDefects\)\)/);
-  assert.match(page, /singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals\}\)\)/);
-  assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals\}/);
+  /* Asserted as a SET rather than as one exact string. The pin here used to be
+     the whole argument list in order, so adding a setting broke it in a way
+     that said nothing about what was wrong — and reordering two fields that
+     changes nothing would break it too. What matters is that every board
+     setting the page holds is in the object it writes: one left out is a
+     preference that silently never persists. */
+  /* MATCHED ON THE OBJECT THE MAP HANDS OVER, not on a `JSON.stringify` of
+     its own. It used to stringify the whole record itself, which deleted every
+     field it did not name: measured, a device holding a stale
+     `pace-board-settings-v1` field lost it, and `futureField` with it, on the
+     first render of the map. `writeBoardSettings` merges over the stored copy,
+     which is what map-settings.ts has always claimed happens. */
+  const written=page.match(/writeBoardSettings\(localStorage,\{([^}]*(?:\{[^}]*\}[^}]*)*)\}\)/);
+  assert.ok(written,"the map still persists its board settings");
+  /* ORDER-INDEPENDENT. This forbade the literal `JSON.stringify({statusVersion:3`
+     and a reviewer moved the stamp to the END of the object: the map replaced
+     the whole record again, a device lost its stale field, its `futureField`
+     and its legacy `dark` on the first render, and 433 tests stayed green. A
+     blacklist of one spelling is not a gate - which is what this change's own
+     notes say about the one it replaced. So: `writeBoardSettings` is the ONLY
+     writer of this key outside map-settings.ts. */
+  /* THREE SHAPES, NOT ONE. This checked a double-quoted `writeSetting` call
+     only, so a single-quoted key, a backtick, or a plain
+     `localStorage.setItem("pace-board-settings-v1", …)` could sit beside
+     `writeBoardSettings` and replace the merged record without failing here.
+     The rule is "the map never writes this key itself"; the spelling is not
+     the rule. */
+  const raw=[
+   /writeSetting\(\s*(?:window\.)?(?:localStorage|storage)\s*,\s*(?:BOARD_SETTINGS_KEY|["'`]pace-board-settings-v1["'`])/,
+   /(?:window\.)?(?:localStorage|storage)\.setItem\(\s*(?:BOARD_SETTINGS_KEY|["'`]pace-board-settings-v1["'`])/,
+  ];
+  assert.ok(!raw.some(shape=>shape.test(page)),
+   "the map must not write pace-board-settings-v1 itself; writeBoardSettings merges, a raw write replaces");
+  /* DERIVED FROM BoardSettings, not hand-listed. A hand-written list cannot
+     know it is complete: add a setting to the type and to readBoardSettings,
+     forget the map's own write, and a hand-listed assertion passes while the
+     preference silently never persists. */
+  const {readBoardSettings:readBoard}=await import("../src/lib/settings/map-settings.ts");
+  for(const field of Object.keys(readBoard(null)))
+   assert.ok(new RegExp("(^|[,{])"+field+"\\s*([,:}]|$)").test(written[1].trim()),
+    field+" is in the map's own write, or it is a setting that never persists");
   /* A restored backup reaches the intervals through the board-settings reader
      now, rather than through a setter inside the map's own import handler. */
   const boardModel = await readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8");
@@ -97,14 +136,14 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
      the page the app opens on. Curtis, looking at a phone: "the facility map
      needs to get on board with title design. Fleetstep should be at top."
      Every other header is name, kicker, title, subtitle, then nav, and the map
-     is now the same. It stays a SIBLING of the header rather than moving
-     inside it because it is `position:sticky` here and only here. */
+     is now the same. The compact selector now shares the header with the brand; the persistent
+     mobile navigation lives in the shared bottom dock. */
   /* Anchored to the MARKUP, not to the bare class name: a comment in page.tsx
      mentions `.mobile-mode-nav` while explaining this very ordering, and a
      bare indexOf found the comment and failed on it. Same trap as matching a
      button by a word its own explanation also uses. */
   assert.ok(trackerPage.indexOf("<AppName/>")<trackerPage.indexOf('<TrackerNav className="mobile-mode-nav"'),"the Facility Map's name must render before its phone nav, as on every other page");
-  assert.match(trackerPage,/<\/header>\s*<TrackerNav className="mobile-mode-nav"/,"the nav follows the header rather than preceding it");
+  assert.match(trackerPage,/<TrackerNav className="mobile-mode-nav" active="\/"\/><\/header>/,"the compact selector shares the header with the brand");
   assert.match(defectPage,/save-log-middle-actions[\s\S]*?SAVE AS FIXED/);
   assert.match(defectPage,/save-fixed-bottom[\s\S]*?SAVE AS FIXED/);
   assert.match(defectPage,/FIX \/ STEPS TAKEN/);
@@ -128,7 +167,14 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedPage,/className="fixed-undo-control"[\s\S]*disabled=\{!undoSnapshot\}[\s\S]*UNDO LAST/);
   assert.equal(/fixed-settings-button/.test(fixedPage),false,"the gear left this page for the shared Settings page");
   assert.equal(/<FixedAppearanceModal/.test(fixedPage),false,"the appearance panel renders on the shared Settings page now");
-  assert.match(fixedSettings,/pace-defect-log-settings-v1/);
+  /* The appearance panel shares the Defect Log's settings record, and it held
+     its own literal for that key — one of two copies reachable from the same
+     page once Fixed Repairs started reading the initials out of it. CLAUDE.md
+     forbids renaming a key, so two literals is two forever and the one that
+     drifts is silent. It imports the name now, so this asserts the import and
+     tests/storage.test.mjs still pins the string itself. */
+  assert.match(fixedSettings,/import \{SETTINGS_KEY\} from "@\/src\/lib\/defects\/defect-log-settings"/);
+  assert.equal(/const SETTINGS_KEY="pace-/.test(fixedSettings),false,"no second literal for a shared key");
   assert.match(fixedSettings,/THEME[\s\S]*FONT[\s\S]*COLORS/);
   assert.match(fixedSettings,/localStorage\.setItem\(SETTINGS_KEY/);
   assert.match(fixedPage,/UNDO FIX/);
@@ -139,7 +185,8 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(defectPage,/className="log-undo-button"[\s\S]*disabled=\{!undoSnapshot\}[\s\S]*UNDO LAST/);
   assert.match(defectCss,/\.log-undo-button\{[^}]*background:var\(--log-surface[^}]*color:var\(--log-muted/);
   assert.match(defectCss,/@media\(max-width:760px\)\{\.log-controls\{grid-template-columns:minmax\(0,1fr\) 82px 48px/);
-  assert.match(fixedCss,/\.fixed-header nav\{[^}]*grid-template-columns:repeat\(6/,"six links, one row on a desktop");
+  assert.match(fixedCss,/\.fixed-header nav\{[^}]*grid-template-columns:repeat\(auto-fit/,
+    "the column count must not encode how many pages exist — repeat(6) hid the gear when an eighth page arrived");
   assert.match(fixedCss,/@media\(max-width:760px\)\{\.fixed-header\{[^}]*overflow:visible/);
   assert.match(fixedCss,/\.fixed-repairs-app>\.fixed-header\{height:auto\}/);
   assert.match(fixedCss,/@media\(max-width:760px\)\{\.fixed-settings-shade\{align-items:stretch/);
@@ -147,9 +194,13 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card>footer\{[^}]*position:static[^}]*transform:none[^}]*white-space:normal/);
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-editor>footer\{[^}]*position:static[^}]*transform:none[^}]*white-space:normal/);
   assert.match(fixedCss,/@media\(max-width:760px\)\{[\s\S]*?\.fixed-repairs-app>\.fixed-header nav\{grid-template-columns:repeat\(3/,"six links, two full rows on a phone");
-  assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions\{width:100%;grid-template-columns:minmax\(0,1\.55fr\) minmax\(0,1fr\) minmax\(0,\.8fr\)/);
+  /* TWO BY TWO ON A PHONE since PTR joined the row. Four in one line at 360
+     put DELETE in a 60px box beside a 41px PTR — four crowded targets with the
+     destructive one on the end. Measured: 2x2 gives each of them ~151px at 360
+     and ~165px at 390, at the same 48px height. */
+  assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions\{width:100%;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions button:first-child\{grid-column:auto\}/);
-  assert.match(worker,/CORE_PAGES = \["\/", "\/down-sheet", "\/defect-log", "\/fixed-repairs", "\/lists", "\/settings"\]/);
+  assert.match(worker,/CORE_PAGES = \["\/", "\/down-sheet", "\/defect-log", "\/fixed-repairs", "\/lists", "\/incidents", "\/shop-talk", "\/settings"\]/);
   /* Checked against the real route list rather than a second copy of it, so
      adding a page and forgetting the service worker fails here instead of
      going unnoticed until a phone loses signal in a bay and that page is
@@ -167,7 +218,7 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
      one never asks for it again. The new icon in Version 186 changed
      favicon.svg and the manifest without renaming either, which is why that
      release bumped this line too. */
-  assert.match(worker,/CACHE_NAME = "pace-bus-tracker-shell-v6"/);
+  assert.match(worker,/CACHE_NAME = "pace-bus-tracker-shell-v7"/);
   assert.match(catalog,/completedBy\?:string/);
   assert.match(catalog,/conditionNotDuplicated\?:boolean/);
   const response=await render("/fixed-repairs");
@@ -175,7 +226,7 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(await response.text(),/Fixed Repairs/);
 });
 
-test("every page draws the same six links from one list",async()=>{
+test("every page draws the same eight links from one list",async()=>{
  const nav=await readFile(new URL("../src/components/shared/tracker-nav.tsx",import.meta.url),"utf8");
  const {TRACKER_PAGES,otherPages}=await import("../src/lib/settings/tracker-pages.ts");
  const pagesSource=await readFile(new URL("../src/lib/settings/tracker-pages.ts",import.meta.url),"utf8");
@@ -184,20 +235,22 @@ test("every page draws the same six links from one list",async()=>{
     TRACKER in its own nav while every other page called it FACILITY MAP. One
     list, one name. */
  assert.deepEqual(TRACKER_PAGES.map(page=>page.label),
-  ["FACILITY MAP","DOWN SHEET","DEFECT LOG","FIXED REPAIRS","FLEET CAMPAIGNS","⚙ SETTINGS"]);
- assert.deepEqual(TRACKER_PAGES.map(page=>page.href),["/","/down-sheet","/defect-log","/fixed-repairs","/lists","/settings"]);
- assert.equal(TRACKER_PAGES.length%3,0,"six links: two full rows of three on a phone, never one alone");
+  ["FACILITY MAP","DOWN SHEET","DEFECT LOG","FIXED REPAIRS","FLEET CAMPAIGNS","INCIDENTS","SHOP TALK","⚙ SETTINGS"]);
+ assert.deepEqual(TRACKER_PAGES.map(page=>page.href),["/","/down-sheet","/defect-log","/fixed-repairs","/lists","/incidents","/shop-talk","/settings"]);
+ assert.notEqual(TRACKER_PAGES.length%3,1,
+  "a phone draws three across, and the last row must never strand a single tab on its own");
  /* Checked on the data, not the source: the file's own comment records the old
     name to explain why the component exists, and prose is not a label. */
  assert.equal(TRACKER_PAGES.some(page=>page.label==="FLEET TRACKER"),false,"the map's private name for itself is gone");
  assert.equal(/label:"FLEET TRACKER"/.test(pagesSource),false);
 
  // The component owns the landmark and the current-page mark.
- assert.match(nav,/<nav className=\{className\} aria-label="Tracker pages">/);
+ assert.match(nav,/<nav className=\{className\} aria-label="Tracker pages" data-tracker-nav>/);
  assert.match(nav,/aria-current=\{current\?"page":undefined\}/);
 
  // Every page renders it, marking itself, and none still carries a hand-written copy.
  const pages=[["app/page.tsx","/"],["app/down-sheet/page.tsx","/down-sheet"],["app/defect-log/page.tsx","/defect-log"],
+  ["app/incidents/page.tsx","/incidents"],["app/shop-talk/page.tsx","/shop-talk"],
   ["app/fixed-repairs/page.tsx","/fixed-repairs"],["app/lists/page.tsx","/lists"],["app/settings/page.tsx","/settings"]];
  for(const [file,active] of pages){
   const source=await readFile(new URL("../"+file,import.meta.url),"utf8");
@@ -208,7 +261,7 @@ test("every page draws the same six links from one list",async()=>{
 
  // The map's desktop menu is the same list minus the map, with counts attached.
  const other=otherPages({"/defect-log":7,"/down-sheet":2});
- assert.deepEqual(other.map(page=>page.href),["/down-sheet","/defect-log","/fixed-repairs","/lists","/settings"]);
+ assert.deepEqual(other.map(page=>page.href),["/down-sheet","/defect-log","/fixed-repairs","/lists","/incidents","/shop-talk","/settings"]);
  assert.equal(other.find(page=>page.href==="/defect-log").count,7);
  assert.equal(other.find(page=>page.href==="/lists").count,undefined,"no count is no count, not zero");
 });
@@ -1001,4 +1054,1460 @@ test("the shift clock says how long the current shift has been running",async()=
  /* No window matching means no shift to name, rather than a guess. */
  assert.equal(activeShift(at(12),{shifts:[],pullouts:[]}),null);
  assert.equal(activeShift("not a time"),null);
+});
+
+test("nothing the app can be heard or felt doing happens before somebody asks", async () => {
+ const {DEFAULT_FEEDBACK,readFeedbackSettings,loadFeedbackSettings,serializeFeedbackSettings,buzz,soundAllowed,FEEDBACK_SETTINGS_KEY}
+  =await import("../src/lib/settings/feedback-settings.ts");
+
+ /* Curtis: "make sure the sound is off by default ok? Any sounds. Toggleable
+    in settings." Off is the whole requirement, so it is asserted from every
+    direction a device can arrive at it. */
+ assert.deepEqual(DEFAULT_FEEDBACK,{sound:false,vibration:false});
+ for(const raw of [null,"","null","{}",'{"sound":true}'.replace("true","null"),"not json","[]","0",'{"version":1}']){
+  const read=readFeedbackSettings(raw);
+  assert.deepEqual(read,{sound:false,vibration:false},JSON.stringify(raw)+" reads as silent");
+ }
+
+ /* OFF IS THE SAFE READ, which inverts what app-mode.ts does on purpose. A
+    corrupt record there resolves to FULL because taking pages away mid-shift
+    is the worse failure; a corrupt record here must not be what starts a
+    phone making noise. */
+ assert.deepEqual(readFeedbackSettings('{"sound":"yes","vibration":1}'),{sound:false,vibration:false},
+  "only a literal true counts, so a hand-edited file cannot switch this on");
+ assert.deepEqual(readFeedbackSettings('{"sound":true,"vibration":true}'),{sound:true,vibration:true},
+  "and an honest yes still works");
+
+ /* A MIXED RECORD READS AS BOTH ON. One switch draws these two flags now, and
+    a device that ticked only SOUND under the two-switch UI would otherwise
+    render that switch ON while holding a bus made no buzz at all -- the app's
+    only perceivable feedback, silently missing, with no way out but toggling
+    off and on. */
+ assert.deepEqual(readFeedbackSettings('{"sound":true,"vibration":false}'),{sound:true,vibration:true},
+  "a sound-only device from the old UI gets the vibration its switch claims");
+ assert.deepEqual(readFeedbackSettings('{"sound":false,"vibration":true}'),{sound:true,vibration:true},
+  "and the other way round");
+
+ /* A storage that throws is a silent phone, not a crash. */
+ const throwing={getItem(){throw new Error("denied")},setItem(){throw new Error("denied")}};
+ assert.deepEqual(loadFeedbackSettings(throwing),{sound:false,vibration:false});
+ assert.equal(buzz(throwing,12),false);
+ assert.equal(soundAllowed(throwing),false);
+
+ /* A DEVICE THAT CAN ACTUALLY VIBRATE, which Node is not: its global
+    navigator has no vibrate, so without this stub `buzz` returned false
+    because the API was missing rather than because the setting was off — and
+    deleting the setting check entirely left the whole suite green. */
+ const realNavigator=globalThis.navigator;
+ let buzzes=0;
+ Object.defineProperty(globalThis,"navigator",{value:{vibrate:()=>{buzzes++;return true}},configurable:true,writable:true});
+ try{
+  const off={getItem:()=>null};
+  assert.equal(buzz(off,12),false,"a device that has never been to Settings stays still");
+  assert.equal(buzzes,0,"and navigator is not reached at all");
+  assert.equal(soundAllowed(off),false);
+
+  const on={getItem:()=>'{"sound":true,"vibration":true}'};
+  assert.equal(buzz(on,12),true,"turning the switch on makes it buzz");
+  assert.equal(buzzes,1,"exactly once");
+  assert.equal(soundAllowed(on),true);
+
+  /* ONE SWITCH, so a record holding only one flag -- which is what a device
+     that used the two-switch UI holds -- must not leave half the feedback
+     dead behind a control that says it is on. */
+  const vibrationOnly={getItem:()=>'{"sound":false,"vibration":true}'};
+  assert.equal(buzz(vibrationOnly,12),true,"an old vibration-only device still buzzes");
+  assert.equal(soundAllowed(vibrationOnly),true,"and its switch is telling the truth");
+  const soundOnly={getItem:()=>'{"sound":true,"vibration":false}'};
+  assert.equal(buzz(soundOnly,12),true,"an old sound-only device buzzes, because its switch says on");
+  assert.equal(soundAllowed(soundOnly),true);
+  assert.equal(buzzes,3,"three buzzes, one per call that was allowed");
+
+  /* A navigator whose vibrate refuses, and one that throws. */
+  globalThis.navigator={vibrate:()=>false};
+  assert.equal(buzz(vibrationOnly,12),false,"a refused vibrate is reported, not thrown");
+  globalThis.navigator={vibrate(){throw new Error("not allowed")}};
+  assert.equal(buzz(vibrationOnly,12),false,"and a throwing one is caught");
+ }finally{
+  Object.defineProperty(globalThis,"navigator",{value:realNavigator,configurable:true,writable:true});
+ }
+
+ /* The default object is copied, so a caller mutating what it read cannot
+    turn the default on for everybody after it. */
+ const first=readFeedbackSettings(null);
+ first.sound=true;
+ assert.equal(readFeedbackSettings(null).sound,false);
+ assert.equal(DEFAULT_FEEDBACK.sound,false);
+
+ assert.match(serializeFeedbackSettings({sound:false,vibration:true}),/"sound":false/);
+ assert.equal(FEEDBACK_SETTINGS_KEY,"pace-feedback-settings-v1");
+});
+
+test("a sound added later cannot get around the switch", async () => {
+ /* THIS IS THE ACTUAL GUARANTEE, and the reason feedback-settings.ts exists
+    at all. When Curtis asked for sound off by default the app made no sound:
+    no AudioContext, no Audio element, no audio file, no speech synthesis. An
+    off switch for nothing is worth very little; a gate that something added
+    in six months cannot walk around is worth the file.
+
+    So this walks the source tree and fails if anything outside that one
+    module names an API that can be heard or felt. The same shape as the test
+    holding pace-role-v1 inside roles.ts, and for a stronger reason: a role
+    read in the wrong place is a bug somebody notices, and a chirp on a phone
+    in a meeting is the app being turned off. */
+ /* STRING-AWARE, because a regex that merely deletes /* ... *\/ is not. A
+    source line holding "https://example.com/*" opened a pseudo-comment that
+    swallowed everything up to the file's next real close — a planted
+    new Audio("/ding.mp3") after one of those passed the scan. And a `//`
+    comment that did not start its line was never stripped at all, so prose
+    about this rule failed the build while real code hid from it: both bugs,
+    opposite directions, one cause.
+
+    Comments go; STRINGS STAY, because an audio path only ever appears in one.
+    A regex literal containing a quote can be mistaken for a string here, which
+    leaves more text in the scan rather than less — the safe direction. */
+ const stripComments=source=>{
+  let out="",i=0;
+  while(i<source.length){
+   const c=source[i],next=source[i+1];
+   if(c==='"'||c==="'"||c==="`"){
+    out+=c;i++;
+    while(i<source.length){
+     const d=source[i];out+=d;i++;
+     if(d==="\\"){if(i<source.length){out+=source[i];i++}continue}
+     if(d===c)break;
+    }
+    continue;
+   }
+   if(c==="/"&&next==="*"){i+=2;while(i<source.length&&!(source[i]==="*"&&source[i+1]==="/"))i++;i+=2;out+=" ";continue}
+   if(c==="/"&&next==="/"){while(i<source.length&&source[i]!=="\n")i++;out+=" ";continue}
+   out+=c;i++;
+  }
+  return out;
+ };
+
+ /* public/ is in scope because public/sw.js can call showNotification, which
+    on Android rings and vibrates. The extension list covers what actually
+    ships: a .mjs, a .json or an .html in these trees runs or renders. */
+ const roots=["app","src","public"],offenders=[],
+  banned=[
+   /\.\s*vibrate\s*\(/,              // navigator.vibrate, and any alias of it
+   /\bnew\s+(?:\w+\s*\.\s*)?Audio\s*\(/,  // new Audio, new window.Audio
+   /\bAudioContext\b/,/\bwebkitAudioContext\b/,
+   /createElement\s*\(\s*["'`]audio["'`]/i,
+   /\bspeechSynthesis\b/,/\bSpeechSynthesisUtterance\b/,
+   /\bnew\s+Notification\s*\(/,/\bshowNotification\s*\(/,  // rings on Android
+   /<audio[\s>]/i,
+   /["'`(\/][\w.\-\/]*\.(?:mp3|wav|ogg|m4a|aac)\b/i,  // a PATH, not a .wav class name
+  ],
+  allowed="src/lib/settings/feedback-settings.ts";
+ const walk=async dir=>{
+  for(const entry of await readdir(new URL("../"+dir+"/",import.meta.url),{withFileTypes:true})){
+   const path=dir+"/"+entry.name;
+   if(entry.isDirectory()){await walk(path);continue}
+   if(!/\.(tsx?|jsx?|mjs|css|html|json|webmanifest)$/.test(entry.name))continue;
+   if(path===allowed)continue;
+   const code=stripComments(await readFile(new URL("../"+path,import.meta.url),"utf8"));
+   for(const pattern of banned)if(pattern.test(code))offenders.push(path+"  ->  "+pattern);
+  }
+ };
+ await Promise.all(roots.map(walk));
+ assert.deepEqual(offenders,[],
+  "anything audible or felt goes through src/lib/settings/feedback-settings.ts, which is off by default:\n"+offenders.join("\n"));
+
+ /* And the one buzz there is actually routes through it. */
+ const mapPage=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ assert.match(mapPage,/buzz\(localStorage,12\)/,"picking a bus up asks the setting first");
+ assert.match(mapPage,/import \{buzz\} from "@\/src\/lib\/settings\/feedback-settings"/);
+
+ /* Settings can reach both switches. */
+ const settingsPage=await readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8");
+ /* ONE switch for both, which is Curtis's call: "Yes sound and vibration
+    together." The storage keeps two flags, so splitting them again later is a
+    UI change and not a migration — but the control sets both, and a stored
+    record with only one of them on still reads as on. */
+ assert.match(settingsPage,/SOUND &amp; VIBRATION ON THIS DEVICE/);
+ assert.match(settingsPage,/checked=\{feedback\.sound\}/,"one flag is enough, because read normalises them together");
+ assert.match(settingsPage,/setFeedback\(\{sound:event\.target\.checked,vibration:event\.target\.checked\}\)/,"and the one switch sets both");
+ assert.doesNotMatch(settingsPage,/checked=\{feedback\.vibration\}/,"there is no second switch any more");
+});
+
+test("Escape in the bus editor is off, and asks only when something changed", async () => {
+ const [mapPage,panel,module]=await Promise.all([
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/_components/map-settings-panel.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/settings/map-settings.ts",import.meta.url),"utf8"),
+ ]);
+ const {readBoardSettings}=await import("../src/lib/settings/map-settings.ts");
+
+ /* OFF unless somebody asked, like every other `===true` setting in this file.
+    Curtis chose "leave it like it is" and then asked for the switch, so the
+    default has to be the behaviour that already existed. */
+ assert.equal(readBoardSettings(null).escapeClosesEditor,false,"a device that has never been to Settings");
+ assert.equal(readBoardSettings("{}").escapeClosesEditor,false);
+ assert.equal(readBoardSettings('{"escapeClosesEditor":"yes"}').escapeClosesEditor,false,"only a literal true counts");
+ assert.equal(readBoardSettings('{"escapeClosesEditor":true}').escapeClosesEditor,true);
+ assert.match(module,/escapeClosesEditor:ui\.escapeClosesEditor===true/);
+
+ /* IT LIVES IN THE EDITOR, not in the page's Escape ladder, because the page
+    knows which layers are open and only this component knows whether anything
+    has been typed into one. */
+ const ladder=mapPage.match(/const escape=\(event:KeyboardEvent\)=>\{\n if\(event\.key!=="Escape"\)return;[\s\S]*?\n\};/);
+ assert.ok(ladder,"the page still has its own ladder");
+ assert.doesNotMatch(ladder[0],/closeEditor|setEdit/,"which still does not touch the editor");
+
+ /* The fingerprint covers all three places a change can hide. A draft-only
+    comparison would call a half-typed defect, or an edited hold time, clean. */
+ /* EVERY BOX, not three of twenty-three. The first version watched only the
+    draft bus, the hold time and a part-typed defect, so an odometer reading,
+    an engine-hour reading, a service completion or a switch target was thrown
+    away without a question -- while the comment beside it promised the
+    opposite. A reading only reaches the draft when its own ADD button is
+    pressed, which is exactly the state somebody is in when they hit Escape. */
+ const fingerprint=mapPage.match(/const typedInto=\[([\s\S]*?)\];/);
+ assert.ok(fingerprint,"the editor fingerprints what was typed into it");
+ for(const field of ["d","holdUntil","newDefect","repairGroup","odometerMiles","odometerRecordedAt","odometerNote",
+  "engineHours","engineHoursRecordedAt","engineHoursNote","maintenanceKind","completionMiles","completionHours",
+  "completionCompletedAt","completionNote","switchBusId","switchDestination","addToDefectLog","addToDownSheet","smartStatusEnabled"])
+  assert.ok(new RegExp("(^|[\\[,\\s])"+field+"\\s*([,\\]]|$)").test(fingerprint[1].trim()),field+" is watched, or Escape discards it silently");
+ /* And NOT these: they say which panel is open, not what is in it. */
+ for(const ui of ["adding","switchOpen","entryMode"])
+  assert.ok(!new RegExp("(^|[\\[,\\s])"+ui+"\\s*([,\\]]|$)").test(fingerprint[1].trim()),ui+" is panel state, and confirming over it is the friction Curtis asked to avoid");
+ assert.match(mapPage,/const \[openedAs\]=useState\(\(\)=>JSON\.stringify\(typedInto\)\)/,"taken once, on open");
+ assert.match(mapPage,/const changed=openedAs!==JSON\.stringify\(typedInto\)/);
+
+ /* Innermost first: a sub-panel takes the Escape before the editor does. */
+ assert.match(mapPage,/if\(adding\)\{setAdding\(false\);return\}/);
+ assert.match(mapPage,/if\(switchOpen\)\{setSwitchOpen\(false\);return\}/);
+
+ /* Guarded by the setting, and the confirm fires ONLY when dirty -- Curtis:
+    "I may not want the close but ask all the time because it's a friction
+    point against speed." */
+ const handler=mapPage.match(/if\(!escapeCloses\)return;[\s\S]*?\},\[([^\]]*)\]\);/);
+ assert.ok(handler,"the editor's Escape is behind the setting");
+ assert.match(handler[0],/if\(changed&&!confirm\(/,"a form nobody touched closes without a question");
+ assert.match(handler[0],/window\.addEventListener\("keydown",escape,true\)/);
+ assert.match(handler[0],/return\(\)=>window\.removeEventListener\("keydown",escape,true\)/,"and comes off again");
+ /* The dependency SET, not its order -- an order pin is the brittleness this
+    file has already been caught by twice. */
+ assert.deepEqual([...new Set(handler[1].split(",").map(name=>name.trim()))].sort(),
+  ["adding","changed","close","d.n","escapeCloses","switchOpen"],"the effect declares exactly what it reads");
+
+ /* THE MAP HAS TO READ IT AND HAND IT DOWN. Deleting either line left the
+    feature entirely dead with the whole suite green -- and worse, the map's
+    write is a full replace, so its stale false would go back over the true
+    that Settings had just written. */
+ assert.match(mapPage,/setEscapeClosesEditor\(ui\.escapeClosesEditor===true\)/,"read on hydration");
+ assert.match(mapPage,/setEscapeClosesEditor\(ui\.escapeClosesEditor\)/,"and refreshed when another tab changes it");
+ assert.match(mapPage,/escapeCloses=\{escapeClosesEditor\}/,"and handed to the editor");
+
+ /* Reachable, and described as what it is. */
+ assert.match(panel,/ESCAPE CLOSES THE BUS EDITOR/);
+ assert.match(panel,/checked=\{escapeClosesEditor\}/);
+});
+
+test("one header colour for the whole app, with a page theme and an override above it", async () => {
+ const {DEFAULT_HEADER_COLOR,DEFAULT_HEADER_THEME,HEADER_SURFACES,HEADER_THEME_KEY,HEADER_TEXT_DARK,HEADER_TEXT_LIGHT,
+  contrastRatio,hasHeaderOverride,headerColorFor,headerContrast,headerGradient,headerStops,headerTextFor,isHeaderColor,loadHeaderTheme,
+  readHeaderTheme,resolveHeaderColor,resolveHeaderInk,saveHeaderTheme,serializeHeaderTheme}
+  =await import("../src/lib/settings/header-theme.ts");
+
+ assert.equal(HEADER_THEME_KEY,"pace-header-theme-v1");
+ /* The eight surfaces of the app, and nothing else: a ninth would be a page
+    that exists, and a missing one a header this setting cannot reach. */
+ assert.deepEqual(HEADER_SURFACES.map(s=>s.key),["map","down","log","fixed","lists","incidents","talk","settings"]);
+
+ /* ALL EIGHT THE SAME is what was chosen, so a device that has never opened
+    this panel resolves every surface to one colour. */
+ for (const {key} of HEADER_SURFACES) assert.equal(headerColorFor(DEFAULT_HEADER_THEME,key),DEFAULT_HEADER_COLOR);
+
+ /* A colour goes straight into a style attribute. Only a hex colour is taken,
+    and everything else reads as "not set" rather than as itself. */
+ assert.ok(isHeaderColor("#041d47")&&isHeaderColor("#ABC")&&isHeaderColor(" #abc123 "));
+ for (const bad of ["red","rgb(4,29,71)","#12345","#gggggg","red; background:url(x)","",null,undefined,7,{}])
+  assert.equal(isHeaderColor(bad),false,String(bad));
+ assert.deepEqual(readHeaderTheme(JSON.stringify({shared:"red; background:url(x)",overrides:{log:"javascript:x"}})),
+  {shared:DEFAULT_HEADER_COLOR,overrides:{}});
+
+ /* An override that is not a colour is stored as an ABSENCE, the spelling
+    setBusHold and the ledger's `gap` use, so "" cannot read as a value. */
+ const mixed=readHeaderTheme(JSON.stringify({shared:"#223344",overrides:{log:"#ff0000",talk:"",lists:5}}));
+ assert.deepEqual(mixed,{shared:"#223344",overrides:{log:"#ff0000"}});
+ assert.equal("talk" in mixed.overrides,false);
+ assert.equal(hasHeaderOverride(mixed,"log"),true);
+ assert.equal(hasHeaderOverride(mixed,"talk"),false);
+ assert.equal(headerColorFor(mixed,"log"),"#ff0000");
+ assert.equal(headerColorFor(mixed,"talk"),"#223344");
+
+ /* Unreadable, missing and the wrong shape all land on the default rather
+    than throwing into a render. */
+ for (const bad of [null,"","{",'"text"',"[]","7"]) assert.deepEqual(readHeaderTheme(bad),{shared:DEFAULT_HEADER_COLOR,overrides:{}});
+ assert.deepEqual(loadHeaderTheme({getItem(){throw new Error("denied")}}),{shared:DEFAULT_HEADER_COLOR,overrides:{}});
+ assert.equal(saveHeaderTheme({getItem:()=>null,setItem(){throw new Error("full")}},DEFAULT_HEADER_THEME),false);
+ assert.deepEqual(readHeaderTheme(serializeHeaderTheme(mixed)),mixed);
+
+ /* THE LADDER: an override for this surface, then a page theme, then the
+    shared colour. A device on the default theme passes no page theme at all,
+    which is the case every surface is in until somebody picks one. */
+ assert.equal(resolveHeaderColor(mixed,"fixed",undefined),"#223344");
+ assert.equal(resolveHeaderColor(mixed,"fixed","#15180f"),"#15180f");
+ /* The override outranks the page theme, so Settings can always force it. */
+ assert.equal(resolveHeaderColor(mixed,"log","#15180f"),"#ff0000");
+ /* A page theme that is not a colour is not a rung. */
+ assert.equal(resolveHeaderColor(mixed,"fixed","chartreuse"),"#223344");
+
+ /* THE INK COMES OFF THE SAME RUNG AS THE COLOUR, and that is the whole
+    reason both are resolved through one pair of functions.
+
+    Curtis: "Why did we have to change a theme?? The tactical theme. Themes
+    should not be affected by default design." The first version of this
+    release computed black-or-white for every header, which turned Tactical's
+    `#e7ddb2` and Terminal's `#61ff9d` white on the three pages a theme
+    decides. A page theme is a designed pairing; taking half of it is not
+    honouring it.
+
+    Computed on rung 1 and rung 3 because those colours came out of a picker
+    and have no ink attached — "white on a dark header" stops being true the
+    moment somebody picks a pale one. */
+ assert.equal(resolveHeaderInk(mixed,"fixed",undefined,undefined),headerTextFor("#223344"),"shared colour: computed");
+ assert.equal(resolveHeaderInk(mixed,"fixed","#15180f","#e7ddb2"),"#e7ddb2","a page theme keeps its own ink");
+ assert.equal(resolveHeaderInk(mixed,"log","#15180f","#e7ddb2"),headerTextFor("#ff0000"),
+  "an override outranks the theme, and brings a computed ink with it");
+ assert.equal(resolveHeaderInk(mixed,"fixed","#15180f",undefined),headerTextFor("#15180f"),
+  "a theme with no ink of its own has no pairing to honour");
+ assert.equal(resolveHeaderInk(mixed,"fixed","#15180f","chartreuse"),headerTextFor("#15180f"),
+  "and neither does one whose ink is not a colour");
+ assert.equal(resolveHeaderInk(mixed,"fixed","chartreuse","#e7ddb2"),headerTextFor("#223344"),
+  "the ink cannot come off a rung the colour did not come off");
+ assert.equal(resolveHeaderInk(mixed,"fixed","#15180F","#E7DDB2"),"#e7ddb2","normalised like every other colour here");
+
+ /* And the contrast note can be asked about the ink that will actually be
+    drawn rather than the one it would have computed. */
+ assert.equal(headerContrast("#15180f","#e7ddb2"),headerContrast("#15180f","#E7DDB2"));
+ assert.notEqual(headerContrast("#15180f","#e7ddb2"),headerContrast("#15180f"),
+  "or the panel would quote a figure for text the page is not using");
+ assert.equal(headerContrast("#15180f","chartreuse"),headerContrast("#15180f"),"junk falls back to the computed ink");
+
+ /* AN EXTERNAL ANCHOR FIRST, because the sweep below is otherwise circular.
+    It picks the text with `headerTextFor`, which calls `contrastRatio`, then
+    measures the result with `contrastRatio` — so any monotone replacement of
+    the luminance function reports ITSELF as fine. Dropping the sRGB
+    linearisation, or swapping the WCAG coefficients for a flat average, both
+    keep the sweep at 4.58 while the real floor falls to 3.75 and 4.32. These
+    three are WCAG's own published numbers and cannot be satisfied by a
+    function that has lost its gamma. */
+ assert.equal(Math.round(contrastRatio("#000000","#ffffff")*100)/100,21);
+ assert.equal(Math.round(contrastRatio("#ffffff","#ffffff")*100)/100,1);
+ assert.equal(Math.round(contrastRatio("#777777","#ffffff")*100)/100,4.48);
+ assert.equal(Math.round(contrastRatio("#0000ff","#ffffff")*100)/100,8.59);
+
+ /* THE TEXT COLOUR IS COMPUTED, so no chosen background can hide the title. */
+ assert.equal(headerTextFor("#041d47"),HEADER_TEXT_LIGHT);
+ assert.equal(headerTextFor("#ffd98a"),HEADER_TEXT_DARK);
+ assert.equal(headerTextFor("nonsense"),HEADER_TEXT_LIGHT);
+ /* Not a handful of samples: the whole colour cube, because the picker will
+    hand out any of it and the failures this guards against showed up on a
+    mid-grey, a magenta and a mid sage rather than on anything anybody chose.
+
+    MEASURED AGAINST BOTH ENDS OF THE GRADIENT, through `headerContrast`. The
+    first version scored the picked colour alone, which is only the bar's LEFT
+    edge: the far end is lighter, a title runs across both, and the sweep
+    reported 4.58 while the real worst square was 3.37. A step of 3 rather
+    than 15, because the 15-step grid missed the worst square by more than a
+    whole grade — 4.58 against 3.37 — and 85 cubed is still instant. */
+ let floor=99,worst="";
+ for (let r=0;r<256;r+=3) for (let g=0;g<256;g+=3) for (let b=0;b<256;b+=3) {
+  const background="#"+[r,g,b].map(v=>v.toString(16).padStart(2,"0")).join("");
+  const ratio=headerContrast(background);
+  if (ratio<floor) { floor=ratio; worst=background; }
+ }
+ /* 4.0, not 4.5, and the number is the point. A gradient costs contrast at
+    its far end and no lift avoids it — 3.86 at 16%, 4.12 at 10%, 4.58 only
+    with no gradient at all. The page title is 25px bold, which needs 3.0 for
+    AA and gets 4.12 at the worst square in the cube. Written as a floor that
+    is true rather than a threshold that is aspirational. */
+ assert.ok(floor>=4.0,"worst header contrast "+floor.toFixed(2)+":1 on "+worst);
+ assert.ok(floor<4.5,"if this passes 4.5 the gradient has gone - check HEADER_LIFT");
+
+ /* Both stops are plain hex, so what the browser paints is what was scored. */
+ assert.equal(headerGradient("#041d47"),"linear-gradient(90deg,#041d47,#1d3459)");
+ assert.deepEqual(headerStops("#041d47"),["#041d47","#1d3459"]);
+ /* Mixed toward white on a dark colour and toward black on a light one. */
+ assert.ok(relativeLuminanceRose(headerStops("#ffd98a")[1])<relativeLuminanceRose("#ffd98a"));
+ function relativeLuminanceRose(hex){ return contrastRatio(hex,"#000000"); }
+
+ /* WHAT IS WRITTEN BACK IS VALIDATED, not just what is read. The read side
+    re-checks everything, so a bad value cannot reach a style attribute either
+    way — but this is the file's own stated rule ("a stored value is not a
+    place to accept `red; background:url(...)`") and nothing failed when the
+    guard was removed from the writer. */
+ assert.equal(JSON.parse(serializeHeaderTheme({shared:"nonsense",overrides:{}})).shared,DEFAULT_HEADER_COLOR);
+ assert.deepEqual(JSON.parse(serializeHeaderTheme({shared:"#223344",overrides:{log:"red; background:url(x)",talk:"#abc"}})).overrides,{talk:"#aabbcc"});
+ /* And only the eight surfaces are carried across, so a key somebody put in
+    the file by hand cannot ride back out of it. */
+ assert.deepEqual(Object.keys(JSON.parse(serializeHeaderTheme({shared:"#223344",overrides:{nonsuch:"#ff0000"}})).overrides),[]);
+ assert.deepEqual(readHeaderTheme(JSON.stringify({shared:"#223344",overrides:{nonsuch:"#ff0000"}})).overrides,{});
+ /* `hasHeaderOverride` must mean "has a COLOUR", not "has a key": the
+    Settings row and the ladder both branch on it, and a key holding junk
+    would make the panel claim an override the page cannot draw. */
+ assert.equal(hasHeaderOverride({shared:"#223344",overrides:{log:"chartreuse"}},"log"),false);
+ assert.equal(resolveHeaderColor({shared:"#223344",overrides:{log:"chartreuse"}},"log","#15180f"),"#15180f");
+
+ /* THREE-DIGIT HEX IS EXPANDED on the way in, because the control that edits
+    it is <input type="color">, which only accepts seven characters and
+    silently shows #000000 for anything shorter — a swatch reading black over
+    a header drawing the right colour. */
+ assert.equal(readHeaderTheme(JSON.stringify({shared:"#abc",overrides:{talk:"#0F8"}})).shared,"#aabbcc");
+ assert.equal(readHeaderTheme(JSON.stringify({shared:"#abc",overrides:{talk:"#0F8"}})).overrides.talk,"#00ff88");
+
+ /* 90deg, because the Facility Map's header bar and the phone nav under it
+    are two stacked boxes of different heights that have to paint the same
+    colour at the same x. A tilted gradient puts a seam between them. */
+ assert.match(headerGradient("#041d47"),/^linear-gradient\(90deg,/);
+ assert.match(headerGradient("nonsense"),/#041d47/);
+});
+
+test("the header panel can see which pages their own theme is deciding", async () => {
+ const {readPageHeaderThemes,pageHeaderThemes,pageThemeHeader,pageThemeHeaderPair,DEFAULT_MAP_HEADER,DEFAULT_PAGE_HEADER,
+  BOARD_SETTINGS_KEY,LOG_SETTINGS_KEY,loadPageHeaderThemes,MINIMUM_PAGE_INK_CONTRAST}
+  =await import("../src/lib/settings/page-header-themes.ts");
+ const {headerContrast}=await import("../src/lib/settings/header-theme.ts");
+ /* THE COLOUR AND THE INK DESIGNED WITH IT, as one value. Curtis: "Why did we
+    have to change a theme?? The tactical theme. Themes should not be affected
+    by default design." They are returned together because a caller that takes
+    the colour from here and computes the ink elsewhere is how Tactical's khaki
+    became white. */
+ const TACTICAL={header:"#15180f",text:"#e7ddb2"},TACTICAL_PAGE={header:"#15180f",text:"#f4e8b8"};
+ const MIDNIGHT={header:"#020a18",text:"#ffffff"};
+ assert.equal(BOARD_SETTINGS_KEY,"pace-board-settings-v1");
+ assert.equal(LOG_SETTINGS_KEY,"pace-defect-log-settings-v1");
+
+ /* The default theme on each page defers to the shared colour, so it is not
+    an entry: every device that has never opened those panels is here. */
+ assert.deepEqual(readPageHeaderThemes(null,null),{});
+ assert.deepEqual(readPageHeaderThemes(
+  JSON.stringify({theme:"default",visuals:{header:"#06275c"}}),
+  JSON.stringify({theme:"light",appearance:{header:"#061d45"}})),{});
+
+ /* A theme that is not the default IS deciding, and the Defect Log and Fixed
+    Repairs share one record, so one answer covers both surfaces. */
+ assert.deepEqual(readPageHeaderThemes(
+  JSON.stringify({theme:"tactical",visuals:{header:"#15180f"}}),
+  JSON.stringify({theme:"midnight",appearance:{header:"#020a18"}})),
+  {map:TACTICAL,log:MIDNIGHT,fixed:MIDNIGHT});
+
+ /* `custom` IS NOT A LOOK SOMEBODY PICKED. Both appearance panels set it when
+    ANY colour in them changes — one bus status colour, one section
+    background. Read as "this page has decided its own header" it took the
+    Facility Map out of the shared setting on every device that had ever
+    nudged a status colour, with the Settings row reporting "its page theme
+    decides this" about a header nobody chose. The question is whether the
+    header colour actually DIFFERS from the one the page would have had. */
+ assert.deepEqual(pageHeaderThemes({theme:"custom",visuals:{header:DEFAULT_MAP_HEADER}},
+   {theme:"custom",appearance:{header:DEFAULT_PAGE_HEADER}}),{});
+ /* `custom` has no table ink either, so the stored one answers — and with
+    nothing stored there is no pairing to honour and the ink is computed by the
+    caller, which `text:""` is how this says so. */
+ assert.deepEqual(pageHeaderThemes({theme:"custom",visuals:{header:"#5b0f3a"}},null),{map:{header:"#5b0f3a",text:""}});
+ assert.deepEqual(pageHeaderThemes({theme:"custom",visuals:{header:"#5b0f3a",headerText:"#ffe9a0"}},null),
+  {map:{header:"#5b0f3a",text:"#ffe9a0"}});
+ assert.equal(pageThemeHeader("map","default",DEFAULT_MAP_HEADER),"");
+ assert.equal(pageThemeHeader("page","light",DEFAULT_PAGE_HEADER),"");
+ assert.equal(pageThemeHeader("map","terminal",undefined),"#00150c");
+ assert.equal(pageThemeHeader("page","tactical",undefined),"#15180f");
+ /* The table outranks a palette that disagrees with it, so the module and the
+    two pages reading one record cannot answer differently — which is how a
+    header bar and the drawer under it end up different colours. */
+ assert.equal(pageThemeHeader("page","tactical","#ff0000"),"#15180f");
+ assert.equal(pageThemeHeader("page","custom","#ff0000"),"#ff0000");
+ assert.equal(pageThemeHeader("page",7,"#ff0000"),"");
+
+ /* THE INK RIDES THE SAME GATE AS THE COLOUR. No page theme deciding means no
+    entry at all, so there is no ink to mistake for one; a theme that IS
+    deciding hands back the pair out of its own table, whatever a stale
+    palette on disk says. */
+ assert.equal(pageThemeHeaderPair("map","default",DEFAULT_MAP_HEADER,"#ff0000"),null);
+ assert.equal(pageThemeHeaderPair("page","light",DEFAULT_PAGE_HEADER,"#ff0000"),null);
+ assert.deepEqual(pageThemeHeaderPair("map","tactical",undefined,undefined),TACTICAL);
+ assert.deepEqual(pageThemeHeaderPair("page","tactical",undefined,undefined),TACTICAL_PAGE);
+ assert.deepEqual(pageThemeHeaderPair("map","terminal",undefined,undefined),{header:"#00150c",text:"#61ff9d"});
+ assert.deepEqual(pageThemeHeaderPair("page","tactical","#ff0000","#00ff00"),TACTICAL_PAGE,"the table outranks a palette that disagrees");
+ assert.deepEqual(pageThemeHeaderPair("page","custom","#3b0f52","#f0e0a0"),{header:"#3b0f52",text:"#f0e0a0"});
+ assert.deepEqual(pageThemeHeaderPair("page","custom","#3b0f52","not a colour"),{header:"#3b0f52",text:""});
+
+ /* A PAIRING THAT HIDES ITS OWN WORDS IS NOT HONOURED. Measured by a cold
+    read: `{theme:"custom",visuals:{header:"#ffffff",headerText:"#ffffff"}}` is
+    reachable from the Facility Map's own appearance panel, which offers both
+    colours and writes `custom` on any change — and it drew a white title on a
+    white header at 1:1, where before the ink followed the theme the same
+    record computed black. */
+ assert.deepEqual(pageThemeHeaderPair("map","custom","#ffffff","#ffffff"),{header:"#ffffff",text:""},"white on white falls back");
+ assert.deepEqual(pageThemeHeaderPair("map","custom","#15180f","#1a1d14"),{header:"#15180f",text:""},"and so does olive on olive");
+ /* It never bites a DESIGNED pairing. Every theme in both tables clears the
+    floor, the lowest being Tactical's khaki, so this catches the palette
+    nobody designed and leaves the ones somebody did. */
+ for(const [kind,name,ink] of [["map","tactical","#e7ddb2"],["map","terminal","#61ff9d"],["page","tactical","#f4e8b8"]]){
+  const pair=pageThemeHeaderPair(kind,name,undefined,undefined);
+  assert.equal(pair.text,ink,kind+" "+name+" keeps its own ink");
+  assert.ok(headerContrast(pair.header,pair.text)>=MINIMUM_PAGE_INK_CONTRAST,kind+" "+name+" clears the floor");
+ }
+ assert.equal(MINIMUM_PAGE_INK_CONTRAST,4.5,"AA for normal text, because a header carries its kicker and nav labels at 8 to 10px");
+
+ /* THE THEME NAME IS THE FACT AND THE STORED PALETTE IS A COPY OF IT, so a
+    record naming a theme resolves from the table even with the palette
+    missing or corrupt — which is an ordinary record for an older build or a
+    hand-seeded device, and used to answer "no theme" while the page's own
+    drawer stayed on the theme. */
+ for (const bad of ["",null,7,"chartreuse","red; background:url(x)",undefined])
+  assert.deepEqual(readPageHeaderThemes(JSON.stringify({theme:"tactical",visuals:{header:bad}}),null),{map:TACTICAL},String(bad));
+ assert.deepEqual(readPageHeaderThemes(JSON.stringify({theme:"tactical"}),JSON.stringify({theme:"midnight"})),
+  {map:TACTICAL,log:MIDNIGHT,fixed:MIDNIGHT});
+
+ /* `custom` has no table entry, and there the stored palette IS the decision
+    — so it is still the only source, and still has to be a colour. */
+ assert.deepEqual(readPageHeaderThemes(null,JSON.stringify({theme:"custom",appearance:{header:"#3b0f52"}})),
+  {log:{header:"#3b0f52",text:""},fixed:{header:"#3b0f52",text:""}});
+ for (const bad of ["",null,7,"chartreuse","red; background:url(x)"])
+  assert.deepEqual(readPageHeaderThemes(null,JSON.stringify({theme:"custom",appearance:{header:bad}})),{},String(bad));
+ for (const bad of [null,"","{",'"text"',"[]","7",JSON.stringify({visuals:{header:"#15180f"}}),JSON.stringify({theme:"nonsuch"})])
+  assert.deepEqual(readPageHeaderThemes(bad,null),{},String(bad));
+
+ /* Absence, not a key holding "" — so `"map" in themes` answers directly. */
+ const one=readPageHeaderThemes(JSON.stringify({theme:"black",visuals:{header:"#000000"}}),null);
+ assert.equal("map" in one,true);
+ assert.equal("log" in one,false);
+ assert.deepEqual(loadPageHeaderThemes({getItem(){throw new Error("denied")}}),{});
+
+ /* The Settings screen passes the settings it is already holding, not JSON,
+    because both appearance panels are on that same screen and a snapshot
+    read on mount would describe the theme as it was before the person
+    changed it. Same rule, so the two callers cannot drift. */
+ assert.deepEqual(
+  pageHeaderThemes({theme:"tactical",visuals:{header:"#15180f"}},{theme:"midnight",appearance:{header:"#020a18"}}),
+  readPageHeaderThemes(
+   JSON.stringify({theme:"tactical",visuals:{header:"#15180f"}}),
+   JSON.stringify({theme:"midnight",appearance:{header:"#020a18"}})));
+ assert.deepEqual(pageHeaderThemes(null,undefined),{});
+ assert.deepEqual(pageHeaderThemes({theme:"default",visuals:{header:"#06275c"}},{theme:"light",appearance:{header:"#061d45"}}),{});
+});
+
+test("a header's pre-JavaScript fallback is the colour it will settle on", async () => {
+ const {DEFAULT_HEADER_COLOR,headerGradient}=await import("../src/lib/settings/header-theme.ts");
+ const expected=headerGradient(DEFAULT_HEADER_COLOR);
+
+ /* HeaderThemeLive paints from an effect, so the browser has already drawn
+    the server's HTML by the time it runs. Whatever each header rule names as
+    its `--app-header-fill` fallback IS the first thing a person sees. Written
+    as each page's OLD colour it was a measured flash — Incidents came up rust
+    and turned navy 37ms later on a warm desktop. These five have no page
+    theme, so the colour they settle on is the app default, and that is what
+    they must open with. Five copies of one literal, asserted identical here
+    rather than trusted. */
+ for (const file of ["../app/down-sheet/down-sheet.css","../app/lists/lists.css","../app/incidents/incidents.css",
+                     "../app/shop-talk/shop-talk.css","../app/settings/settings.css"]) {
+  const css=await readFile(new URL(file, import.meta.url), "utf8");
+  /* Balanced, not a regex: the fallback is `color-mix(...)` inside
+     `linear-gradient(...)` inside `var(...)`, and a non-greedy `[^;]*?\)`
+     stops at the first inner bracket and compares a truncated string. */
+  const found=[];
+  for (let at=css.indexOf("var(--app-header-fill,"); at>=0; at=css.indexOf("var(--app-header-fill,",at+1)) {
+   let depth=1,i=at+"var(--app-header-fill,".length; const from=i;
+   while (i<css.length&&depth>0) { if(css[i]==="(")depth++; else if(css[i]===")")depth--; i++; }
+   found.push(css.slice(from,i-1));
+  }
+  assert.equal(found.length,1,file+" should name the fallback exactly once");
+  assert.equal(found[0],expected,file+" must fall back to the app default, not its own old colour");
+ }
+
+ /* THE MAP IS IN THE SAME LIST, and it used to fall back through
+    `var(--header-bg)` — whose own literal is the OLD #06275c, and which the
+    map writes inline from its theme anyway. Measured: with JavaScript off the
+    eight headers drew two different navies, and with it on the map held
+    #06275c for 116ms before turning #041d47, while the other seven changed
+    colour not at all. The server render cannot read LocalStorage, so falling
+    back "to the theme" was never going to produce the theme. */
+ const globals=await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+ const bare=globals.match(/(?:^|\})header\{background:var\(--app-header-fill,([^;]*)\);/m);
+ assert.ok(bare,"the bare header rule must read the shared fill");
+ assert.equal(bare[1],expected,"and fall back to the app default, not the old navy");
+
+ /* The Defect Log and Fixed Repairs fall back to their own page variable,
+    which React writes inline. NOT "correct without JavaScript" — the server
+    render writes the hook's default, which is the app default — but it keeps
+    the page's one source of truth in the chain. */
+ const log=await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
+ assert.match(log,/\.log-header\{background:var\(--app-header-fill,var\(--log-header\)\)/);
+ const fixed=await readFile(new URL("../app/fixed-repairs/fixed-repairs.css", import.meta.url), "utf8");
+ assert.match(fixed,/\.fixed-header\{background:var\(--app-header-fill,var\(--fixed-header,#061d45\)\)/);
+});
+
+test("the painting is wired up, and no header still names a colour of its own", async () => {
+ /* NOTHING IN tests/ TOUCHED THE COMPONENT THAT DOES THE PAINTING, which a
+    cold read found by grepping for it and getting nothing back. The modules
+    below are exercised; the wiring between them was not, and deleting
+    `var(--app-header-fill,…)` from one stylesheet leaves that page silently
+    keeping a hard-coded colour — which is the exact bug this change exists to
+    remove — with the suite still green. */
+ const live=await readFile(new URL("../src/components/shared/header-theme-live.tsx", import.meta.url), "utf8");
+ const layout=await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+ const {DEFAULT_HEADER_COLOR,HEADER_SURFACES}=await import("../src/lib/settings/header-theme.ts");
+
+ /* Mounted once, in the root layout, inside the crash boundary. */
+ assert.match(layout,/import HeaderThemeLive from "@\/src\/components\/shared\/header-theme-live"/);
+ assert.match(layout,/<CrashGuard><HeaderThemeLive\/>/);
+ /* The static status bar colour is the app default, not the old navy: it is
+    what the OS paints before any JavaScript runs. */
+ assert.match(layout,new RegExp('themeColor:"'+DEFAULT_HEADER_COLOR+'"'));
+
+ /* The three properties the stylesheets read, and the meta the OS reads. */
+ for (const name of ["--app-header","--app-header-fill","--app-header-text"])
+  assert.ok(live.includes('setProperty("'+name+'"'),"HeaderThemeLive must set "+name);
+ assert.match(live,/meta\[name="theme-color"\]/);
+ /* It resolves through the ladder, not the shared colour alone — otherwise a
+    themed page's <html> and status bar disagree with its own header. */
+ assert.match(live,/resolveHeaderColor\(theme,surface,page\?\.header\)/);
+ /* AND THE INK COMES OFF THE SAME RUNG AS THE COLOUR. Painted as
+    `headerTextFor(colour)` for one release, which is how the Facility Map's
+    Tactical header lost its khaki: the map sets `--header-text` from its own
+    theme, and this writes `--app-header-text` on <html>, which every header
+    rule reads first. Curtis: "Themes should not be affected by default
+    design." */
+ assert.match(live,/setProperty\("--app-header-text",resolveHeaderInk\(theme,surface,page\?\.header,page\?\.text\)\)/);
+ assert.equal(/setProperty\("--app-header-text",headerTextFor/.test(live),false,
+  "the computed ink must not be painted over a page theme's own");
+ /* And it never writes a record. */
+ assert.equal(/setItem|saveHeaderTheme/.test(live),false,"HeaderThemeLive must not write storage");
+
+ /* Every route the nav offers has a surface, and `/` is matched last because
+    every path starts with it. */
+ const routes=[...live.matchAll(/\["(\/[a-z-]*)","([a-z]+)"\]/g)].map(m=>[m[1],m[2]]);
+ assert.deepEqual(routes.map(r=>r[1]).sort(),HEADER_SURFACES.map(s=>s.key).sort());
+ assert.equal(routes[routes.length-1][0],"/");
+
+ /* ALL EIGHT HEADER BARS READ THE SHARED FILL. */
+ const bars=[["../app/globals.css",/header\{background:var\(--app-header-fill,/],
+  ["../app/down-sheet/down-sheet.css",/\.down-header\{[^}]*background:var\(--app-header-fill,/],
+  ["../app/defect-log/defect-log.css",/\.log-header\{background:var\(--app-header-fill,/],
+  ["../app/fixed-repairs/fixed-repairs.css",/\.fixed-header\{background:var\(--app-header-fill,/],
+  ["../app/lists/lists.css",/\.lists-header\{[^}]*background:var\(--app-header-fill,/],
+  ["../app/incidents/incidents.css",/\.incidents-header\{[^}]*background:var\(--app-header-fill,/],
+  ["../app/shop-talk/shop-talk.css",/\.talk-header\{[^}]*background:var\(--app-header-fill,/],
+  ["../app/settings/settings.css",/\.settings-header\{[^}]*background:var\(--app-header-fill,/]];
+ for (const [file,pattern] of bars) {
+  const css=await readFile(new URL(file, import.meta.url), "utf8");
+  assert.match(css,pattern,file+" must paint its header from the shared fill");
+ }
+
+ /* AND NOTHING INSIDE A HEADER STILL NAMES ITS OWN COLOUR. The change
+    converted the header's BACKGROUND on all eight pages and its FOREGROUND on
+    two, and the gap was only visible by picking a pale colour and measuring:
+    the kickers, subtitles, tab bands and tab labels stayed at literals chosen
+    for a navy header and came out at 1.0 to 1.9:1. Every colour inside a
+    header rule now derives from `--app-header` or `--app-header-text`, and a
+    literal reintroduced here fails before anybody has to look at it. */
+ /* `-header` and not `-header-anything`, or this catches the new
+    `.settings-header-colour` panel, which is a settings card and not a
+    header. And only the declaration that WINS: a base rule's literal that a
+    later rule converts is how every one of these files is written.
+
+    The `m` flag is load-bearing: these stylesheets put several rules on one
+    line, so a rule can be preceded by `}` OR by a newline, and without it
+    every rule that happens to start a line was skipped — including the two
+    that convert the Defect Log's active tab, which left this reporting a
+    literal that three lines later is not what paints.
+
+    FOUR HOLES A COLD READ GOT A REAL DEFECT THROUGH, all closed here:
+
+    - `app/globals.css` was not in the list, and it holds `.app-kicker`,
+      `.app-subtitle`, `.app-refresh`, the bare `header` rule and the phone
+      nav — every one of them drawn inside a header. Putting `.app-kicker`
+      back on its own pre-change blue passed.
+    - only four properties were read, so `border`, `border-left` and
+      `box-shadow` were invisible. Two rust and green dividers were in the
+      shipped code the whole time.
+    - a value counted as derived if it mentioned one of eight variable names
+      ANYWHERE, so a literal sitting beside one passed.
+    - in a comma-separated selector list only the LAST selector was recorded,
+      so `.talk-header p,.talk-scope-note{color:#b9e0c9}` was never examined. */
+ const HEADER_SELECTOR=/\b(?:down|log|fixed|lists|incidents|talk|settings)-header(?![\w-])|\.app-kicker|\.app-subtitle|\.app-refresh|\.mobile-mode-nav|\.app-name|\.header-advanced-toggle|^header\b/;
+ const RULE=/(^|\}|\{)([^{}]*?)\{([^{}]*)\}/gm;
+ const PAINTS=/^(color|background|background-color|border|border-color|border-left|border-right|border-top|border-bottom|box-shadow|outline-color)$/;
+ /* Derived means the value's EVERY colour comes from the header. A literal
+    beside a variable is still a literal, so the hex is looked for directly
+    and a `var(--app-header…)` fallback literal is not counted as one. */
+ const HEADER_VAR=/var\(--(app-header|app-header-text|app-header-fill|log-header|log-header-text|fixed-header|fixed-header-text|log-accent-text|header-bg|header-text|down-navy|panel-bg|log-surface|log-accent|fixed-surface|fixed-ink|theme-border)[^)]*\)/g;
+ const winner=new Map();
+ for (const file of ["../app/globals.css","../app/down-sheet/down-sheet.css","../app/defect-log/defect-log.css",
+   "../app/fixed-repairs/fixed-repairs.css","../app/lists/lists.css","../app/incidents/incidents.css",
+   "../app/shop-talk/shop-talk.css","../app/settings/settings.css"]) {
+  const css=(await readFile(new URL(file, import.meta.url), "utf8")).replace(/\/\*[\s\S]*?\*\//g,"");
+  for (const match of css.matchAll(RULE)) {
+   const body=match[3];
+   /* EVERY selector in the list, not just the last one. */
+   for (const selector of match[2].split(",").map(part=>part.trim()).filter(Boolean)) {
+    /* The bare `header{…}` rule is the Facility Map's, and it is the one
+       selector with no class at all — pinning its text white was the headline
+       failure of the previous review and passed this check. */
+    if(!HEADER_SELECTOR.test(selector)) continue;
+    for (const decl of body.split(";")) {
+     const [property,...rest]=decl.split(":");
+     const name=(property||"").trim();
+     if(!PAINTS.test(name)) continue;
+     winner.set(file.replace("../app/","")+"  "+selector+"  "+name,rest.join(":").trim());
+    }
+   }
+  }
+ }
+ /* A shadow may be any colour — it is depth, not a surface somebody reads
+    words off — so only its being a LITERAL is allowed, not a branded one. */
+ const BRANDED=/#(?:[0-9a-f]{2})*(?:74a8df|9fc7ff|dbeaff|c4d7ee|e8a579|f0cdb4|79c99a|b9e0c9|082f60|5a1d07|0a4527|0b4f9e|a4663c|46805f|2a0c03|03200f|eaf3ff|d3e3f7|81a9dc|8fc0f3|c98355|5aa37a|7fa4cf|5c79a2)/i;
+ /* A DELIBERATE LIFT OFF THE HEADER IS DERIVED, and a literal wearing one is
+    not. The Defect Log tints its inactive tabs toward a fixed blue so they
+    stay readable, which is its own older rule and fine — the header colour is
+    still what dominates. The share is what separates that from
+    `color-mix(in srgb,var(--app-header-text) 10%,#b9e0c9)`, which is a
+    literal with a variable standing next to it and which got past the first
+    version of this check. At or above half, the header decides. */
+ const LIFT=/color-mix\(\s*in srgb\s*,\s*var\(--[\w-]+[^)]*\)\s*(\d+)%/;
+ const offenders=[...winner].filter(([where,value])=>{
+   const bare=value.replace(HEADER_VAR,"");
+   if(!/#[0-9a-f]{3,8}\b/i.test(bare)) return false;
+   const lift=value.match(LIFT);
+   if(lift&&Number(lift[1])>=50&&HEADER_VAR.test(value)) return false;
+   /* box-shadow and outline carry no text; a neutral literal there is fine. */
+   if(/ (box-shadow|outline-color)$/.test(where)) return BRANDED.test(bare);
+   return true;
+ }).map(([where,value])=>where+" : "+value);
+ assert.deepEqual(offenders,[],"a header rule still names its own colour:\n  "+offenders.join("\n  "));
+});
+
+test("the wiring between the colour and the pixels, which nothing used to exercise", async () => {
+ /* A cold read mutated this wiring twelve ways and the suite caught none of
+    them: the painter stopped following the route, both listeners came out,
+    two routes were swapped so Incidents drew Shop Talk's override, the two
+    themed pages were unplugged from the shared colour, the ladder's middle
+    rung was dropped at both call sites, Settings stopped asking for a
+    repaint, and the save was put back before the write. Every one is a
+    behaviour a person sees. The modules they connect are well covered; the
+    connections were not covered at all. */
+ const live=await readFile(new URL("../src/components/shared/header-theme-live.tsx", import.meta.url), "utf8");
+ const settings=await readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8");
+ const log=await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+ const fixed=await readFile(new URL("../app/fixed-repairs/page.tsx", import.meta.url), "utf8");
+ const {HEADER_SURFACES}=await import("../src/lib/settings/header-theme.ts");
+
+ /* IT FOLLOWS THE ROUTE. With `[]` for deps it paints the first page opened
+    and then never again, so a per-page override applies to whichever page you
+    happened to land on. */
+ assert.match(live,/\},\[path\]\);/,"the painter's effect must depend on the path");
+
+ /* BOTH LISTENERS, and both removed. `storage` fires only in OTHER tabs —
+    the shop computer's second tab — and the CustomEvent is the same-tab path
+    that repaints the Settings page you are changing the colour on. */
+ for (const pattern of [/window\.addEventListener\("storage",fromAnotherTab\)/,
+                        /window\.addEventListener\(HEADER_THEME_KEY,apply\)/,
+                        /window\.removeEventListener\("storage",fromAnotherTab\)/,
+                        /window\.removeEventListener\(HEADER_THEME_KEY,apply\)/])
+  assert.match(live,pattern,"HeaderThemeLive must add and remove "+pattern);
+ assert.match(settings,/window\.dispatchEvent\(new CustomEvent\(HEADER_THEME_KEY\)\)/,
+   "Settings must ask the page it is on to repaint");
+
+ /* THE PAIRINGS, not just the set. Swapping two of them made Incidents paint
+    Shop Talk's colour, and a sorted-set comparison cannot see that. */
+ const routes=Object.fromEntries([...live.matchAll(/\["(\/[a-z-]*)","([a-z]+)"\]/g)].map(m=>[m[1],m[2]]));
+ assert.deepEqual(routes,{"/down-sheet":"down","/defect-log":"log","/fixed-repairs":"fixed",
+   "/lists":"lists","/incidents":"incidents","/shop-talk":"talk","/settings":"settings","/":"map"});
+ assert.equal(Object.keys(routes).length,HEADER_SURFACES.length);
+
+ /* The hook watches the page theme AND ITS INK as well as the surface, or
+    switching a page's own theme leaves its header on the colour it had — and
+    picking a theme changes both halves of the pairing at once. */
+ assert.match(live,/\},\[surface,pageTheme,pageInk\]\);/);
+
+ /* THE HALF OF THE INK FIX THAT PAINTS THE DEFECT LOG'S TITLE, which had no
+    assertion at all. A second cold read deleted the `setInk` line, built it,
+    and measured `--log-header-text:#ffffff` on Tactical olive — a white 25px
+    title and white nav tiles, exactly the complaint this change answers —
+    with all 405 tests still green. It then replaced the returned `text` with
+    `headerTextFor(colour)` to the same effect. Both are named here. */
+ assert.match(live,/setInk\(resolveHeaderInk\(theme,surface,pageTheme,pageInk\)\)/,
+  "the hook must resolve the ink through the ladder, not compute it");
+ assert.match(live,/return \{color:colour,text:ink\|\|headerTextFor\(colour\),fill:headerGradient\(colour\)\}/,
+  "and must return the resolved ink, with the computed one only as the pre-effect fallback");
+ assert.equal(/text:headerTextFor\(colour\)[,}]/.test(live),false,
+  "returning the computed ink unconditionally is the mutation that put white on Tactical");
+
+ /* THE TWO THEMED PAGES FEED THEIR OWN VARIABLE FROM THE RESOLVED COLOUR,
+    and pass their page theme in, which is the ladder's middle rung. Unplug
+    either and that page keeps its own theme's header while the other seven
+    move, which is the split this release exists to close. */
+ assert.match(log,/"--log-header":headerSkin\.color,"--log-header-text":headerSkin\.text/);
+ /* THE INK TRAVELS WITH THE COLOUR, out of one pair, so a page on Tactical
+    keeps Tactical's header text. Curtis: "Why did we have to change a theme??
+    The tactical theme. Themes should not be affected by default design." */
+ assert.match(log,/pageThemeHeaderPair\("page",settings\.theme,settings\.appearance\.header,settings\.appearance\.headerText\)/);
+ assert.match(log,/useHeaderColor\("log",logHeaderTheme\?\.header,logHeaderTheme\?\.text\)/);
+ assert.match(fixed,/"--fixed-header":headerSkin\.color,"--fixed-header-text":headerSkin\.text/);
+ assert.match(fixed,/pageThemeHeaderPair\("page",fixedAppearance\.theme,fixedAppearance\.appearance\.header,fixedAppearance\.appearance\.headerText\)/);
+ assert.match(fixed,/useHeaderColor\("fixed",fixedHeaderTheme\?\.header,fixedHeaderTheme\?\.text\)/);
+ /* And the accent keeps an ink computed for the ACCENT, not the header's. */
+ assert.match(log,/"--log-accent-text":headerTextFor\(settings\.appearance\.accent\)/);
+
+ /* THE PANEL READS THE LIVE SETTINGS, so its rows cannot describe a theme the
+    person changed two rows further down the same screen. */
+ assert.match(settings,/const pageThemes=pageHeaderThemes\(board,log\);/);
+
+ /* AND IT ASKS FOR THE HEADER OUT OF THE PAIR, not the pair. Passing `page`
+    straight to `resolveHeaderColor` makes every page-theme row show navy, and
+    reverting the contrast note to `headerContrast(colour)` makes it quote a
+    figure for ink those pages are not using. Both stayed green through a cold
+    read's mutations. */
+ /* Anchored to the ROW's own line. Matched loosely it also found the contrast
+    note's identical call, so breaking the row survived — measured. */
+ assert.match(settings,/const effective=resolveHeaderColor\(headerTheme,surface\.key,page\?\.header\);/);
+ assert.match(settings,/headerContrast\(colour,resolveHeaderInk\(headerTheme,surface\.key,page\?\.header,page\?\.text\)\)/);
+ assert.equal(/ratio:headerContrast\(colour\)/.test(settings),false,"the note must not score against an ink the page is not drawing");
+ /* The swatch beside it draws the same ink it quotes, or the panel measures
+    one thing and shows another. */
+ assert.match(settings,/ink=\{resolveHeaderInk\(headerTheme,surface\.key,page\?\.header,page\?\.text\)\}/);
+
+ /* SAVED BEFORE THE STATE MOVES. The other order leaves the swatches showing
+    a colour no header took and no repaint was asked for. */
+ const save=settings.indexOf("saveHeaderTheme(localStorage,next)");
+ const state=settings.indexOf("setHeaderThemeState(next);",settings.indexOf("const setHeaderTheme="));
+ assert.ok(save>0&&state>save,"the write must be attempted before the panel moves");
+});
+
+test("one header padding, in all five files that decide one", async () => {
+ /* The globals.css comment names five files as the fix and only one of them
+    was pinned, so four of the five could go back to `11px 12px` or vanish
+    with the suite green — which is how they were wrong in the first place. */
+ const files=[["../app/globals.css",/\.app>header\{height:auto;min-height:38px;[^}]*padding:12px[;}]/],
+  ["../app/lists/lists.css",/\.lists-header\{align-items:flex-start;flex-direction:column;padding:12px\}/],
+  ["../app/incidents/incidents.css",/\.incidents-header\{align-items:flex-start;flex-direction:column;padding:12px\}/],
+  ["../app/shop-talk/shop-talk.css",/\.talk-header\{align-items:flex-start;flex-direction:column;padding:12px\}/],
+  ["../app/fixed-repairs/fixed-repairs.css",/@media\(max-width:760px\)\{\.fixed-repairs-app>\.fixed-header\{padding:12px\}\}/]];
+ for (const [file,pattern] of files) {
+  const css=await readFile(new URL(file, import.meta.url), "utf8");
+  assert.match(css,pattern,file+" must put its header on the one 12px padding");
+ }
+ /* Measured at 390 and 1180: the six pages with no page FRAME land on exactly
+    12/7 and 18/8. The Facility Map and the Down Sheet sit further in by their
+    own frame width, which is a visible change and not this release's. */
+});
+
+test("the Down Sheet's page title defers to the header, like the Defect Log's", async () => {
+ /* The Defect Log half of this fix has two assertions; the Down Sheet half
+    had none, and emitting the variable unconditionally pins the title white
+    over whatever colour somebody picks — 1.35:1 on a pale yellow, measured,
+    beside a panel that says that cannot happen. */
+ const page=await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+ assert.match(page,/const titleColor=displaySettings\.styles\.pageTitle\.color\.toLowerCase\(\)===DEFAULT_DOWN_SHEET_DISPLAY\.styles\.pageTitle\.color\.toLowerCase\(\)\?\{\}:\{"--down-page-title-color":/,
+   "the title colour is left out while it is still the default");
+ assert.match(page,/const appStyle=\{\.\.\.titleColor,/,"and spread first so a chosen one still wins");
+ const css=await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+ assert.match(css,/\.down-header h1\{color:var\(--down-page-title-color,var\(--app-header-text,#fff\)\)/,
+   "and the fallback is the header's computed ink");
+});
+
+test("the header panel draws one control per row and nothing that does nothing", async () => {
+ /* Curtis: "Just make it as much of a minimalist design as you can. Even
+    though we have more settings controls."
+
+    Counted before: 57 elements, 18 controls, 112 words, 630px — a quarter of
+    the Settings page for one setting — of which SEVEN were disabled FOLLOW
+    buttons and eight were a second swatch showing a colour the picker beside
+    it already showed. After: 27 words, 11 controls, no disabled anything.
+    These assertions are the shape, not the pixels: a row carries a name and
+    one swatch, and a qualifier or a clear ONLY when there is something to
+    qualify or clear. */
+ const page=await readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8");
+ const css=await readFile(new URL("../app/settings/settings.css", import.meta.url), "utf8");
+
+ /* The swatch IS the input: one element per row, not a chip plus a picker. */
+ assert.match(page,/function HeaderSwatch\(/);
+ assert.match(page,/<label className="hc-swatch"[^>]*>\s*<span aria-hidden="true">Aa<\/span>\s*<input type="color"/,
+   "the swatch wraps the real input rather than sitting beside one");
+ const swatchInput=css.match(/\.hc-swatch input\{([^}]*)\}/);
+ assert.ok(swatchInput,"the input must have a rule");
+ assert.match(swatchInput[1],/position:absolute;inset:0;width:100%;height:100%/,
+   "the input fills the swatch - without the explicit size Chromium gives a colour input its own 50x27 and it pokes out of the box");
+ assert.match(swatchInput[1],/opacity:0/,"and is invisible rather than absent");
+ /* THE ONE THING THIS FILE CANNOT SEE is whether that input is the thing a
+    finger actually lands on, and a cold read proved it: adding
+    `visibility:hidden` to this rule left every assertion above passing while
+    all nine pickers stopped responding to a click and Tab stopped reaching
+    them at all. `opacity:0` hides a thing that is still there; these three
+    take it away. A source scan cannot hit-test, so it names them. */
+ for (const away of ["visibility:hidden","display:none","pointer-events:none"])
+  assert.equal(swatchInput[1].includes(away),false,
+    "`"+away+"` on the swatch input makes it untouchable while it still looks right");
+ assert.match(css,/\.hc-swatch:focus-within\{outline:/,"and the focus ring moves to the box");
+
+ /* EVERY CONTROL IS NAMED. The only text inside the swatch is an
+    `aria-hidden` "Aa", so without these the accessible name computes EMPTY —
+    nine colour pickers and a clear button with no page attached to any of
+    them. Dropping either passed every other assertion here. */
+ /* `[^>]*` cannot be used to cross this tag: `onChange={event=>…}` contains
+    a `>`, so the class stops inside the attribute it is meant to skip. */
+ assert.match(page,/<input type="color" value=\{colour\} onChange=\{event=>onPick\(event\.target\.value\)\} aria-label=\{label\}/,
+   "the swatch input must carry the page's name");
+ assert.match(page,/colour=\{headerTheme\.shared\} label="Header colour for every page"/);
+ /* The row swatch shows the colour AND the ink that row will draw: a computed
+    white "Aa" over Tactical's olive, beside a note quoting the khaki's ratio,
+    is the panel measuring one thing and showing another. */
+ assert.match(page,/colour=\{effective\} ink=\{resolveHeaderInk\(headerTheme,surface\.key,page\?\.header,page\?\.text\)\} label=\{surface\.label\+" header colour"\}/);
+ assert.match(page,/className="hc-clear" aria-label=\{"Clear "\+surface\.label\+"'s own header colour"\}/);
+
+ /* The swatch draws the ink the header will be WRITTEN in, which is the only
+    reason it is a box with letters in it rather than a square of colour.
+    Hard-coding it white passed everything else. */
+ /* The ink is the row's, with the computed one as the fallback for the shared
+    swatch, which has no theme behind it. */
+ assert.match(page,/className="hc-swatch" style=\{\{background:headerGradient\(colour\),color:ink\|\|headerTextFor\(colour\)\}\}/);
+ /* One swatch component, used for the shared colour and for all eight rows. */
+ assert.ok((page.match(/<HeaderSwatch /g)||[]).length>=2,"one component, used for the shared colour and for the rows");
+
+ /* NOTHING DISABLED. The clear is rendered only on a row that has an
+    override; seven greyed-out buttons is the absence of news drawn eight
+    times. */
+ const panel=page.slice(page.indexOf('<section className="settings-header-colour">'),
+                        page.indexOf("</section>",page.indexOf('className="hc-foot"')));
+ assert.equal(/\bdisabled[=}]/.test(panel),false,"no control in this panel is ever drawn disabled");
+ assert.match(panel,/\{own\?<button type="button" className="hc-clear"/,"the clear exists only with an override");
+ assert.match(panel,/\{own\?<i>own<\/i>:page\?<i>page theme<\/i>:null\}/,
+   "and a row says what decides it only when something other than the shared colour does");
+
+ /* The column is reserved on every row, so one row having a clear does not
+    push its swatch out of line with the seven that do not. */
+ assert.match(css,/\.hc-list>\.hc-row\{grid-template-columns:minmax\(0,1fr\) auto 44px 44px\}/);
+ /* And each cell is placed, or the clear and the swatch share column 3 and
+    sit on top of each other on the one row that has both. */
+ for (const [sel,col] of [["\\.hc-row>b","1"],["\\.hc-row>i","2"],["\\.hc-row>\\.hc-clear","3"],["\\.hc-row>\\.hc-swatch","4"]])
+  assert.match(css,new RegExp(sel+"\\{[^}]*grid-column:"+col+"[;}]"),sel+" must sit in column "+col);
+ /* 44px: this app's tap target, and the panel's own measurement. */
+ assert.match(css,/\.hc-swatch\{[^}]*width:44px;height:44px/);
+ assert.match(css,/\.hc-clear\{width:44px;height:44px/);
+ assert.match(css,/\.hc-row\{min-height:44px/);
+
+ /* NO CARD. The drawer is already a box; every section inside THIS DEVICE is
+    separated by a rule instead, and the four of them agree. */
+ const SECTIONS=["settings-lite-switch","settings-header-colour","settings-feedback","settings-welcome-again"];
+ for (const name of SECTIONS) {
+  const rule=css.match(new RegExp("\\."+name+"\\{([^}]*)\\}"));
+  assert.ok(rule,name+" must have a layout rule");
+  /* box-shadow too: a card drawn as `box-shadow:0 0 0 2px` is still a card,
+     and passed when only `border` and `background` were looked for. */
+  assert.equal(/border:1px|background:#fff|background:#fdfefe|border-radius|box-shadow/.test(rule[1]),false,
+    name+" must not draw a card inside the drawer");
+ }
+ /* ALL FOUR on the hairline, not three — dropping one leaves two sections
+    running together with nothing between them. */
+ const hairline=css.match(/([^{}]*)\{border-top:1px solid #e1e8f3\}/);
+ assert.ok(hairline,"a hairline between them instead");
+ for (const name of SECTIONS)
+  assert.ok(hairline[1].includes(".settings-drawer-body>."+name),name+" must carry the hairline");
+ assert.match(css,/\.settings-drawer-body>\.settings-lite-switch:first-child\{border-top:0\}/,
+   "and none above the first");
+
+ /* The LITE MODE switch is styled at all, which it was not: `.settings-check`
+    is scoped to two other pages, so on this one it computed `display:inline`
+    and rendered as `LITE MODE ON THIS DEVICEDraws less of the app…`, one
+    run-together paragraph with the checkbox inside the first word. The
+    comment above the rule used to claim it "looks fine". */
+ assert.match(css,/\.settings-lite-switch \.settings-check\{display:flex/);
+ assert.match(css,/\.settings-lite-switch \.settings-check>span\{display:grid/);
+ /* AND AT THE PHONE BREAKPOINT TOO. The base rules were widened to cover it
+    and the 760px block one line below was not, so on every width this app
+    runs on the lite switch sat a size smaller and a tap target shorter than
+    the structurally identical row directly beneath it — 9px/8px/44px against
+    10px/9px/48px, measured. A fix that stops at a media query is half a fix. */
+ const phone=css.match(/@media\(max-width:760px\)\{\.settings-feedback b[^}]*\}[^@]*?\}\}/);
+ assert.ok(phone,"the feedback phone block must exist");
+ for (const piece of [".settings-lite-switch b",".settings-lite-switch small",".settings-lite-switch .settings-check"])
+  assert.ok(phone[0].includes(piece),piece+" must be sized with its neighbour on a phone");
+
+ /* THE TAG IS THE ONLY THING LEFT THAT SAYS A PAGE IS NOT FOLLOWING, so it
+    carries the `<small>` colour it replaced rather than a fainter one: 5.37:1
+    against 3.04:1, which is under AA at 8px. */
+ assert.match(css,/\.hc-row>i\{grid-column:2;color:#5a6b84;/);
+ assert.match(css,/\.hc-clear\{width:44px;height:44px;border:0;background:none;color:#5a6b84;/);
+
+ /* AND THE ONE SENTENCE SAYS THE OVERRIDE WINS. "a page on its own theme
+    keeps that" reads as "and you cannot change it from here", which is the
+    opposite of what the ladder does — a colour typed on a themed row beats
+    the theme, and clearing it falls back to the theme rather than to the
+    shared colour. It is the one thing the six-line paragraph carried that
+    the rows do not teach by themselves. */
+ assert.match(page,/Give one its own below \u2014 that wins, even on a page with its own theme\.|Give one its own below — that wins, even on a page with its own theme\./);
+});
+
+/* REOPEN WHERE YOU LEFT OFF. Curtis: "when I leave phone app and go back in I
+   want it to return to the tab I was using. Not default back to map."
+
+   The script is a STRING in its module, so the text run below is the text the
+   layout writes into the page. It is run by itself, handed a stand-in for the
+   window: nothing of its module is in scope, which is how a browser has it.
+
+   The stand-in holds the two things the script waits on - the network's
+   answer and the clock - so each case decides which comes first. Its storage
+   is one object, so the remembering half can be run against the same record
+   the script reads. */
+function resumeWindow({path="/",search="",hash="",referrer="",standalone=true,iosStandalone=false,local={},session={},sessionKeeps=true,sessionThrows=false,online=true,hasFetch=true,replaceThrows=false,fetchThrows=false,ready=true,loaded=true}={}){
+ const store=(initial,keeps=true,throws=false)=>{
+  const data=initial instanceof Map?initial:new Map(Object.entries(initial));
+  return {data,getItem(key){if(throws)throw new Error("blocked");return data.has(key)?data.get(key):null},
+   setItem(key,value){if(throws)throw new Error("blocked");if(keeps)data.set(key,String(value))}};
+ };
+ const win={
+  replaced:null,asked:[],timers:[],answer:null,stopped:0,now:0,
+  location:{pathname:path,search,hash,replace(target){if(replaceThrows)throw new Error("no");win.replaced=target}},
+  document:{referrer,readyState:loaded?"complete":"loading",documentElement:{style:{visibility:""}}},
+  __pacePageReady:ready,listeners:new Map(),
+  addEventListener(name,fn){if(!win.listeners.has(name))win.listeners.set(name,new Set());win.listeners.get(name).add(fn)},
+  removeEventListener(name,fn){win.listeners.get(name)?.delete(fn)},
+  emit(name){for(const fn of [...(win.listeners.get(name)||[])])fn()},
+  localStorage:store(local),sessionStorage:store(session,sessionKeeps,sessionThrows),
+  navigator:{standalone:iosStandalone,onLine:online},
+  matchMedia:query=>({matches:standalone&&query==="(display-mode: standalone)"}),
+  stop(){win.stopped+=1},
+  setTimeout(run,after){win.timers.push({run,at:win.now+after})},
+  /* Moves the clock to `ms`, running what fell due on the way, in order. */
+  tick(ms){
+   for(;;){
+    const due=win.timers.filter(timer=>!timer.done&&timer.at<=ms).sort((a,b)=>a.at-b.at)[0];
+    if(!due)break;
+    due.done=true;win.now=due.at;due.run();
+   }
+   win.now=ms;
+  },
+  get hidden(){return win.document.documentElement.style.visibility==="hidden"},
+ };
+ if(hasFetch)win.fetch=(url,options)=>{
+  if(fetchThrows)throw new Error("no fetch");
+  win.asked.push({url,...options});
+  return new Promise((resolve,reject)=>{win.answer={ok:()=>resolve({ok:true,status:200}),status:code=>resolve({ok:code<400,status:code}),fail:()=>reject(new TypeError("Failed to fetch"))}});
+ };
+ return win;
+}
+/* Lets the promise the script is waiting on run its handlers. */
+const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
+
+test("a fresh start from the home screen reopens the page the app was left on",async()=>{
+ const {LAST_PAGE_KEY,LAUNCH_SEEN_KEY,CRASH_REPORT_KEY,PAGE_SETTLE_MS,RESUME_CONFIG,RESUME_SOURCE,SERVICE_WORKER_PATH,pageMemory,pagePath,rememberPage,resumeScriptText}=await import("../src/lib/settings/last-page.ts");
+ const {TRACKER_PAGES}=await import("../src/lib/settings/tracker-pages.ts");
+ const text=resumeScriptText();
+ const run=win=>new Function("window","return "+text)(win);
+ const left=(page,at=new Date(Date.now()-60000).toISOString())=>({[LAST_PAGE_KEY]:JSON.stringify({version:1,path:page,at})});
+ const kept=win=>JSON.parse(win.localStorage.data.get(LAST_PAGE_KEY)||"null");
+ const WAIT=RESUME_CONFIG.wait;
+ const FLAG=RESUME_CONFIG.flag;
+
+ assert.equal(LAST_PAGE_KEY,"pace-last-page-v1");
+
+ /* THE CASE HE DESCRIBED. Left on the Defect Log, the phone closed the app,
+    the icon is tapped: a fresh start at the map. The map is hidden, the
+    network is asked, it answers, and the app goes. */
+ let win=resumeWindow({local:left("/defect-log")});
+ assert.equal(run(win),"resuming");
+ assert.equal(win.hidden,true,"the map is not drawn while the app finds out whether it can move");
+ assert.equal(win[FLAG],true,"and the map underneath is told a start is being turned round");
+ assert.equal(win.replaced,null,"nothing moves until something answers");
+ assert.deepEqual(win.asked,[{url:"/defect-log",method:"HEAD",cache:"no-store"}],"the page's headers, not the page");
+ assert.equal(win.sessionStorage.data.get(LAUNCH_SEEN_KEY),"1","marked, so the next page of this run is not a fresh start");
+ win.answer.ok();
+ await settle();
+ assert.equal(win.replaced,"/defect-log");
+ assert.equal(kept(win).path,"/defect-log");
+ assert.ok(Date.parse(kept(win).resuming)>0,"the move is marked on the record before it is made");
+ /* An answer that is not the server failing means the network is there. */
+ win=resumeWindow({local:left("/defect-log")});
+ run(win);
+ win.answer.status(405);
+ await settle();
+ assert.equal(win.replaced,"/defect-log");
+ /* No signal at all fails at once, and the phone holds every page for that. */
+ win=resumeWindow({local:left("/defect-log")});
+ run(win);
+ win.answer.fail();
+ await settle();
+ assert.equal(win.replaced,"/defect-log");
+ win=resumeWindow({local:left("/defect-log"),online:false});
+ assert.equal(run(win),"resuming");
+ assert.equal(win.replaced,"/defect-log","a phone that knows it is offline is not made to ask");
+ assert.deepEqual(win.asked,[]);
+ win=resumeWindow({local:left("/defect-log"),hasFetch:false});
+ run(win);
+ assert.equal(win.replaced,"/defect-log");
+ /* iOS says it is on a home screen through navigator.standalone. */
+ win=resumeWindow({standalone:false,iosStandalone:true,local:left("/down-sheet"),online:false});
+ run(win);
+ assert.equal(win.replaced,"/down-sheet");
+ /* Every page the app has can be reopened. */
+ for(const page of TRACKER_PAGES.filter(page=>page.href!=="/")){
+  win=resumeWindow({local:left(page.href),online:false});
+  run(win);
+  assert.equal(win.replaced,page.href);
+ }
+
+ /* An immediate HEAD must NOT interrupt delayed home HTML/scripts. Both the
+    document load and the mounted page's readiness are required. */
+ for(const loadFirst of [true,false]){
+  win=resumeWindow({local:left("/defect-log"),ready:false,loaded:false});
+  run(win);win.answer.ok();await settle();
+  assert.equal(win.replaced,null,"HEAD alone cannot abort the loading map");
+  const load=()=>{win.document.readyState="complete";win.emit("load")};
+  const ready=()=>{win[RESUME_CONFIG.ready]=true;win.emit(RESUME_CONFIG.ready)};
+  (loadFirst?load:ready)();
+  assert.equal(win.replaced,null,"one readiness signal is insufficient");
+  win.tick(1000);(loadFirst?ready:load)();
+  assert.equal(win.replaced,"/defect-log");
+  win.tick(1000+WAIT);
+  assert.equal(win.stopped,1,"stalled destination is stopped only with a complete hydrated fallback");
+  assert.equal(win.hidden,false);
+  assert.equal(win.document.readyState,"complete");
+  assert.equal(win[RESUME_CONFIG.ready],true);
+ }
+ win=resumeWindow({local:left("/defect-log"),ready:false,loaded:false,online:false});
+ run(win);win.tick(WAIT);
+ assert.equal(win.replaced,null,"slow hydration leaves the home navigation uninterrupted");
+ assert.equal(win.stopped,0,"do not stop loading the fallback itself");
+ assert.equal(win.hidden,false);
+ win.document.readyState="complete";win[RESUME_CONFIG.ready]=true;
+ win.emit("load");win.emit(RESUME_CONFIG.ready);
+ assert.equal(win.replaced,null,"late readiness cannot take away the visible map");
+
+ /* WIFI THAT IS JOINED AND DEAD does not fail a request, it hangs it. The
+    map is shown, and the app stays on it for this run. */
+ win=resumeWindow({local:left("/defect-log")});
+ run(win);
+ win.tick(WAIT-1);
+ assert.equal(win.hidden,true);
+ win.tick(WAIT);
+ assert.equal(win.hidden,false,"the map is shown when nothing has answered in time");
+ assert.equal(win.replaced,null);
+ win.answer.ok();
+ await settle();
+ assert.equal(win.replaced,null,"an answer that comes after the map was shown moves nothing");
+ assert.equal(kept(win).resuming,undefined,"and no move was marked");
+ assert.equal(win.stopped,0);
+ /* A server that answers with an error of its own is not gone to. */
+ win=resumeWindow({local:left("/defect-log")});
+ run(win);
+ win.answer.status(503);
+ await settle();
+ assert.equal(win.replaced,null);
+ assert.equal(win.hidden,false);
+ assert.equal(kept(win).resuming,undefined);
+ /* A MOVE THAT WAS STARTED AND HAS NOT ARRIVED IS STOPPED before the map is
+    shown: the map is not handed to somebody and then taken away. The clock
+    for it starts when the move does, not when the page loaded. */
+ win=resumeWindow({local:left("/defect-log")});
+ run(win);
+ win.tick(2000);
+ win.answer.ok();
+ await settle();
+ assert.equal(win.replaced,"/defect-log");
+ win.tick(2000+WAIT-1);
+ assert.equal(win.hidden,true,"still waiting for the move, past the first limit");
+ assert.equal(win.stopped,0);
+ win.tick(2000+WAIT);
+ assert.equal(win.stopped,1,"stopped");
+ assert.equal(win.hidden,false,"and only then shown");
+ /* The mark stays on. Whether a stopped move really stopped cannot be read
+    back, and the mark is all that stands in front of a page that arrives late
+    and dead - so the start after this one is the map, and the page is
+    forgotten. That is the price, and it is one tap. */
+ assert.ok(kept(win).resuming);
+ let after=resumeWindow({local:win.localStorage.data,online:false});
+ assert.equal(run(after),"stayed");
+ /* Nothing leaves the page hidden for good, whichever way it went. */
+ for(const options of [{online:false},{},{hasFetch:false}]){
+  win=resumeWindow({local:left("/defect-log"),...options});
+  run(win);
+  win.tick(WAIT*2);
+  assert.equal(win.hidden,false,JSON.stringify(options));
+ }
+ /* A browser with no stop() still shows the page. */
+ win=resumeWindow({local:left("/defect-log"),online:false});
+ win.stop=undefined;
+ run(win);
+ win.tick(WAIT);
+ assert.equal(win.hidden,false);
+
+ /* EACH OF THESE IS SOMEBODY WHO ASKED FOR THE MAP, or a start that cannot be
+    told from one. One at a time, with everything else as in the case above. */
+ const stays=(options,why)=>{
+  const made=resumeWindow({local:left("/defect-log"),...options});
+  assert.equal(run(made),"stayed",why);
+  assert.equal(made.replaced,null,why);
+  assert.equal(made.hidden,false,why+": nothing is hidden");
+  assert.deepEqual(made.asked,[],why+": nothing is asked");
+  assert.deepEqual(made.timers,[],why+": nothing is left waiting");
+  assert.equal(made[FLAG],undefined,why+": the map underneath is an ordinary map");
+  return made;
+ };
+ stays({session:{[LAUNCH_SEEN_KEY]:"1"}},"a later page of the same run - a tap on the Map tile, or a reload");
+ stays({referrer:"https://app.example/defect-log"},"sent here from another page of the app");
+ stays({standalone:false},"a browser tab: a bookmark to the map opens the map");
+ stays({search:"?scan=down-sheet"},"an address that asks for something");
+ stays({hash:"#bus"},"an address with a part");
+ stays({sessionKeeps:false},"storage that will not take the mark moves nobody");
+ stays({sessionThrows:true},"session storage that refuses");
+ stays({local:left("/")},"left on the map");
+ stays({local:{}},"nothing remembered: the first time the app is opened");
+ stays({local:{[LAST_PAGE_KEY]:"{not json"}},"a record that cannot be read");
+ stays({local:{[LAST_PAGE_KEY]:"\"/defect-log\""}},"a record of the wrong shape");
+ /* Only a page the app has. A stored address is text somebody could have put
+    there, and it is never followed anywhere else. */
+ for(const path of ["/api/mcp","//elsewhere.example","https://elsewhere.example/","/defect-log?scan=heat","/defect-log/","javascript:alert(1)",7,null])
+  stays({local:{[LAST_PAGE_KEY]:JSON.stringify({version:1,path,at:new Date().toISOString()})}},"a remembered "+JSON.stringify(path));
+ /* Not on the map at all: nothing to turn round, and the script writes nothing. */
+ win=stays({path:"/fixed-repairs"},"a fresh start somewhere else");
+ assert.equal(kept(win).path,"/defect-log");
+ /* A fresh start is marked wherever it lands, so the map tapped next is not one. */
+ assert.equal(win.sessionStorage.data.get(LAUNCH_SEEN_KEY),"1");
+
+ /* THE CRASH SCREEN'S OWN RECORD keeps a page shut too. */
+ const then=Date.now()-60000;
+ const crash=(url,at)=>({[CRASH_REPORT_KEY]:JSON.stringify({url,at:new Date(at).toISOString(),message:"x"})});
+ stays({local:{...left("/defect-log",new Date(then).toISOString()),...crash("/defect-log",then+5000)}},"stopped after it was remembered");
+ stays({local:{...left("/defect-log",new Date(then).toISOString()),...crash("/defect-log",then)}},"stopped in the same instant");
+ stays({local:{...left("/defect-log",new Date(then).toISOString()),...crash("/defect-log/",then+5000)}},"the crash record keeps the address as it was typed");
+ stays({local:{[LAST_PAGE_KEY]:JSON.stringify({version:1,path:"/defect-log"}),...crash("/defect-log",then-999999)}},"remembered with no time, and it has crashed: kept shut");
+ const goes=(local,why)=>{const made=resumeWindow({local,online:false});run(made);assert.equal(made.replaced,"/defect-log",why)};
+ goes({...left("/defect-log",new Date(then).toISOString()),...crash("/defect-log",then-5000)},"a crash from before it was last remembered: the page has come up since");
+ goes({...left("/defect-log",new Date(then).toISOString()),...crash("/down-sheet",then+5000)},"another page's crash");
+ goes({[LAST_PAGE_KEY]:JSON.stringify({version:1,path:"/defect-log"})},"remembered with no time and no crash");
+ goes({...left("/defect-log"),[CRASH_REPORT_KEY]:JSON.stringify({url:"/defect-log",at:"some time"})},"a crash that cannot be placed does not shut a page for ever");
+
+ /* IF THE MARK CANNOT BE WRITTEN, nothing moves and the map is shown. */
+ win=resumeWindow({local:left("/defect-log"),online:false});
+ win.localStorage.setItem=()=>{throw new Error("full")};
+ assert.equal(run(win),"resuming");
+ assert.equal(win.replaced,null);
+ assert.equal(win.hidden,false);
+ win=resumeWindow({local:left("/defect-log"),online:false});
+ win.localStorage.setItem=()=>{};
+ run(win);
+ assert.equal(win.replaced,null,"storage that says yes and keeps nothing");
+ assert.equal(win.hidden,false);
+ /* IF ANYTHING IN IT FAILS, the page is left as it was found: shown. */
+ win=resumeWindow({local:left("/defect-log"),online:false,replaceThrows:true});
+ run(win);
+ assert.equal(win.hidden,false,"the move itself refused");
+ assert.deepEqual(kept(win),JSON.parse(left("/defect-log",kept(win).at)[LAST_PAGE_KEY]),"a move that never started leaves no mark behind");
+ win.tick(WAIT*2);
+ assert.equal(win.stopped,0,"and nothing to stop, on a map somebody is now using");
+ win=resumeWindow({local:left("/defect-log"),fetchThrows:true});
+ assert.equal(run(win),"stayed");
+ assert.equal(win.hidden,false,"the question itself refused");
+ win=resumeWindow({local:left("/defect-log")});
+ win.matchMedia=()=>{throw new Error("no")};
+ assert.equal(run(win),"stayed");
+ win=resumeWindow({local:left("/defect-log")});
+ win.localStorage.getItem=()=>{throw new Error("blocked")};
+ assert.equal(run(win),"stayed");
+ assert.equal(win.hidden,false);
+
+ /* THE SCRIPT WRITES ONE KEY AND ONE MARK, and the key only when it moves. */
+ for(const options of [{local:left("/defect-log"),online:false},{path:"/down-sheet"},{path:"/settings",standalone:false},{}]){
+  win=resumeWindow(options);
+  run(win);
+  assert.deepEqual([...win.localStorage.data.keys()].filter(key=>key!==LAST_PAGE_KEY),[]);
+  assert.deepEqual([...win.sessionStorage.data.keys()],[LAUNCH_SEEN_KEY]);
+ }
+ win=resumeWindow({path:"/down-sheet"});
+ run(win);
+ assert.equal(win.localStorage.data.size,0,"it does not remember; a page that has come up does");
+
+ /* REMEMBERING. The address only, and only a page the app has. */
+ const fresh=()=>{const data=new Map();return {data,getItem:key=>data.has(key)?data.get(key):null,setItem:(key,value)=>{data.set(key,String(value))}}};
+ let storage=fresh();
+ const now=new Date("2026-11-17T12:00:00.000Z");
+ assert.equal(rememberPage(storage,"/defect-log",{now}),true);
+ assert.deepEqual(JSON.parse(storage.data.get(LAST_PAGE_KEY)),{version:1,path:"/defect-log",at:"2026-11-17T12:00:00.000Z"});
+ assert.equal(rememberPage(storage,"/down-sheet/",{now}),true);
+ assert.equal(JSON.parse(storage.data.get(LAST_PAGE_KEY)).path,"/down-sheet","one page, with or without the slash");
+ for(const path of ["/api/scan-identify","/defect-log?scan=heat","/nowhere",7])
+  assert.equal(rememberPage(storage,path,{now}),false,JSON.stringify(path));
+ assert.equal(JSON.parse(storage.data.get(LAST_PAGE_KEY)).path,"/down-sheet","a page the app does not have does not wipe what was remembered");
+ /* An address with nothing in it is the map. */
+ for(const path of ["",undefined,null])
+  assert.equal(rememberPage(storage,path,{now}),true,JSON.stringify(path));
+ assert.equal(JSON.parse(storage.data.get(LAST_PAGE_KEY)).path,"/");
+ assert.equal(pagePath(""),"/");
+ assert.equal(pagePath("/lists/"),"/lists");
+ assert.equal(rememberPage({getItem:()=>null,setItem(){throw new Error("full")}},"/defect-log"),false,"a full device is not an error on the page");
+ assert.equal(rememberPage({getItem(){throw new Error("blocked")},setItem(){}},"/defect-log",{keepMark:true}),true,"nor is one that will not be read");
+ /* The probation mark is carried only when asked, and only for the same page. */
+ const marked=JSON.stringify({version:1,path:"/defect-log",at:"2026-11-17T11:00:00.000Z",resuming:"2026-11-17T11:59:59.000Z"});
+ storage=fresh();storage.data.set(LAST_PAGE_KEY,marked);
+ rememberPage(storage,"/defect-log",{keepMark:true,now});
+ assert.deepEqual(JSON.parse(storage.data.get(LAST_PAGE_KEY)),{version:1,path:"/defect-log",at:"2026-11-17T12:00:00.000Z",resuming:"2026-11-17T11:59:59.000Z"});
+ rememberPage(storage,"/defect-log",{now});
+ assert.equal(JSON.parse(storage.data.get(LAST_PAGE_KEY)).resuming,undefined,"written fresh, the mark is gone");
+ storage=fresh();storage.data.set(LAST_PAGE_KEY,marked);
+ rememberPage(storage,"/down-sheet",{keepMark:true,now});
+ assert.equal(JSON.parse(storage.data.get(LAST_PAGE_KEY)).resuming,undefined,"a mark is one page's, not the next one's");
+ /* What the two halves call a page is the same thing. */
+ for(const page of TRACKER_PAGES){
+  storage=fresh();
+  rememberPage(storage,page.href+"/");
+  win=resumeWindow({local:storage.data,online:false});
+  run(win);
+  assert.equal(win.replaced,page.href==="/"?null:page.href,page.href);
+ }
+
+ /* THE TWO HALVES ON ONE RECORD, across a start and the start after it. `page`
+    is what the component tells the memory about; a fresh start gets a new
+    window over the same storage. */
+ const start=(data,options={})=>{const made=resumeWindow({local:data,online:false,...options});return {made,result:run(made)}};
+ const page=(made,path,turnedRound=made[FLAG]===true)=>pageMemory(made.localStorage,()=>path,turnedRound);
+ const record=data=>JSON.parse(data.get(LAST_PAGE_KEY)||"null");
+
+ /* An ordinary page: remembered when it is drawn, and again as it is left. */
+ let data=new Map();
+ let memory=pageMemory({getItem:key=>data.get(key)??null,setItem:(key,value)=>data.set(key,value)},()=>"/defect-log",false);
+ assert.equal(memory.up(),true);
+ assert.equal(record(data).path,"/defect-log");
+ assert.equal(memory.used(),false,"a touch is nothing to an ordinary page");
+ assert.equal(memory.settled(),true);
+ assert.equal(memory.left(),true);
+
+ /* A REOPENED PAGE THAT STAYS UP. The map underneath writes nothing at any
+    point - not when it is drawn, not as it is left for the other page. */
+ data=new Map(Object.entries(left("/defect-log")));
+ let first=start(data);
+ assert.equal(first.made.replaced,"/defect-log");
+ let map=page(first.made,"/");
+ assert.deepEqual([map.up(),map.settled(),map.left()],[false,false,false]);
+ assert.ok(record(data).resuming,"so the mark reaches the page it was written for");
+ let reopened=page(first.made,"/defect-log",false);
+ reopened.up();
+ assert.ok(record(data).resuming,"drawn is not yet up: its records are read after the first draw");
+ reopened.left();
+ assert.ok(record(data).resuming,"nor is being left before it has stayed up");
+ reopened.settled();
+ assert.equal(record(data).resuming,undefined,"it stayed up");
+ assert.equal(record(data).path,"/defect-log");
+ assert.equal(start(data).made.replaced,"/defect-log","and is reopened the next time");
+
+ /* A REOPENED PAGE THAT THROWS ON ITS OWN RECORDS, a moment after it is
+    drawn, with a phone too full to save a crash report. The first cut of this
+    ended probation on the first draw and reopened that page for ever. */
+ data=new Map(Object.entries(left("/defect-log")));
+ first=start(data);
+ page(first.made,"/defect-log",false).up();
+ let second=start(data);
+ assert.equal(second.result,"stayed","the next start is the map");
+ assert.equal(second.made[FLAG],undefined);
+ page(second.made,"/").up();
+ assert.deepEqual({path:record(data).path,resuming:record(data).resuming},{path:"/",resuming:undefined},"an ordinary map, remembered");
+ assert.equal(start(data).result,"stayed","and so is the one after");
+ /* ...and one that never draws at all. */
+ data=new Map(Object.entries(left("/defect-log")));
+ start(data);
+ assert.equal(start(data).result,"stayed");
+
+ /* A START THAT GAVE UP DOES NOT FORGET THE PAGE. The map came up underneath
+    and was shown, and nobody touched it. */
+ data=new Map(Object.entries(left("/defect-log")));
+ first=start(data,{online:true});
+ first.made.tick(WAIT);
+ assert.equal(first.made.hidden,false);
+ map=page(first.made,"/");
+ assert.deepEqual([map.up(),map.settled(),map.left()],[false,false,false]);
+ assert.equal(record(data).path,"/defect-log");
+ assert.equal(start(data).made.replaced,"/defect-log","the next start, with the network back, goes there");
+ /* Touched, it is where the person was. */
+ data=new Map(Object.entries(left("/defect-log")));
+ first=start(data,{online:true});
+ first.made.tick(WAIT);
+ map=page(first.made,"/");
+ map.up();
+ assert.equal(map.used(),true);
+ assert.equal(record(data).path,"/");
+ assert.equal(map.used(),false,"once");
+ assert.equal(map.left(),true);
+ assert.equal(start(data).result,"stayed");
+ /* The flag is about the map it was raised on, and nothing else. */
+ let where="/";
+ memory=pageMemory(first.made.localStorage,()=>where,true);
+ assert.equal(memory.up(),false);
+ where="/down-sheet";
+ assert.equal(memory.left(),true);
+ assert.equal(record(data).path,"/down-sheet");
+
+ /* EVERY PAGE IT CAN REOPEN IS A PAGE THE PHONE HOLDS FOR A BAY WITH NO
+    SIGNAL. A page reopened and not held would be a blank screen where the map
+    used to load. */
+ const worker=await readFile(new URL("../public/sw.js",import.meta.url),"utf8");
+ const held=JSON.parse(worker.match(/CORE_PAGES = (\[[^\]]*\])/)[1]);
+ assert.deepEqual(RESUME_CONFIG.pages,TRACKER_PAGES.map(page=>page.href));
+ assert.deepEqual([...RESUME_CONFIG.pages].sort(),[...held].sort());
+ /* The worker passes a request that is not a GET straight to the network, so
+    the question the script asks is answered by the network and not a cache. */
+ assert.match(worker,/if \(request\.method !== "GET"\) return;/);
+
+ /* THE TEXT STANDS BY ITSELF. It ran above with nothing of its module in
+    scope. It is a string, so a build carries it as it is - which is the whole
+    reason it is one, and these hold what that asks of it. */
+ assert.equal(text.startsWith("("+RESUME_SOURCE+")("),true);
+ assert.doesNotMatch(RESUME_SOURCE,/[<`\\]|\$\{/,"it can sit in a template literal and in a script tag");
+ assert.doesNotMatch(RESUME_SOURCE,/\/\*|\/\/ /,"no comment is sent with every page");
+ assert.doesNotMatch(RESUME_SOURCE,/=>|\?\.|\?\?|\.\.\.|\b(?:let|const|async|await|class)\b/,"the oldest JavaScript that will do");
+ assert.doesNotMatch(text,/\b(?:TRACKER_PAGES|RESUME_CONFIG|LAST_PAGE_KEY|LAUNCH_SEEN_KEY|CRASH_REPORT_KEY|PAGE_SETTLE_MS|rememberPage|pageMemory|pagePath)\b/);
+ assert.doesNotMatch(resumeScriptText({...RESUME_CONFIG,pages:["</script><script>alert(1)"]}),/<\/script/i,"settings cannot end the tag");
+ const moduleSource=await readFile(new URL("../src/lib/settings/last-page.ts",import.meta.url),"utf8");
+ assert.doesNotMatch(moduleSource,/\.toString\(\)\s*\+|resumeLastPage/,"not a function written out with toString: a build re-prints those");
+ /* And the build does carry it as it is. `npm test` builds first; a run of
+    this file alone against an older build is told to build. */
+ const built=await readFile(new URL("../dist/server/index.js",import.meta.url),"utf8").catch(()=>"");
+ if(built)assert.ok(built.includes(RESUME_SOURCE),"dist/server/index.js does not hold the script as written - run `npm run build`, and if it still does not, the build is rewriting it");
+
+ /* WHERE THE TWO HALVES ARE MOUNTED. */
+ const [layout,script,live,guard,mapPage]=await Promise.all([
+  readFile(new URL("../app/layout.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/_components/resume-last-page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/_components/last-page-live.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/_components/crash-guard.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+ ]);
+ assert.match(layout,/<CrashGuard><HeaderThemeLive\/><ResumeLastPage\/><LastPageLive\/>\{children\}<\/CrashGuard>/);
+ /* The script is written by the server, ahead of the page: an effect would
+    run after the map was already on screen. */
+ assert.doesNotMatch(script,/^\s*["']use client["']/m);
+ assert.doesNotMatch(script,/useEffect|useLayoutEffect/);
+ assert.match(script,/<script dangerouslySetInnerHTML=\{\{__html:resumeScriptText\(\)\}\}\/>/);
+ /* The remembering is driven from an effect INSIDE the crash boundary, and
+    holds no rule of its own: it tells the memory the four moments. */
+ assert.match(live,/^"use client";/);
+ assert.match(live,/\[RESUME_CONFIG\.flag\]===true/,"it reads the flag the script raises, by the one name");
+ assert.match(live,/pageMemory\(window\.localStorage,\(\)=>window\.location\.pathname,turnedRound\)/);
+ assert.match(live,/memory\.up\(\);\s*const timer=window\.setTimeout\(\(\)=>\{\s*memory\.settled\(\);/);
+ assert.match(live,/\[RESUME_CONFIG\.ready\]=true/);
+ assert.match(live,/dispatchEvent\(new Event\(RESUME_CONFIG\.ready\)\)/);
+ assert.match(live,/\[RESUME_CONFIG\.ready\]=false/);
+ assert.match(live,/window\.clearTimeout\(timer\)/,"a page that goes down before it has stayed up never says it did");
+ assert.match(live,/if\(document\.visibilityState==="hidden"\)memory\.left\(\)/);
+ assert.match(live,/if\(event\.persisted\)memory\.left\(\)/,"and when Back brings a page back without loading it");
+ for(const [type,handler,capture] of [["visibilitychange","left",""],["pageshow","back",""],["pointerdown","used",",true"],["keydown","used",",true"]]){
+  assert.ok(live.includes('addEventListener("'+type+'",'+handler+capture+')'),type+" is listened for");
+  assert.ok(live.includes('removeEventListener("'+type+'",'+handler+capture+')'),type+" is let go of");
+ }
+ assert.match(live,/\},\[pathname\]\);/,"it follows the one move that changes the page without loading one");
+ assert.doesNotMatch(live,/setItem|getItem|rememberPage|pace-/,"it writes through the memory and names no key");
+ assert.ok(PAGE_SETTLE_MS>=1000,"long enough for a page to read its records and fall over on them");
+ /* The offline worker is asked for from every page now, not only the map. */
+ assert.equal(SERVICE_WORKER_PATH,"/sw.js");
+ assert.match(live,/navigator\.serviceWorker\.register\(SERVICE_WORKER_PATH\)/);
+ assert.match(mapPage,/navigator\.serviceWorker\.register\("\/sw\.js"\)/,"and the map still asks");
+ /* The crash screen's key is spelled in two files that cannot import each other. */
+ assert.match(guard,new RegExp('CRASH_STORAGE_KEY="'+CRASH_REPORT_KEY+'"'));
+ assert.match(guard,/url:typeof location==="undefined"\?"":location\.pathname/,"the crash record still says which page stopped");
+ /* The manifest still starts at the map: iOS reads it once, when the icon is
+    made, so changing it would reach nobody who already has the app. */
+ const manifest=JSON.parse(await readFile(new URL("../public/manifest.webmanifest",import.meta.url),"utf8"));
+ assert.equal(manifest.start_url,RESUME_CONFIG.home);
 });
