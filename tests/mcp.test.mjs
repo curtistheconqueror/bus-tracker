@@ -505,8 +505,10 @@ test("a sign-in that fails without a message still reports one",async()=>{
    a live project — it needs neither. */
 test("the route invalidates the cached session when a board read fails",async()=>{
  const source=await readFile(new URL("../app/api/mcp/route.ts",import.meta.url),"utf8");
- assert.match(source,/if\(rows\.error\)\{if\(!rows\.blind\)sessions\.invalidate\(signedIn\.client\)/,
-  "a failed board read must drop the client THAT failed, not whatever is cached — and a blind read must not drop one at all");
+ assert.match(source,/if\(!rows\.blind\)sessions\.invalidate\(signedIn\.client\);/,
+  "a failed board read must drop the client THAT failed, not whatever is cached");
+ assert.match(source,/else if\(!blindRetried\)\{blindRetried=true;sessions\.invalidate\(signedIn\.client\)\}/,
+  "and a blind read drops it only on the first try, so an expired session still recovers");
  assert.ok(!source.includes("let clientKey"),"the hand-rolled cache must be gone");
  assert.match(source,/sessionCacheKey\(credentials\)/,"the cache key must come from session-cache.ts");
 });
@@ -753,47 +755,93 @@ test("initialize negotiates the protocol version instead of echoing whatever it 
  for(const known of SUPPORTED_PROTOCOL_VERSIONS)assert.equal(await version(known),known,known+" is spoken here, so it is honoured");
 });
 
-/* A BLIND LOGIN MUST NOT BECOME A SIGN-IN LOOP. Reporting the blind read (F2)
-   put it down the same branch as a failed one, and that branch drops the cached
-   client so the next request signs in again — right for a session that has
-   probably expired, wrong here, because a login that signed in fine and cannot
-   see the buses is not expired, it is not permitted. Signing in again cannot
-   change that, so every call would re-authenticate for as long as the grant
-   stays wrong, against Supabase's auth rate limit. Raised as a follow-up on the
-   2026-11-18 gate; this holds the line it drew. */
-test("a login that can see no buses keeps its session, while a refused read drops it",async()=>{
+/* A BLIND LOGIN IS RETRIED ONCE AND THEN LEFT ALONE. Two things look identical
+   from the route — a login that may not read, and a session whose refresh
+   failed and fell back to the anon key — and they want opposite answers.
+   Invalidating always is a sign-in loop for the first; never invalidating
+   strands the second for the life of the isolate. Both were raised on the
+   2026-11-18 gates, each as the consequence of fixing the other. One retry
+   serves both, and this holds that line in the only way that counts: by
+   counting sign-ins through the real route. */
+test("a blind login costs one retry and then keeps its session, and an expired one recovers",async()=>{
  const {register}=await import("node:module");
  register("./helpers/mcp-route-hooks.mjs",import.meta.url);
  const GOOD="correct-horse-battery-staple";
  const [buses,defects,entries]=BOARD_TABLES;
  const call=async()=>{
   const {POST}=await import("@/app/api/mcp/route.ts");
-  /* locate_bus REQUIRES fleet_number: called without it the request is refused
-     for bad arguments before the board is ever loaded, so nothing signs in and
-     this measured 0 either way. The fixture was wrong, not the route. */
+  /* locate_bus REQUIRES fleet_number: without it the call is refused for bad
+     arguments before the board is ever loaded, so nothing signs in and this
+     counts 0 whatever the route does. The fixture was wrong, not the route. */
   const body={jsonrpc:"2.0",id:1,method:"tools/call",params:{name:"locate_bus",arguments:{fleet_number:"17501"}}};
   const response=await POST(new Request("https://example.invalid/api/mcp",{method:"POST",headers:{Authorization:"Bearer "+GOOD,"Content-Type":"application/json"},body:JSON.stringify(body)}));
-  await response.json();
+  return response.json();
  };
  const signIns=()=>(globalThis.__MCP_TEST_CALLS__||[]).filter(entry=>entry.kind==="signIn").length;
-
- /* EACH PHASE GETS ITS OWN LOGIN. The session cache is keyed on the
-    credentials and lives for the module, so reusing one email would measure
-    the cache left behind by an earlier test rather than this behaviour — which
-    is exactly what the first draft of this test did, and it read 0 sign-ins. */
+ /* EACH PHASE GETS ITS OWN LOGIN, because the session cache is keyed on the
+    credentials and lives for the module: reusing one measures the cache an
+    earlier test left behind. The first draft did, and read 0 sign-ins. */
  const env=email=>({MCP_TOKEN:GOOD,SUPABASE_URL:"https://shop.invalid",SUPABASE_ANON_KEY:"anon",SHOP_EMAIL:email,SHOP_PASSWORD:"pw"});
+ const FLEET={[buses.table]:[{id:"b1",fleet_number:"17501",location:"garage-1"}],[defects.table]:[],[entries.table]:[]};
+ const NOTHING={[buses.table]:[],[defects.table]:[],[entries.table]:[]};
+ /* `blindRetried` spans requests on purpose, so a phase that inherited it would
+    measure the phase before. A successful read clears it; start each one there. */
+ const reset=async email=>{globalThis.__MCP_TEST_ENV__=env(email);globalThis.__MCP_TEST_FAIL_TABLE__="";globalThis.__MCP_TEST_ROWS__=FLEET;globalThis.__MCP_TEST_CALLS__=[];await call()};
 
- /* Blind: the login works and the buses table answers with nothing. */
- globalThis.__MCP_TEST_ENV__=env("blind-reader@shop.invalid");
- globalThis.__MCP_TEST_FAIL_TABLE__="";
- globalThis.__MCP_TEST_ROWS__={[buses.table]:[],[defects.table]:[],[entries.table]:[]};
- globalThis.__MCP_TEST_CALLS__=[];
+ /* A non-empty board reads and TERMINATES. The stub used to re-serve its rows
+    on every lap of the keyset walk, so any non-empty table looped forever. */
+ await reset("healthy-reader@shop.invalid");
+ const found=await call();
+ assert.ok(JSON.stringify(found).includes("17501"),"a real board is read, and the paged walk ends");
+
+ /* Blind and staying blind: one sign-in to get in, one retry, then left alone. */
+ await reset("blind-reader@shop.invalid");
+ globalThis.__MCP_TEST_ROWS__=NOTHING;globalThis.__MCP_TEST_CALLS__=[];
  await call();await call();await call();
- assert.equal(signIns(),1,"three calls on a blind login sign in ONCE — the session is kept, because signing in again cannot grant it rows");
+ /* ONE, not three. The sign-in that got in was spent by `reset` before the
+    counter was zeroed, so what is counted here is the retry alone — which is
+    the whole claim: three blind calls cost one extra sign-in, not one each. */
+ assert.equal(signIns(),1,"three blind calls cost ONE retry between them, not one sign-in per call");
 
- /* Refused: the buses table errors outright. That one still drops the client,
-    because it may be an expired session and nothing here renews one. */
+ /* The same shape, but the login starts seeing rows again — an expired session
+    whose next sign-in works. It must recover rather than stay stranded. */
+ await reset("expired-reader@shop.invalid");
+ globalThis.__MCP_TEST_ROWS__=NOTHING;globalThis.__MCP_TEST_CALLS__=[];
+ const blind=await call();
+ assert.ok(JSON.stringify(blind).includes("no buses"),"the blind read is reported");
+ globalThis.__MCP_TEST_ROWS__=FLEET;
+ const recovered=await call();
+ assert.ok(JSON.stringify(recovered).includes("17501"),"the very next call signs in again and recovers");
+
+ /* TWO EXPIRIES IN ONE ISOLATE, which is the case that proves the mark is
+    CLEARED rather than merely set. A session dies, the retry recovers it — and
+    then a second session dies later in the same isolate. If a good read did not
+    clear the mark, that second death would never get its retry and the endpoint
+    would be stranded for the rest of the isolate's life, which is the very
+    thing the retry exists to stop. Here the stub makes a dead session really
+    dead: only the client from the last successful sign-in can see rows, so
+    nothing recovers without signing in again. */
+ globalThis.__MCP_TEST_ENV__=env("twice-expired@shop.invalid");
+ globalThis.__MCP_TEST_FAIL_TABLE__="";
+ globalThis.__MCP_TEST_ROWS__=FLEET;
+ globalThis.__MCP_TEST_LIVE_CLIENT__=-1;   /* every existing client is stale */
+ globalThis.__MCP_TEST_CALLS__=[];
+ const first=await call();                 /* signs in; that client becomes live */
+ assert.ok(JSON.stringify(first).includes("17501"),"a fresh sign-in can read");
+ globalThis.__MCP_TEST_LIVE_CLIENT__=-1;   /* the session dies */
+ await call();                             /* blind -> retry -> signs in, live again */
+ const afterFirstDeath=await call();
+ assert.ok(JSON.stringify(afterFirstDeath).includes("17501"),"the first expiry recovers");
+ globalThis.__MCP_TEST_LIVE_CLIENT__=-1;   /* and it dies a SECOND time */
+ await call();
+ const afterSecondDeath=await call();
+ assert.ok(JSON.stringify(afterSecondDeath).includes("17501"),"and so does the second — the mark was cleared by the read in between");
+ globalThis.__MCP_TEST_LIVE_CLIENT__=undefined;
+
+ /* A refused read is the other branch and is unchanged: it drops the client
+    every time, because it may be an expired session and nothing renews one. */
  globalThis.__MCP_TEST_ENV__=env("refused-reader@shop.invalid");
+ globalThis.__MCP_TEST_ROWS__=FLEET;
  globalThis.__MCP_TEST_FAIL_TABLE__=buses.table;
  globalThis.__MCP_TEST_CALLS__=[];
  await call();await call();await call();

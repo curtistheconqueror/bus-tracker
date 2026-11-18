@@ -65,6 +65,13 @@ function bearer(request:Request){
    endpoint work for an hour of uptime and then stop. */
 const sessions=createSessionCache<ReadableClient>();
 
+/* Whether a blind read has already cost this isolate a fresh sign-in. It lives
+   beside the cache and NOT inside the request, because its whole job is to span
+   requests: one request can only ever see its own first blind read, so a
+   per-request flag would retry on every call and be the loop it exists to
+   prevent. Reset by any read that works — see `loadBoard`. */
+let blindRetried=false;
+
 type Credentials={url:string;anonKey:string;email:string;password:string};
 
 async function signedInClient(credentials:Credentials):Promise<{client:ReadableClient|null;error:string}>{
@@ -144,14 +151,31 @@ export async function POST(request:Request){
      answering "could not be read" for as long as it lives. A refused read —
      a permission problem rather than an expiry — costs one extra sign-in on a
      request that had already failed, which is the right way round to be wrong. */
-  /* A BLIND READ KEEPS ITS SESSION. The reasoning above is about a session that
-     has probably expired, and one extra sign-in on an already-failed request is
-     a fair price for that. A login that signed in and can see no buses is not
-     expired — it is not permitted — so dropping the client would sign in again
-     on EVERY call for as long as the grant stays wrong, which is a sign-in loop
-     against Supabase's auth rate limit rather than one extra. Raised on the
-     2026-11-18 gate as a consequence of reporting the blind read at all. */
-  if(rows.error){if(!rows.blind)sessions.invalidate(signedIn.client);return {error:rows.error,board:null}}
+  /* A BLIND READ IS RETRIED ONCE, AND THEN THE SESSION IS KEPT, because the two
+     things that look like it want opposite answers and neither may be starved.
+
+     A login that signed in and can see no buses is not expired, it is not
+     permitted. Dropping its client would sign in again on EVERY call for as
+     long as the grant stays wrong — a loop against Supabase's auth rate limit.
+
+     But a session whose REFRESH failed looks identical from here: supabase-js
+     falls back to the anon key rather than erroring, and 0002's `select to
+     authenticated` then returns no rows. Keeping that client unconditionally
+     left a dead session in a warm isolate for its whole life, where before it
+     re-signed in on the next call and recovered. Both were raised on the
+     2026-11-18 gates — one as the fix for the other, which is the shape of a
+     trade rather than a fix.
+
+     So: the first blind read drops the client, and a second in a row keeps it.
+     An expired session recovers on the very next call, and a genuinely blind
+     login pays ONE extra sign-in per isolate instead of one per call. The mark
+     is cleared by any read that works, so a later expiry gets its retry too. */
+  if(rows.error){
+   if(!rows.blind)sessions.invalidate(signedIn.client);
+   else if(!blindRetried){blindRetried=true;sessions.invalidate(signedIn.client)}
+   return {error:rows.error,board:null};
+  }
+  blindRetried=false;
   return {error:"",board:boardFromRows(rows.buses,rows.defects,rows.entries,new Date().toISOString())};
  }
 
