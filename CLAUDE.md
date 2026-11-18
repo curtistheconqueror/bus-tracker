@@ -93,7 +93,7 @@ branding.** Counted at this commit —
 | | what it is | where |
 | --- | --- | --- |
 | the yard's geometry | six independent descriptions of one building that must agree, plus **179 slot-prefix literals across 17 files** (`grep -rhoE` over `app src`, see below), some carrying BEHAVIOUR (`smart-status`, `mystery-buses`, `road-calls`) | `docs/roadmap/facility-config.md`, scoped and not built |
-| 52 storage keys | all prefixed `pace-`, and renaming one is forbidden above | the key list below |
+| 52 listed storage keys (50 in use, 2 retired) | all prefixed `pace-`, and renaming one is forbidden above | the key list below |
 | the Shop Cloud | one project, one shop login, and RLS grants any authenticated user full insert and update | `supabase/migrations/0002_shared_records.sql` |
 | the MCP | one `MCP_TOKEN` with no issuer and no per-organisation identity | `docs/AGENT_MCP.md` |
 
@@ -284,7 +284,7 @@ per-device view state — which panel is open, what has been dismissed
   pace-down-sheet-soft-collapsed-v1    the DOWN SHEET's SOFT DOWN board, collapsed by default
   pace-down-sheet-idot-collapsed-v1    the DOWN SHEET's IDOT board, collapsed by default
   pace-defect-log-stats-open-v1
-  pace-defect-log-advanced-open-v1     ADVANCED ACTIONS, open or closed
+  pace-defect-log-advanced-open-v1     NO LONGER READ — ADVANCED ACTIONS starts collapsed on every visit (#49)
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
   pace-status-report-picks-v1          which boxes are ticked on the STATUS REPORT

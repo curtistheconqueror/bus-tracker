@@ -2053,7 +2053,7 @@ test("the header panel draws one control per row and nothing that does nothing",
    answer and the clock - so each case decides which comes first. Its storage
    is one object, so the remembering half can be run against the same record
    the script reads. */
-function resumeWindow({path="/",search="",hash="",referrer="",standalone=true,iosStandalone=false,local={},session={},sessionKeeps=true,sessionThrows=false,online=true,hasFetch=true,replaceThrows=false,fetchThrows=false}={}){
+function resumeWindow({path="/",search="",hash="",referrer="",standalone=true,iosStandalone=false,local={},session={},sessionKeeps=true,sessionThrows=false,online=true,hasFetch=true,replaceThrows=false,fetchThrows=false,ready=true,loaded=true}={}){
  const store=(initial,keeps=true,throws=false)=>{
   const data=initial instanceof Map?initial:new Map(Object.entries(initial));
   return {data,getItem(key){if(throws)throw new Error("blocked");return data.has(key)?data.get(key):null},
@@ -2062,7 +2062,11 @@ function resumeWindow({path="/",search="",hash="",referrer="",standalone=true,io
  const win={
   replaced:null,asked:[],timers:[],answer:null,stopped:0,now:0,
   location:{pathname:path,search,hash,replace(target){if(replaceThrows)throw new Error("no");win.replaced=target}},
-  document:{referrer,documentElement:{style:{visibility:""}}},
+  document:{referrer,readyState:loaded?"complete":"loading",documentElement:{style:{visibility:""}}},
+  __pacePageReady:ready,listeners:new Map(),
+  addEventListener(name,fn){if(!win.listeners.has(name))win.listeners.set(name,new Set());win.listeners.get(name).add(fn)},
+  removeEventListener(name,fn){win.listeners.get(name)?.delete(fn)},
+  emit(name){for(const fn of [...(win.listeners.get(name)||[])])fn()},
   localStorage:store(local),sessionStorage:store(session,sessionKeeps,sessionThrows),
   navigator:{standalone:iosStandalone,onLine:online},
   matchMedia:query=>({matches:standalone&&query==="(display-mode: standalone)"}),
@@ -2145,6 +2149,33 @@ test("a fresh start from the home screen reopens the page the app was left on",a
   run(win);
   assert.equal(win.replaced,page.href);
  }
+
+ /* An immediate HEAD must NOT interrupt delayed home HTML/scripts. Both the
+    document load and the mounted page's readiness are required. */
+ for(const loadFirst of [true,false]){
+  win=resumeWindow({local:left("/defect-log"),ready:false,loaded:false});
+  run(win);win.answer.ok();await settle();
+  assert.equal(win.replaced,null,"HEAD alone cannot abort the loading map");
+  const load=()=>{win.document.readyState="complete";win.emit("load")};
+  const ready=()=>{win[RESUME_CONFIG.ready]=true;win.emit(RESUME_CONFIG.ready)};
+  (loadFirst?load:ready)();
+  assert.equal(win.replaced,null,"one readiness signal is insufficient");
+  win.tick(1000);(loadFirst?ready:load)();
+  assert.equal(win.replaced,"/defect-log");
+  win.tick(1000+WAIT);
+  assert.equal(win.stopped,1,"stalled destination is stopped only with a complete hydrated fallback");
+  assert.equal(win.hidden,false);
+  assert.equal(win.document.readyState,"complete");
+  assert.equal(win[RESUME_CONFIG.ready],true);
+ }
+ win=resumeWindow({local:left("/defect-log"),ready:false,loaded:false,online:false});
+ run(win);win.tick(WAIT);
+ assert.equal(win.replaced,null,"slow hydration leaves the home navigation uninterrupted");
+ assert.equal(win.stopped,0,"do not stop loading the fallback itself");
+ assert.equal(win.hidden,false);
+ win.document.readyState="complete";win[RESUME_CONFIG.ready]=true;
+ win.emit("load");win.emit(RESUME_CONFIG.ready);
+ assert.equal(win.replaced,null,"late readiness cannot take away the visible map");
 
  /* WIFI THAT IS JOINED AND DEAD does not fail a request, it hangs it. The
     map is shown, and the app stays on it for this run. */
@@ -2454,7 +2485,10 @@ test("a fresh start from the home screen reopens the page the app was left on",a
  assert.match(live,/^"use client";/);
  assert.match(live,/\[RESUME_CONFIG\.flag\]===true/,"it reads the flag the script raises, by the one name");
  assert.match(live,/pageMemory\(window\.localStorage,\(\)=>window\.location\.pathname,turnedRound\)/);
- assert.match(live,/memory\.up\(\);\s*const timer=window\.setTimeout\(\(\)=>\{memory\.settled\(\)\},PAGE_SETTLE_MS\)/);
+ assert.match(live,/memory\.up\(\);\s*const timer=window\.setTimeout\(\(\)=>\{\s*memory\.settled\(\);/);
+ assert.match(live,/\[RESUME_CONFIG\.ready\]=true/);
+ assert.match(live,/dispatchEvent\(new Event\(RESUME_CONFIG\.ready\)\)/);
+ assert.match(live,/\[RESUME_CONFIG\.ready\]=false/);
  assert.match(live,/window\.clearTimeout\(timer\)/,"a page that goes down before it has stayed up never says it did");
  assert.match(live,/if\(document\.visibilityState==="hidden"\)memory\.left\(\)/);
  assert.match(live,/if\(event\.persisted\)memory\.left\(\)/,"and when Back brings a page back without loading it");

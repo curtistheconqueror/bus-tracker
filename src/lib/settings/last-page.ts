@@ -51,6 +51,15 @@
    - a page whose crash was recorded after it was last remembered is skipped;
    - if the mark cannot be written, nothing moves.
 
+   BEFORE REPLACEMENT, BOTH THE HOME DOCUMENT AND THE HYDRATED PAGE MUST BE
+   READY. LastPageLive signals after its settling timer, and document.complete
+   means the document and scripts finished loading. An early navigation aborts
+   that loading; stopping it later cannot reconstruct an interrupted map. If
+   readiness misses the same wait budget, reveal the map without navigating or
+   stopping its loading. This costs about two seconds on a normal fresh start,
+   and slow devices may stay on the map for that run. The deadline starts only
+   when this script runs, not before initial document delivery.
+
    AND THE NETWORK IS ASKED FIRST. Pages here load network-first, and wifi that
    is joined but dead does not fail a request, it hangs it. Going straight to
    the other page would have doubled that wait behind a hidden screen, with a
@@ -100,7 +109,7 @@ export const LAUNCH_SEEN_KEY="pace-launch-seen";
    on purpose and cannot be imported from here. A test holds the two together. */
 export const CRASH_REPORT_KEY="pace-crash-report-v1";
 
-export type ResumeConfig={key:string;seenKey:string;crashKey:string;pages:string[];home:string;wait:number;flag:string};
+export type ResumeConfig={key:string;seenKey:string;crashKey:string;pages:string[];home:string;wait:number;flag:string;ready:string};
 
 export const RESUME_CONFIG:ResumeConfig={
  key:LAST_PAGE_KEY,seenKey:LAUNCH_SEEN_KEY,crashKey:CRASH_REPORT_KEY,
@@ -115,6 +124,7 @@ export const RESUME_CONFIG:ResumeConfig={
  /* Raised on the window by the script when it tries to turn a start round,
     and read by the remembering half of the same page. */
  flag:"__paceResumeTried",
+ ready:"__pacePageReady",
 };
 /* How long a page has to stay up before it counts as having come up. Its
    records are read in effects after the first draw, and a page that throws on
@@ -227,12 +237,14 @@ export const RESUME_SOURCE=`function(config,win){
   if(!(since>=0))since=0;
   var crash=record(config.crashKey);
   if(crash&&clean(crash.url)===last.path&&Date.parse(crash.at)>=since)return "stayed";
-  var settled=false;
-  var stay=function(){if(!settled){settled=true;show()}};
+  var settled=false,networkReady=false;
+  var cleanup=function(){win.removeEventListener("load",go);win.removeEventListener(config.ready,go)};
+  var stay=function(){if(!settled){settled=true;cleanup();show()}};
   var giveUp=function(){try{win.stop()}catch(error){}show()};
   var go=function(){
-   if(settled)return;
+   if(settled||!networkReady||doc.readyState!=="complete"||win[config.ready]!==true)return;
    settled=true;
+   cleanup();
    try{
     win.localStorage.setItem(config.key,JSON.stringify({version:1,path:last.path,at:last.at,resuming:new Date().toISOString()}));
     var marked=record(config.key);
@@ -248,8 +260,11 @@ export const RESUME_SOURCE=`function(config,win){
   win[config.flag]=true;
   root.style.visibility="hidden";
   win.setTimeout(stay,config.wait);
-  if(win.navigator.onLine===false||typeof win.fetch!=="function")go();
-  else win.fetch(last.path,{method:"HEAD",cache:"no-store"}).then(function(answer){if(answer&&answer.status>=500)stay();else go()},go);
+  win.addEventListener("load",go);
+  win.addEventListener(config.ready,go);
+  var available=function(){networkReady=true;go()};
+  if(win.navigator.onLine===false||typeof win.fetch!=="function")available();
+  else win.fetch(last.path,{method:"HEAD",cache:"no-store"}).then(function(answer){if(answer&&answer.status>=500)stay();else available()},available);
   return "resuming";
  }catch(error){
   show();

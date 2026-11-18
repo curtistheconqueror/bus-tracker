@@ -35,12 +35,17 @@ export default function LastPageLive(){
   const back=(event:PageTransitionEvent)=>{if(event.persisted)memory.left()};
   const used=()=>{memory.used()};
   memory.up();
-  const timer=window.setTimeout(()=>{memory.settled()},PAGE_SETTLE_MS);
+  const timer=window.setTimeout(()=>{
+   memory.settled();
+   (window as unknown as Record<string,unknown>)[RESUME_CONFIG.ready]=true;
+   window.dispatchEvent(new Event(RESUME_CONFIG.ready));
+  },PAGE_SETTLE_MS);
   document.addEventListener("visibilitychange",left);
   window.addEventListener("pageshow",back);
   window.addEventListener("pointerdown",used,true);
   window.addEventListener("keydown",used,true);
   return()=>{
+   (window as unknown as Record<string,unknown>)[RESUME_CONFIG.ready]=false;
    window.clearTimeout(timer);
    document.removeEventListener("visibilitychange",left);
    window.removeEventListener("pageshow",back);

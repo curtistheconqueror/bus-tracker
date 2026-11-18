@@ -15,6 +15,14 @@ The record of 196 and everything before it is in `docs/RELEASES.md`; the former 
 
 ## 197 — reopen where you left off, and a door on Doors
 
+### Review correction (2026-11-18)
+
+PR50 CodeRabbit found early replacement could abort the still-loading fallback map. Replacement now requires both document load and the hydrated page settling signal, within the original 2.5-second script budget. If either is late, the map remains and continues loading uninterrupted; readiness arriving later cannot navigate away. A normal fresh resume now waits roughly two seconds plus destination loading. Slower devices may stay on the map for that run.
+
+The 2.5-second deadline starts when the inline script executes, NOT at app launch: the unchanged network-first service worker can stall fetching the initial document before this script is delivered. No bounded cold-launch guarantee is claimed.
+
+Targeted executable cases cover readiness in either order, late readiness, and a stalled destination. A Chromium loopback fixture using the production inline script verified a delayed map script (700ms) completes before destination GET, then fallback controls work after cancellation; a 4000ms script continues loading with no destination GET and controls work after it arrives. This fixture is not a physical iOS/PWA or full-map integration test.
+
 ### Source
 
 Release source: `a5098c6`, on `main`. Previous: `4086c98`, the commit that recorded 196's live verification. The last commit that changed code is `6308003`; the two after it are this file and `CLAUDE.md`.
@@ -89,7 +97,7 @@ What a person will see:
 
 What it does when things are wrong:
 
-- **Wifi that is joined but dead.** If the network has not answered in 2.5 seconds, the map is shown and the app stays there for that run. The page that was left is still remembered for next time, unless somebody uses the map.
+- **Wifi that is joined but dead.** Once the inline script has arrived, if network/readiness has not completed within 2.5 seconds, the current map document is revealed (and may still be loading) and the app stays there for that run. The page that was left is still remembered for next time, unless somebody uses the map.
 - **A page that will not draw.** A reopened page is on probation until it has stayed up for two seconds. If it never does, the next fresh start is the map. Closing the app and opening it again is still the way out of a broken page.
 - **No signal at all.** It moves at once; the phone holds every page for that.
 
