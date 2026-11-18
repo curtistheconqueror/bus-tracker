@@ -25,12 +25,14 @@ Targeted executable cases cover readiness in either order, late readiness, and a
 
 ### Source
 
-Release source: `a5098c6`, on `main`. Previous: `4086c98`, the commit that recorded 196's live verification. The last commit that changed code is `6308003`; the two after it are this file and `CLAUDE.md`.
+Release application source and last code-changing commit: `ce326a07b83cc5b11285ca86b8f48ecc82d7e53e`. This contains the startup readiness correction. The earlier `a5098c6` / `6308003` candidates MUST NOT be published. Publish the validated current branch HEAD containing this correction and its release documentation; record its full SHA in the Sites save. `6088dc5` adds only checklist wording after the application fix; this commit corrects only release documentation.
 
-The three blocks below were run at `a5098c6`, the commit below the one this file is updated in.
+Verified history through `6088dc5` (run 2026-11-18):
 
 ```
-$ git log --oneline 4086c98..a5098c6
+6088dc5 Clarify initial document delivery in weak-network check
+ce326a0 Wait for a complete hydrated map before resuming last page
+1b2ac33 The handoff: Curtis's answer on Incidents and Settings, and when the map
 a5098c6 Every page reopens, on every device: Curtis's answer
 6219109 Queue reopening the last page in 197, beside the door
 6308003 The app reopens on the page it was left on
@@ -38,29 +40,7 @@ a27d269 Queue the door on the Doors group as 197
 0dc91ce A door on the Doors group
 ```
 
-```
-$ git diff --name-only 4086c98..a5098c6 -- app src tests
-app/_components/last-page-live.tsx
-app/_components/resume-last-page.tsx
-app/layout.tsx
-src/lib/defects/repair-catalog.ts
-src/lib/settings/last-page.ts
-tests/defects.test.mjs
-tests/settings.test.mjs
-```
-
-```
-$ git diff --shortstat 4086c98..a5098c6
- 9 files changed, 1067 insertions(+), 13 deletions(-)
-```
-
-Proof of no infrastructure change. This returned nothing:
-
-```
-$ git diff --name-only 4086c98..a5098c6 -- supabase package.json package-lock.json .github public worker
-```
-
-`public/sw.js` and `public/manifest.webmanifest` are untouched. The cache name is not bumped and does not need to be.
+The former verification command blocks were run at `a5098c6`, before the readiness fix; they are not evidence for the corrected candidate. Corrected application `ce326a0` passed a fresh production build, all 470 tests and ESLint (zero errors; one existing warning). Exact-head CI for `6088dc5`: run 44228532300 passed. No dependency, backend, service-worker or manifest changes are included.
 
 ### Migrations
 
@@ -173,7 +153,7 @@ On a phone with the app on its home screen. Open the app once after the update b
 4. Close the app fully from the map and open it again. It should open on the map.
 5. Go to the **Down Sheet**, switch to another app for a minute without closing this one, and come back. It should still be on the Down Sheet, as before.
 6. Go to the Defect Log and leave the phone alone until it has closed the app by itself — an hour, or overnight. Open it. **This is the real test, and the one that could not be run:** it should open on the Defect Log.
-7. If it opens on the map in step 2 or 6, say so. Nothing is broken; the phone does not start the app the way the design assumed, and that needs a different approach.
+7. If it opens on the map in step 2 or 6, record device, launch method, connectivity and approximate delay. Investigate map-readiness exceeding the script budget, network fallback, probation/crash recovery, and session/referrer conditions; do not assume unexpected phone startup behavior is the cause.
 8. In the garage with weak or dead Wi-Fi, distinguish delivery of the initial document from resume. The unchanged service worker can wait on the initial GET before this script runs; there is no guaranteed launch-to-visible deadline. After script delivery, its 2.5-second readiness/network budget reveals the map if resume is not ready, without aborting map loading. A started replacement has another 2.5-second stalled-navigation limit. With cached pages and no signal, a ready map can reopen the remembered page. Record any blank or unusable fallback.
 
 For the door:
