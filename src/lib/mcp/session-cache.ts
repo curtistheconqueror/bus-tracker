@@ -14,7 +14,11 @@
        inheriting somebody else's bad minute.
      * A FAILED READ DROPS THE CLIENT. The commonest reason a read fails on a
        client that just worked is that its session went stale, and re-signing in
-       is cheap next to staying broken. A refused read — a permission problem
+       is cheap next to staying broken. ONE EXCEPTION, decided by the route and
+       not here: a read that SUCCEEDS and returns no rows at all is usually a
+       permission problem rather than an expiry, so it drops the client at most
+       once an hour instead of every time — otherwise a login that may not read
+       would sign in on every call for as long as its grant stayed wrong. A refused read — a permission problem
        rather than an expiry — costs one extra sign-in on a request that was
        failing anyway, which is the right way round to be wrong.
      * THE KEY INCLUDES EVERY CREDENTIAL, the password among them. Keyed on the

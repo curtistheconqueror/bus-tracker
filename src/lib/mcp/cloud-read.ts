@@ -119,9 +119,15 @@ export async function readLiveRows(client:ReadableClient,table:string,key:string
 /* `blind` separates the two ways `error` gets set, because the caller treats
    them differently. A read that FAILED may be an expired session, which is
    worth dropping the cached client over. A read that SUCCEEDED and returned no
-   buses is a permissions or wrong-project problem, and signing in again cannot
-   change it — so the session is kept and the login is simply unable to see the
-   fleet until somebody fixes the grant. */
+   buses is a permissions or wrong-project problem, and signing in again usually
+   cannot change it — so the session is largely kept and the login is simply
+   unable to see the fleet until somebody fixes the grant.
+
+   NOT ENTIRELY KEPT, and the route owns that nuance rather than this file: a
+   session whose refresh failed ALSO reads as blind, because supabase-js falls
+   back to the anon key instead of erroring. So `loadBoard` drops the client on
+   a blind read at most once an hour — often enough that a dead session
+   recovers, rarely enough that a genuinely blind login is not a sign-in loop. */
 export type BoardRows={buses:CloudRow[];defects:CloudRow[];entries:CloudRow[];error:string;blind?:boolean};
 
 /* All three tables, in one place, so a partial read is never mistaken for a

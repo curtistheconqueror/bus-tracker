@@ -507,8 +507,8 @@ test("the route invalidates the cached session when a board read fails",async()=
  const source=await readFile(new URL("../app/api/mcp/route.ts",import.meta.url),"utf8");
  assert.match(source,/if\(!rows\.blind\)sessions\.invalidate\(signedIn\.client\);/,
   "a failed board read must drop the client THAT failed, not whatever is cached");
- assert.match(source,/else if\(!blindRetried\)\{blindRetried=true;sessions\.invalidate\(signedIn\.client\)\}/,
-  "and a blind read drops it only on the first try, so an expired session still recovers");
+ assert.match(source,/else if\(Date\.now\(\)-blindRetriedAt>BLIND_RETRY_MS\)\{blindRetriedAt=Date\.now\(\);sessions\.invalidate\(signedIn\.client\)\}/,
+  "and a blind read drops it at most once an hour, so a session that dies later still recovers");
  assert.ok(!source.includes("let clientKey"),"the hand-rolled cache must be gone");
  assert.match(source,/sessionCacheKey\(credentials\)/,"the cache key must come from session-cache.ts");
 });
@@ -836,6 +836,39 @@ test("a blind login costs one retry and then keeps its session, and an expired o
  await call();
  const afterSecondDeath=await call();
  assert.ok(JSON.stringify(afterSecondDeath).includes("17501"),"and so does the second — the mark was cleared by the read in between");
+ globalThis.__MCP_TEST_LIVE_CLIENT__=undefined;
+
+ /* A DEATH AFTER THE RETRY IS SPENT STILL RECOVERS, which a boolean mark could
+    not do. The sequence: the login is genuinely blind, so the retry is spent
+    and the client kept — then THAT session is revoked, and somebody fixes the
+    grant. The kept client reads as anon, so the read is still blind and the
+    mark is still spent: with a boolean the dead client stayed for the life of
+    the isolate. An hour's limit lets it try again. The clock is moved rather
+    than waited on. */
+ globalThis.__MCP_TEST_ENV__=env("blind-then-dead@shop.invalid");
+ globalThis.__MCP_TEST_FAIL_TABLE__="";
+ globalThis.__MCP_TEST_ROWS__=NOTHING;
+ globalThis.__MCP_TEST_LIVE_CLIENT__=-1;
+ globalThis.__MCP_TEST_CALLS__=[];
+ await call();await call();          /* blind: the retry is spent, client kept */
+ /* NOW THAT KEPT SESSION IS REVOKED. Without this the kept client is still the
+    live one, so restoring the fleet below simply reads — which is what the
+    first draft of this fixture measured, and it proved nothing. */
+ globalThis.__MCP_TEST_LIVE_CLIENT__=-2;
+ globalThis.__MCP_TEST_ROWS__=FLEET; /* and the grant is fixed... */
+ const stillBlind=await call();      /* ...but the kept client is dead, so still nothing */
+ assert.ok(JSON.stringify(stillBlind).includes("no buses"),"the kept client is dead and sees nothing even once the grant is fixed");
+ const realNow=Date.now;
+ try{
+  Date.now=()=>realNow()+61*60*1000;
+  /* The first call past the hour is the one that DROPS the dead client — it has
+     already read with it by the time the decision is made, so it is still
+     blind. Recovery lands on the request after, which is true of every branch
+     here: the route reads, then decides what to do with the client. */
+  await call();
+  const recovered=await call();
+  assert.ok(JSON.stringify(recovered).includes("17501"),"an hour later it tries again, and the next call recovers");
+ }finally{Date.now=realNow}
  globalThis.__MCP_TEST_LIVE_CLIENT__=undefined;
 
  /* A refused read is the other branch and is unchanged: it drops the client

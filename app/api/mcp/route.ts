@@ -65,12 +65,25 @@ function bearer(request:Request){
    endpoint work for an hour of uptime and then stop. */
 const sessions=createSessionCache<ReadableClient>();
 
-/* Whether a blind read has already cost this isolate a fresh sign-in. It lives
-   beside the cache and NOT inside the request, because its whole job is to span
-   requests: one request can only ever see its own first blind read, so a
-   per-request flag would retry on every call and be the loop it exists to
-   prevent. Reset by any read that works — see `loadBoard`. */
-let blindRetried=false;
+/* WHEN a blind read last cost this isolate a fresh sign-in, and how long before
+   it may cost another. It lives beside the cache and NOT inside the request,
+   because spanning requests is its whole job: one request can only ever see its
+   own first blind read, so a per-request mark would retry on every call and be
+   the loop it exists to prevent.
+
+   A TIME LIMIT RATHER THAN A BOOLEAN, and that is a correction. A boolean is
+   spent once and never comes back except on a read that works, which strands
+   this sequence: a login is genuinely blind, the retry is spent and the client
+   kept, THAT session is later revoked, and somebody then fixes the grant. The
+   kept client now reads as anon, so the read is still blind, the mark is still
+   spent, and the dead client stays for the life of the isolate — recovered only
+   by a recycle. Reproduced on the 2026-11-18 gate.
+
+   An hour bounds the cost the same way the boolean did — a truly blind login
+   pays one sign-in an hour, not one per call — while letting a death that
+   happens later get its own retry. */
+const BLIND_RETRY_MS=60*60*1000;
+let blindRetriedAt=0;
 
 type Credentials={url:string;anonKey:string;email:string;password:string};
 
@@ -166,16 +179,17 @@ export async function POST(request:Request){
      2026-11-18 gates — one as the fix for the other, which is the shape of a
      trade rather than a fix.
 
-     So: the first blind read drops the client, and a second in a row keeps it.
-     An expired session recovers on the very next call, and a genuinely blind
-     login pays ONE extra sign-in per isolate instead of one per call. The mark
-     is cleared by any read that works, so a later expiry gets its retry too. */
+     So: a blind read drops the client at most once an hour, and keeps it in
+     between. An expired session recovers on the very next call, and a genuinely
+     blind login pays one extra sign-in an HOUR instead of one per call. Any
+     read that works clears the mark outright, so an expiry after a good read
+     gets its retry immediately rather than waiting out the hour. */
   if(rows.error){
    if(!rows.blind)sessions.invalidate(signedIn.client);
-   else if(!blindRetried){blindRetried=true;sessions.invalidate(signedIn.client)}
+   else if(Date.now()-blindRetriedAt>BLIND_RETRY_MS){blindRetriedAt=Date.now();sessions.invalidate(signedIn.client)}
    return {error:rows.error,board:null};
   }
-  blindRetried=false;
+  blindRetriedAt=0;
   return {error:"",board:boardFromRows(rows.buses,rows.defects,rows.entries,new Date().toISOString())};
  }
 
