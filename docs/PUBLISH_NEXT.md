@@ -174,7 +174,7 @@ On a phone with the app on its home screen. Open the app once after the update b
 5. Go to the **Down Sheet**, switch to another app for a minute without closing this one, and come back. It should still be on the Down Sheet, as before.
 6. Go to the Defect Log and leave the phone alone until it has closed the app by itself — an hour, or overnight. Open it. **This is the real test, and the one that could not be run:** it should open on the Defect Log.
 7. If it opens on the map in step 2 or 6, say so. Nothing is broken; the phone does not start the app the way the design assumed, and that needs a different approach.
-8. In the garage with the wifi down or weak: close the app fully on the Defect Log and open it. It should open on the Defect Log with no signal at all, and on the map after about two and a half seconds if the wifi is joined but dead. It should not sit on a blank screen.
+8. In the garage with weak or dead Wi-Fi, distinguish delivery of the initial document from resume. The unchanged service worker can wait on the initial GET before this script runs; there is no guaranteed launch-to-visible deadline. After script delivery, its 2.5-second readiness/network budget reveals the map if resume is not ready, without aborting map loading. A started replacement has another 2.5-second stalled-navigation limit. With cached pages and no signal, a ready map can reopen the remembered page. Record any blank or unusable fallback.
 
 For the door:
 
