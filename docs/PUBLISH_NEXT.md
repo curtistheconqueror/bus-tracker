@@ -17,19 +17,21 @@ The record of 196 and everything before it is in `docs/RELEASES.md`; the former 
 
 ### Source
 
-Release source: `6308003`, on `main`. Previous: `4086c98`, the commit that recorded 196's live verification.
+Release source: `a5098c6`, on `main`. Previous: `4086c98`, the commit that recorded 196's live verification. The last commit that changed code is `6308003`; the two after it are this file and `CLAUDE.md`.
 
-The three blocks below were run at `6308003`, the commit below the one this file is updated in.
+The three blocks below were run at `a5098c6`, the commit below the one this file is updated in.
 
 ```
-$ git log --oneline 4086c98..6308003
+$ git log --oneline 4086c98..a5098c6
+a5098c6 Every page reopens, on every device: Curtis's answer
+6219109 Queue reopening the last page in 197, beside the door
 6308003 The app reopens on the page it was left on
 a27d269 Queue the door on the Doors group as 197
 0dc91ce A door on the Doors group
 ```
 
 ```
-$ git diff --name-only 4086c98..6308003 -- app src tests
+$ git diff --name-only 4086c98..a5098c6 -- app src tests
 app/_components/last-page-live.tsx
 app/_components/resume-last-page.tsx
 app/layout.tsx
@@ -40,14 +42,14 @@ tests/settings.test.mjs
 ```
 
 ```
-$ git diff --shortstat 4086c98..6308003
- 9 files changed, 983 insertions(+), 13 deletions(-)
+$ git diff --shortstat 4086c98..a5098c6
+ 9 files changed, 1067 insertions(+), 13 deletions(-)
 ```
 
 Proof of no infrastructure change. This returned nothing:
 
 ```
-$ git diff --name-only 4086c98..6308003 -- supabase package.json package-lock.json .github public worker
+$ git diff --name-only 4086c98..a5098c6 -- supabase package.json package-lock.json .github public worker
 ```
 
 `public/sw.js` and `public/manifest.webmanifest` are untouched. The cache name is not bumped and does not need to be.
@@ -65,6 +67,8 @@ One `sessionStorage` name, `pace-launch-seen`, marks the first page of a run of 
 ### What was asked for
 
 Curtis, on the reopening: *"when I leave phone app and go back in I want it to return to the tab I was using. Not default back to map. I was using the defect log. This may be the correct way to use the app or most apps."*
+
+Curtis, asked afterwards whether a shared iPad should leave Incidents and Settings out: *"Phone and shared iPad should act the same: reopen on whatever page I left, including Incidents, Settings and Defect Log. Only fall back to the map after a reset, a device restart, or something like that. I don't want to tap Defect Log every time I switch apps and come back 3 minutes later."* That is what was built, so nothing changed for it.
 
 Curtis, on the door: *"Please put a door 🚪 emoji on the doors defect."*
 
@@ -93,7 +97,17 @@ Three costs, known and left:
 
 1. **A fresh start is a little slower when it reopens a page other than the map.** It loads the map's page, asks one small question of the network, then loads the other page.
 2. **A good page can be forgotten once.** Reopen the app, glance at it and pocket the phone inside two seconds, and if the phone then closes the app, the next start is the map. The same happens after a start where the network answered and the page then stalled. Each costs one tap.
-3. **On a shared device, the app opens where the last person left it** — Incidents and Settings included.
+3. **On a shared device, the app opens where the last person left it** — Incidents and Settings included. Curtis chose that; see his words above.
+
+**When it lands on the map instead, all of it:**
+
+- the map is where it was left;
+- the first time the app is ever opened, or after a reset that clears the site's data, because the record goes with it;
+- the page it was reopening did not stay up, the time before;
+- the network did not answer in 2.5 seconds — and then only for that run;
+- the two forgotten-once cases in cost 2.
+
+**A device restart is not on that list.** Curtis named it as a time the map would be acceptable. The app reopens the page after a restart too: a page cannot tell a restart from the phone closing the app, and the record is still there.
 
 There is no switch for this in Settings. One is a UI change and Curtis's call.
 
@@ -163,8 +177,9 @@ For the door:
 ### Open questions for Curtis
 
 - **A switch in Settings** to turn reopening off on a device. Not built.
-- **Incidents and Settings** are reopened like any other page. On a shared iPad that puts the last person's page in front of the next one. Either can be left out.
 - **The door on a logged defect's card**, not only in the picker. Not built.
+
+Answered on 2026-11-17 and closed: **Incidents and Settings are reopened like any other page, on the phone and the shared iPad alike.**
 
 ### Rollback
 
