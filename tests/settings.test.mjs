@@ -2062,16 +2062,23 @@ function resumeWindow({path="/",search="",hash="",referrer="",standalone=true,io
  const win={
   replaced:null,asked:[],timers:[],answer:null,stopped:0,now:0,
   location:{pathname:path,search,hash,replace(target){if(replaceThrows)throw new Error("no");win.replaced=target}},
-  document:{referrer,readyState:loaded?"complete":"loading",documentElement:{style:{visibility:""}}},
+  document:{referrer,readyState:loaded?"complete":"loading",visibilityState:"visible",documentElement:{style:{visibility:""}},listeners:new Map(),
+   addEventListener(name,fn){if(!win.document.listeners.has(name))win.document.listeners.set(name,new Set());win.document.listeners.get(name).add(fn)},
+   removeEventListener(name,fn){win.document.listeners.get(name)?.delete(fn)},
+   emit(name,event){for(const fn of [...(win.document.listeners.get(name)||[])])fn(event)}},
   __pacePageReady:ready,listeners:new Map(),
   addEventListener(name,fn){if(!win.listeners.has(name))win.listeners.set(name,new Set());win.listeners.get(name).add(fn)},
   removeEventListener(name,fn){win.listeners.get(name)?.delete(fn)},
-  emit(name){for(const fn of [...(win.listeners.get(name)||[])])fn()},
+  emit(name,event){for(const fn of [...(win.listeners.get(name)||[])])fn(event)},
+  dispatchEvent(event){win.emit(event.type,event);return true},
+  /* How many handlers are still attached, anywhere. */
+  get listening(){return [...win.listeners.values(),...win.document.listeners.values()].reduce((count,set)=>count+set.size,0)},
   localStorage:store(local),sessionStorage:store(session,sessionKeeps,sessionThrows),
   navigator:{standalone:iosStandalone,onLine:online},
   matchMedia:query=>({matches:standalone&&query==="(display-mode: standalone)"}),
   stop(){win.stopped+=1},
-  setTimeout(run,after){win.timers.push({run,at:win.now+after})},
+  setTimeout(run,after){const timer={run,at:win.now+after};win.timers.push(timer);return timer},
+  clearTimeout(timer){if(timer)timer.done=true},
   /* Moves the clock to `ms`, running what fell due on the way, in order. */
   tick(ms){
    for(;;){
@@ -2094,7 +2101,7 @@ function resumeWindow({path="/",search="",hash="",referrer="",standalone=true,io
 const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
 
 test("a fresh start from the home screen reopens the page the app was left on",async()=>{
- const {LAST_PAGE_KEY,LAUNCH_SEEN_KEY,CRASH_REPORT_KEY,PAGE_SETTLE_MS,RESUME_CONFIG,RESUME_SOURCE,SERVICE_WORKER_PATH,pageMemory,pagePath,rememberPage,resumeScriptText}=await import("../src/lib/settings/last-page.ts");
+ const {LAST_PAGE_KEY,LAUNCH_SEEN_KEY,CRASH_REPORT_KEY,PAGE_SETTLE_MS,RESUME_CONFIG,RESUME_SOURCE,SERVICE_WORKER_PATH,clearPageReady,pageMemory,pagePath,rememberPage,resumeScriptText,signalPageReady,watchPage}=await import("../src/lib/settings/last-page.ts");
  const {TRACKER_PAGES}=await import("../src/lib/settings/tracker-pages.ts");
  const text=resumeScriptText();
  const run=win=>new Function("window","return "+text)(win);
@@ -2176,6 +2183,171 @@ test("a fresh start from the home screen reopens the page the app was left on",a
  win.document.readyState="complete";win[RESUME_CONFIG.ready]=true;
  win.emit("load");win.emit(RESUME_CONFIG.ready);
  assert.equal(win.replaced,null,"late readiness cannot take away the visible map");
+
+ /* THE SIGNAL, FROM THE HALF THAT SENDS IT. Every case above raised the flag
+    by hand, so nothing ran the code that raises it - and for one release that
+    code sent it from the two-second probation timer, inside a 2.5-second
+    wait. A review switched the signal off altogether and the suite passed.
+    `watchPage` is what the component runs when a page has been drawn; here it
+    is run, against the window the script is waiting on. */
+ win=resumeWindow({local:left("/defect-log"),ready:false,loaded:false});
+ run(win);win.answer.ok();await settle();
+ win.document.readyState="complete";win.emit("load");
+ assert.equal(win.replaced,null,"the network has answered and the document has loaded, and the map is not up yet");
+ let unwatch=watchPage(win);
+ assert.equal(win.replaced,"/defect-log","the map is drawn, and the app goes");
+ assert.deepEqual(win.timers.filter(timer=>timer.done),[],"before any timer has run: drawn is ready");
+ assert.ok(kept(win).resuming,"and the move was marked");
+ /* ANYWHERE INSIDE THE WAIT, not only its first half second. This is the
+    measurement that failed: sent from the two-second timer, the signal came
+    2.6 seconds in for a map drawn at 0.6, and nothing was reopened. The old
+    limit was WAIT less the timer, so 499 was the last moment that worked. */
+ assert.equal(WAIT-PAGE_SETTLE_MS,500);
+ for(const drawnAt of [0,499,500,1000,2000,WAIT-1]){
+  win=resumeWindow({local:left("/defect-log"),ready:false,online:false});
+  run(win);
+  win.tick(drawnAt);
+  watchPage(win);
+  assert.equal(win.replaced,"/defect-log","a map drawn "+drawnAt+" ms after the script");
+ }
+ /* A map that is not up inside the wait is shown and kept - and stays the
+    page the person left, because a map that was only fallen back to does not
+    remember itself. */
+ win=resumeWindow({local:left("/defect-log"),ready:false,online:false});
+ run(win);
+ win.tick(WAIT);
+ assert.equal(win.hidden,false);
+ unwatch=watchPage(win);
+ assert.equal(win.replaced,null,"drawn too late: the map that was shown is not taken away");
+ assert.equal(kept(win).path,"/defect-log","and the next start tries again");
+ /* THE MAP BEING UP IS NOT THE NETWORK HAVING ANSWERED. Drawn and loaded
+    first, the app still waits to hear that the page it is going to is there. */
+ win=resumeWindow({local:left("/defect-log"),ready:false,loaded:false});
+ run(win);
+ win.document.readyState="complete";win.emit("load");
+ watchPage(win);
+ assert.equal(win[RESUME_CONFIG.ready],true);
+ assert.equal(win.replaced,null,"a map that is up is not left before the network has answered");
+ win.answer.ok();await settle();
+ assert.equal(win.replaced,"/defect-log");
+ win=resumeWindow({local:left("/defect-log"),ready:false});
+ run(win);
+ watchPage(win);
+ win.answer.status(503);await settle();
+ assert.equal(win.replaced,null,"nor when the server answers with a failure of its own");
+ assert.equal(win.hidden,false);
+ win=resumeWindow({local:left("/defect-log"),ready:false});
+ run(win);
+ watchPage(win);
+ win.tick(WAIT);
+ win.answer.ok();await settle();
+ assert.equal(win.replaced,null,"nor when the answer comes after the map was shown");
+ /* A MAP THAT HAS GONE DOWN AGAIN IS NOT READY. The crash boundary took the
+    tree, or the route moved, before the network answered. */
+ win=resumeWindow({local:left("/defect-log"),ready:false});
+ run(win);
+ unwatch=watchPage(win);
+ assert.equal(win[RESUME_CONFIG.ready],true);
+ unwatch();
+ assert.equal(win[RESUME_CONFIG.ready],false);
+ win.answer.ok();await settle();
+ assert.equal(win.replaced,null);
+ win.tick(WAIT);
+ assert.equal(win.hidden,false,"and the page is shown at the limit, whatever is on it");
+ /* The two functions the signal is made of, by themselves. */
+ win=resumeWindow({ready:false});
+ let heard=0;
+ win.addEventListener(RESUME_CONFIG.ready,event=>{heard+=1;assert.equal(event.type,RESUME_CONFIG.ready)});
+ signalPageReady(win);
+ assert.deepEqual([win[RESUME_CONFIG.ready],heard],[true,1],"the flag for a script that asks later, the event for one already waiting");
+ clearPageReady(win);
+ assert.deepEqual([win[RESUME_CONFIG.ready],heard],[false,1]);
+ win.dispatchEvent=()=>{throw new Error("no events")};
+ signalPageReady(win);
+ assert.equal(win[RESUME_CONFIG.ready],true,"a window that will not send the event still carries the flag");
+
+ /* THE REST OF WHAT A DRAWN PAGE DOES, run the same way. An ordinary page
+    reopened and on probation: remembered with its mark when drawn, cleared
+    when it has stayed up, written again as the app is left. */
+ const onProbation=JSON.stringify({version:1,path:"/defect-log",at:"2026-11-17T11:00:00.000Z",resuming:"2026-11-17T11:59:59.000Z"});
+ win=resumeWindow({path:"/defect-log",standalone:false,ready:false,local:{[LAST_PAGE_KEY]:onProbation}});
+ unwatch=watchPage(win);
+ assert.ok(kept(win).resuming,"drawn: remembered, still on probation");
+ assert.notEqual(kept(win).at,"2026-11-17T11:00:00.000Z");
+ win.tick(PAGE_SETTLE_MS-1);
+ assert.ok(kept(win).resuming);
+ win.tick(PAGE_SETTLE_MS);
+ assert.equal(kept(win).resuming,undefined,"stayed up: probation is over");
+ win.location.pathname="/down-sheet";
+ win.document.emit("visibilitychange");
+ assert.equal(kept(win).path,"/defect-log","still visible: nothing is written");
+ win.document.visibilityState="hidden";
+ win.document.emit("visibilitychange");
+ assert.equal(kept(win).path,"/down-sheet","the app is left: the page on screen is the one remembered");
+ win.location.pathname="/lists";
+ win.emit("pageshow",{persisted:false});
+ assert.equal(kept(win).path,"/down-sheet","an ordinary load is not Back");
+ win.emit("pageshow",{persisted:true});
+ assert.equal(kept(win).path,"/lists","Back brought a page back without loading it");
+ assert.equal(win.listening,4);
+ unwatch();
+ assert.equal(win.listening,0,"nothing is left listening when the page goes");
+ /* A page that goes down before it has stayed up never says it did. */
+ win=resumeWindow({path:"/defect-log",standalone:false,ready:false,local:{[LAST_PAGE_KEY]:onProbation}});
+ unwatch=watchPage(win);
+ win.tick(PAGE_SETTLE_MS-1);
+ unwatch();
+ win.tick(PAGE_SETTLE_MS*3);
+ assert.ok(kept(win).resuming,"the timer went with the page");
+ /* A map that was only fallen back to is remembered when somebody uses it. */
+ for(const gesture of ["pointerdown","keydown"]){
+  win=resumeWindow({local:left("/defect-log")});
+  run(win);
+  win.tick(WAIT);
+  watchPage(win);
+  win.tick(WAIT+PAGE_SETTLE_MS);
+  assert.equal(kept(win).path,"/defect-log",gesture+": drawn, settled and untouched, it has written nothing");
+  win.emit(gesture);
+  assert.equal(kept(win).path,"/",gesture);
+ }
+ /* Storage that cannot even be reached is not an error on the page. */
+ win=resumeWindow({path:"/defect-log",ready:false});
+ Object.defineProperty(win,"localStorage",{get(){throw new Error("blocked")}});
+ unwatch=watchPage(win);
+ assert.equal(typeof unwatch,"function");
+ unwatch();
+ assert.equal(win.listening,0);
+
+ /* THE MANUAL FIXTURE RUNS THE APP'S OWN CODE. tests/fixtures/
+    resume-navigation-server.mjs is what a person drives in a browser to see a
+    stalled move recovered from. Its map set the ready flag by hand, the moment
+    its script arrived, while the app sent it from a two-second timer - so it
+    reported a resume the app never made. It is written out from the module's
+    functions now, and what it sends is run here against the same stand-in. */
+ const fixture=await import("./fixtures/resume-navigation-server.mjs");
+ const fixtureSource=await readFile(new URL("./fixtures/resume-navigation-server.mjs",import.meta.url),"utf8");
+ win=resumeWindow({local:left("/defect-log"),ready:false});
+ run(win);win.answer.ok();await settle();
+ assert.equal(win.replaced,null);
+ new Function("window",fixture.watchPageSource()+"\nreturn watchPage(window)")(win);
+ assert.equal(win.replaced,"/defect-log","the fixture's page raises the signal the way the app's does");
+ assert.ok(kept(win).resuming);
+ /* And down the path that writes, on an ordinary page, so every function it
+    was written out from is run and not only parsed. What this does not hold:
+    that a helper added to the module later is written out too. */
+ win=resumeWindow({path:"/defect-log",standalone:false,ready:false});
+ const stopFixture=new Function("window",fixture.watchPageSource()+"\nreturn watchPage(window)")(win);
+ assert.equal(kept(win).path,"/defect-log");
+ win.tick(PAGE_SETTLE_MS);
+ win.location.pathname="/down-sheet";win.document.visibilityState="hidden";win.document.emit("visibilitychange");
+ assert.equal(kept(win).path,"/down-sheet");
+ stopFixture();
+ assert.equal(win.listening,0);
+ /* The whole of what /map.js sends parses, and draws through watchPage. */
+ new Function("document","setTimeout","window",fixture.mapScript(1500));
+ assert.match(fixture.mapScript(1500),/watchPage\(window\);\n\},1500\);$/);
+ assert.doesNotMatch(fixtureSource.replace(/^\/\/.*$/gm,""),/RESUME_CONFIG\.ready|__pacePageReady|dispatchEvent/,"it does not raise the signal itself");
+ assert.match(fixtureSource,/if\(process\.argv\[1\]&&fileURLToPath\(import\.meta\.url\)===process\.argv\[1\]\)/,"it listens only when run, so importing it here opens no port");
 
  /* WIFI THAT IS JOINED AND DEAD does not fail a request, it hangs it. The
     map is shown, and the app stays on it for this run. */
@@ -2480,24 +2652,40 @@ test("a fresh start from the home screen reopens the page the app was left on",a
  assert.doesNotMatch(script,/^\s*["']use client["']/m);
  assert.doesNotMatch(script,/useEffect|useLayoutEffect/);
  assert.match(script,/<script dangerouslySetInnerHTML=\{\{__html:resumeScriptText\(\)\}\}\/>/);
- /* The remembering is driven from an effect INSIDE the crash boundary, and
-    holds no rule of its own: it tells the memory the four moments. */
+ /* The remembering is started from an effect INSIDE the crash boundary, and
+    the component holds NO RULE of its own: one line starts `watchPage`, which
+    is run above.
+
+    THIS PART IS STILL A CHECK ON TEXT, and it should not be read as more.
+    Nothing here mounts a component. So the component's whole body is held, to
+    the character: a condition on the line above the call, an early return, a
+    brace round it - each passed a version of this that matched the one line -
+    all change the body and fail here. What it cannot catch is a body that
+    reads the same and behaves differently, which for seven lines with no
+    branch in them is the hook rules' job. */
  assert.match(live,/^"use client";/);
- assert.match(live,/\[RESUME_CONFIG\.flag\]===true/,"it reads the flag the script raises, by the one name");
- assert.match(live,/pageMemory\(window\.localStorage,\(\)=>window\.location\.pathname,turnedRound\)/);
- assert.match(live,/memory\.up\(\);\s*const timer=window\.setTimeout\(\(\)=>\{\s*memory\.settled\(\);/);
- assert.match(live,/\[RESUME_CONFIG\.ready\]=true/);
- assert.match(live,/dispatchEvent\(new Event\(RESUME_CONFIG\.ready\)\)/);
- assert.match(live,/\[RESUME_CONFIG\.ready\]=false/);
- assert.match(live,/window\.clearTimeout\(timer\)/,"a page that goes down before it has stayed up never says it did");
- assert.match(live,/if\(document\.visibilityState==="hidden"\)memory\.left\(\)/);
- assert.match(live,/if\(event\.persisted\)memory\.left\(\)/,"and when Back brings a page back without loading it");
- for(const [type,handler,capture] of [["visibilitychange","left",""],["pageshow","back",""],["pointerdown","used",",true"],["keydown","used",",true"]]){
-  assert.ok(live.includes('addEventListener("'+type+'",'+handler+capture+')'),type+" is listened for");
-  assert.ok(live.includes('removeEventListener("'+type+'",'+handler+capture+')'),type+" is let go of");
- }
- assert.match(live,/\},\[pathname\]\);/,"it follows the one move that changes the page without loading one");
+ const body=live.slice(live.indexOf("export default function LastPageLive(){"));
+ assert.equal(body,[
+  'export default function LastPageLive(){',
+  ' const pathname=usePathname();',
+  ' useEffect(()=>watchPage(window),[pathname]);',
+  ' useEffect(()=>{',
+  '  try{if("serviceWorker" in navigator)navigator.serviceWorker.register(SERVICE_WORKER_PATH).catch(()=>{})}catch{}',
+  ' },[]);',
+  ' return null;',
+  '}',
+  '',
+ ].join("\n"),"it follows the load, and the one move that changes the page without loading one - and does nothing else");
+ assert.match(live,/import \{SERVICE_WORKER_PATH,watchPage\} from "@\/src\/lib\/settings\/last-page";/);
+ assert.doesNotMatch(live,/setTimeout|addEventListener|dispatchEvent|RESUME_CONFIG|pageMemory|signalPageReady|clearPageReady|PAGE_SETTLE_MS/,"none of what watchPage does is done here as well");
  assert.doesNotMatch(live,/setItem|getItem|rememberPage|pace-/,"it writes through the memory and names no key");
+ /* And capture, so a handler lower down that stops a tap does not hide it. */
+ const watchSource=moduleSource.slice(moduleSource.indexOf("export function watchPage"),moduleSource.indexOf("/* THE SCRIPT, AS TEXT"));
+ for(const [type,handler,capture] of [["pointerdown","used",",true"],["keydown","used",",true"]]){
+  assert.ok(watchSource.includes('win.addEventListener("'+type+'",'+handler+capture+')'),type+" is heard in capture");
+  assert.ok(watchSource.includes('win.removeEventListener("'+type+'",'+handler+capture+')'),type+" is let go of the same way");
+ }
+ assert.match(watchSource,/memory\.up\(\);\s*signalPageReady\(win\);\s*const timer=win\.setTimeout\(\(\)=>\{memory\.settled\(\)\},PAGE_SETTLE_MS\);/,"drawn, then ready, then the probation timer - the signal does not wait for it");
  assert.ok(PAGE_SETTLE_MS>=1000,"long enough for a page to read its records and fall over on them");
  /* The offline worker is asked for from every page now, not only the map. */
  assert.equal(SERVICE_WORKER_PATH,"/sw.js");

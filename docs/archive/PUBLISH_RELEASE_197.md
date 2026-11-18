@@ -19,6 +19,10 @@ The record of 196 and everything before it is in `docs/RELEASES.md`; the former 
 
 ## 197 — reopen where you left off, and a door on Doors
 
+### Second correction (2026-11-18, after publication)
+
+A re-gate of the published head found this file silent about the commonest reason a fresh start lands on the map, and wrong further down about what a normal one costs. The paragraph below is right that a normal resume waits roughly two seconds; cost 1 further down still says only "a little slower", and the list of when it lands on the map does not mention readiness at all. **As published, the page is reopened only if the map's code arrives and draws within about half a second**: the ready signal was sent from the two-second probation timer, inside the 2.5-second budget. "Slower devices may stay on the map" understated it - any delay of about half a second did it, including the first launch after each release. This file is left as the record of what 197 said. The fix, and the corrected account, are in `docs/PUBLISH_NEXT.md` under 198.
+
 ### Review correction (2026-11-18)
 
 PR50 CodeRabbit found early replacement could abort the still-loading fallback map. Replacement now requires both document load and the hydrated page settling signal, within the original 2.5-second script budget. If either is late, the map remains and continues loading uninterrupted; readiness arriving later cannot navigate away. A normal fresh resume now waits roughly two seconds plus destination loading. Slower devices may stay on the map for that run.
