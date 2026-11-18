@@ -498,13 +498,15 @@ test("a sign-in that fails without a message still reports one",async()=>{
  assert.ok(error.length>0);
 });
 
-/* The route must actually drop the client when a read fails, not merely own a
-   cache that could. Asserted against the source, because the alternative needs
-   a Worker and a live project. */
+/* The route must drop the client THAT FAILED, not whatever is cached. This is
+   the identity check and stays text; WHEN it drops one is driven for real in
+   "a login that can see no buses keeps its session" below, now that the route
+   can be run. The comment here used to say the alternative needed a Worker and
+   a live project — it needs neither. */
 test("the route invalidates the cached session when a board read fails",async()=>{
  const source=await readFile(new URL("../app/api/mcp/route.ts",import.meta.url),"utf8");
- assert.match(source,/if\(rows\.error\)\{sessions\.invalidate\(signedIn\.client\)/,
-  "a failed board read must drop the client THAT failed, not whatever is cached");
+ assert.match(source,/if\(rows\.error\)\{if\(!rows\.blind\)sessions\.invalidate\(signedIn\.client\)/,
+  "a failed board read must drop the client THAT failed, not whatever is cached — and a blind read must not drop one at all");
  assert.ok(!source.includes("let clientKey"),"the hand-rolled cache must be gone");
  assert.match(source,/sessionCacheKey\(credentials\)/,"the cache key must come from session-cache.ts");
 });
@@ -749,4 +751,52 @@ test("initialize negotiates the protocol version instead of echoing whatever it 
  assert.equal(await version("garbage"),FALLBACK_PROTOCOL_VERSION,"and neither is a nonsense one");
  assert.equal(await version(undefined),FALLBACK_PROTOCOL_VERSION,"none offered falls back");
  for(const known of SUPPORTED_PROTOCOL_VERSIONS)assert.equal(await version(known),known,known+" is spoken here, so it is honoured");
+});
+
+/* A BLIND LOGIN MUST NOT BECOME A SIGN-IN LOOP. Reporting the blind read (F2)
+   put it down the same branch as a failed one, and that branch drops the cached
+   client so the next request signs in again — right for a session that has
+   probably expired, wrong here, because a login that signed in fine and cannot
+   see the buses is not expired, it is not permitted. Signing in again cannot
+   change that, so every call would re-authenticate for as long as the grant
+   stays wrong, against Supabase's auth rate limit. Raised as a follow-up on the
+   2026-11-18 gate; this holds the line it drew. */
+test("a login that can see no buses keeps its session, while a refused read drops it",async()=>{
+ const {register}=await import("node:module");
+ register("./helpers/mcp-route-hooks.mjs",import.meta.url);
+ const GOOD="correct-horse-battery-staple";
+ const [buses,defects,entries]=BOARD_TABLES;
+ const call=async()=>{
+  const {POST}=await import("@/app/api/mcp/route.ts");
+  /* locate_bus REQUIRES fleet_number: called without it the request is refused
+     for bad arguments before the board is ever loaded, so nothing signs in and
+     this measured 0 either way. The fixture was wrong, not the route. */
+  const body={jsonrpc:"2.0",id:1,method:"tools/call",params:{name:"locate_bus",arguments:{fleet_number:"17501"}}};
+  const response=await POST(new Request("https://example.invalid/api/mcp",{method:"POST",headers:{Authorization:"Bearer "+GOOD,"Content-Type":"application/json"},body:JSON.stringify(body)}));
+  await response.json();
+ };
+ const signIns=()=>(globalThis.__MCP_TEST_CALLS__||[]).filter(entry=>entry.kind==="signIn").length;
+
+ /* EACH PHASE GETS ITS OWN LOGIN. The session cache is keyed on the
+    credentials and lives for the module, so reusing one email would measure
+    the cache left behind by an earlier test rather than this behaviour — which
+    is exactly what the first draft of this test did, and it read 0 sign-ins. */
+ const env=email=>({MCP_TOKEN:GOOD,SUPABASE_URL:"https://shop.invalid",SUPABASE_ANON_KEY:"anon",SHOP_EMAIL:email,SHOP_PASSWORD:"pw"});
+
+ /* Blind: the login works and the buses table answers with nothing. */
+ globalThis.__MCP_TEST_ENV__=env("blind-reader@shop.invalid");
+ globalThis.__MCP_TEST_FAIL_TABLE__="";
+ globalThis.__MCP_TEST_ROWS__={[buses.table]:[],[defects.table]:[],[entries.table]:[]};
+ globalThis.__MCP_TEST_CALLS__=[];
+ await call();await call();await call();
+ assert.equal(signIns(),1,"three calls on a blind login sign in ONCE — the session is kept, because signing in again cannot grant it rows");
+
+ /* Refused: the buses table errors outright. That one still drops the client,
+    because it may be an expired session and nothing here renews one. */
+ globalThis.__MCP_TEST_ENV__=env("refused-reader@shop.invalid");
+ globalThis.__MCP_TEST_FAIL_TABLE__=buses.table;
+ globalThis.__MCP_TEST_CALLS__=[];
+ await call();await call();await call();
+ assert.equal(signIns(),3,"a refused read drops the cached client, so each call signs in again");
+ globalThis.__MCP_TEST_FAIL_TABLE__="";
 });

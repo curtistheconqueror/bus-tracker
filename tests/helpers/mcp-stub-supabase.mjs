@@ -13,15 +13,22 @@ function recorder() {
 
 const WRITE_VERBS = ["insert", "update", "upsert", "delete", "rpc"];
 
+/* The real chain is `.from(t).select("*").is(...)[.gt(...)].order(...).limit(n)`,
+   and it pages until a page comes back EMPTY. So `limit` serves the rows once
+   and nothing after that, or the walk never ends. */
 function table(name) {
+  let served = false;
   const api = {
     select() { recorder().push({ kind: "select", table: name }); return api; },
+    is() { return api; },
     order() { return api; },
     gt() { return api; },
-    limit() { return api; },
-    then(resolve) {
-      const rows = (globalThis.__MCP_TEST_ROWS__ || {})[name] || [];
-      return Promise.resolve({ data: rows, error: null }).then(resolve);
+    limit() {
+      const failing = globalThis.__MCP_TEST_FAIL_TABLE__;
+      if (failing === name) return Promise.resolve({ data: null, error: { message: "permission denied for table " + name } });
+      const rows = served ? [] : ((globalThis.__MCP_TEST_ROWS__ || {})[name] || []);
+      served = true;
+      return Promise.resolve({ data: rows, error: null });
     },
   };
   for (const verb of WRITE_VERBS) {

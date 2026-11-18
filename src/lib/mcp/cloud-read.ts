@@ -116,7 +116,13 @@ export async function readLiveRows(client:ReadableClient,table:string,key:string
  }
 }
 
-export type BoardRows={buses:CloudRow[];defects:CloudRow[];entries:CloudRow[];error:string};
+/* `blind` separates the two ways `error` gets set, because the caller treats
+   them differently. A read that FAILED may be an expired session, which is
+   worth dropping the cached client over. A read that SUCCEEDED and returned no
+   buses is a permissions or wrong-project problem, and signing in again cannot
+   change it — so the session is kept and the login is simply unable to see the
+   fleet until somebody fixes the grant. */
+export type BoardRows={buses:CloudRow[];defects:CloudRow[];entries:CloudRow[];error:string;blind?:boolean};
 
 /* All three tables, in one place, so a partial read is never mistaken for a
    quiet shop.
@@ -144,7 +150,7 @@ export async function readBoardRows(client:ReadableClient):Promise<BoardRows> {
     `SUPABASE_URL` pointing at the wrong project, reads as an empty garage. A
     real one never has zero buses; a cloud nobody has pushed to yet is better
     described this way than as a fleet with nothing wrong with it. */
- if(!busRows.rows.length)return {...empty,error:"The shop cloud returned no buses for this login. Check that it may select from the buses table (RLS) and that SUPABASE_URL names the shop's own project."};
+ if(!busRows.rows.length)return {...empty,blind:true,error:"The shop cloud returned no buses for this login. Check that it may select from the buses table (RLS) and that SUPABASE_URL names the shop's own project."};
  const defectRows=await readLiveRows(client,defects.table,defects.key);
  if(defectRows.error)return {...empty,error:defectRows.error};
  const entryRows=await readLiveRows(client,entries.table,entries.key);

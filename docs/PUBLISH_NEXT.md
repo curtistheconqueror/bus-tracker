@@ -19,7 +19,7 @@ the branch is published and is not rebased. One file conflicted,
 `tests/helpers/modules.mjs`, where this branch and `main` had each appended
 export lines at the same end: resolved as the union of both, with every module
 path checked to exist. Measured on the merged tree, in a container rather than
-in CI: the production build succeeds, **512 of 512 tests pass** and ESLint is
+in CI: the production build succeeds, **513 of 513 tests pass** and ESLint is
 clean. CI must re-run on the actual merge SHA before anything is packaged, and
 the test count above moves with every change that adds one.
 

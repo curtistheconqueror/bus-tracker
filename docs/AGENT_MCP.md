@@ -279,7 +279,7 @@ already do for old sheets.
 
 ## What was verified
 
-- 42 tests (`tests/mcp.test.mjs`), three of them added answering the 2026-11-18 gate: the route's auth driven rather than read, a blind read, and version negotiation. Mutation-tested every round: each key assertion was checked by
+- 43 tests (`tests/mcp.test.mjs`), four of them added answering the 2026-11-18 gate: the route's auth driven rather than read, a blind read, and version negotiation. Mutation-tested every round: each key assertion was checked by
   breaking the code it guards and confirming the test went red.
 - The map **cannot** put a bus on the Down Sheet: a bus row whose `map_fields`
   claim `down`, `onDownSheet` and `downSheetReady`, with nothing on the sheet,

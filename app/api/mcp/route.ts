@@ -144,7 +144,14 @@ export async function POST(request:Request){
      answering "could not be read" for as long as it lives. A refused read —
      a permission problem rather than an expiry — costs one extra sign-in on a
      request that had already failed, which is the right way round to be wrong. */
-  if(rows.error){sessions.invalidate(signedIn.client);return {error:rows.error,board:null}}
+  /* A BLIND READ KEEPS ITS SESSION. The reasoning above is about a session that
+     has probably expired, and one extra sign-in on an already-failed request is
+     a fair price for that. A login that signed in and can see no buses is not
+     expired — it is not permitted — so dropping the client would sign in again
+     on EVERY call for as long as the grant stays wrong, which is a sign-in loop
+     against Supabase's auth rate limit rather than one extra. Raised on the
+     2026-11-18 gate as a consequence of reporting the blind read at all. */
+  if(rows.error){if(!rows.blind)sessions.invalidate(signedIn.client);return {error:rows.error,board:null}}
   return {error:"",board:boardFromRows(rows.buses,rows.defects,rows.entries,new Date().toISOString())};
  }
 
