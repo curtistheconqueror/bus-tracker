@@ -15,6 +15,90 @@ export {shareAreaLabel};
 
 export type QuickFilterShareBus=QuickFilterBus&{n:string;l?:string};
 
+/* LEAVING A BUS OUT OF WHAT GETS SHARED.
+
+   Curtis, with the last 24 hours of his own reports open - six buses - and one
+   he did not want to send: "there's no way to remove a bus from the list
+   before sharing it ... It should only drop it from what gets shared, not
+   delete the defect report itself. Make it easy to undo, and make sure the
+   count badge updates."
+
+   IT IS A PROPERTY OF THIS LOOK AT THIS LIST, NEVER OF A RECORD. The ids left
+   out are held by the page while the drawer is open and nowhere else: not on
+   the bus, not on the defect, not in storage. That is the rule the single-bus
+   FOCUS share already follows for a swiped-away defect, and for the same
+   reason - the Shop Cloud ships every field it has no column for, so a "leave
+   this one out" flag on a record would reach every other phone in the shop
+   and hide the bus on all of them. Nothing here can delete, close or change a
+   defect, because nothing here is handed one to write.
+
+   KEYED ON THE BUS ID, which is the one place in a share that is right. The
+   id is device-local and means nothing off this device - and this never
+   leaves the device, or even the page. A fleet number would be the legible
+   key and the wrong one: two records can carry one number while a mistyped
+   bus waits to be merged, and leaving one out must not take the other.
+
+   A BUS LEFT OUT STAYS ON THE LIST AS A SLIM "LEFT OUT" ROW, WITH ITS OWN
+   PUT BACK. It vanished at first, with one PUT BACK at the top for the last
+   one, and a cold read found what that costs: the rows below slid up, so the
+   next bus's LEAVE OUT landed under the finger that had just pressed one, and a
+   double tap left out two; and once gone, nothing said WHICH bus was out. A row
+   held in place keeps the list still, names the bus, and puts back the one
+   meant rather than the last one pressed. Leaving out is `excludeFromFocusShare`
+   in focus-share-scope.ts, the FOCUS share's own; putting one back is
+   `restoreLeftOutBus` below.
+
+   WHICH LISTS OFFER IT is here and not in the page. Defects Logged is the one
+   Curtis asked about. Two of the others already carry row buttons that change
+   real records - END DEFERRAL, and REMOVE on the recommended list, which
+   takes a bus off that list for good - and a second, harmless "remove" beside
+   those is how somebody presses the wrong one. Offering it elsewhere is a
+   line here and a decision about those rows. */
+const LEAVE_OUT_FILTERS:ReadonlySet<QuickFilterKey>=new Set<QuickFilterKey>(["logged"]);
+export function quickFilterCanLeaveOut(key:QuickFilterKey|null|undefined):boolean{
+ return !!key&&LEAVE_OUT_FILTERS.has(key);
+}
+
+export type QuickFilterShareScope<T>={
+ /* What the three outputs carry, and the count says. */
+ buses:T[];
+ /* The buses on the list that were left out by hand - the very objects, in
+    list order, so the drawer can draw a LEFT OUT row in each one's place. */
+ out:T[];
+ /* Every bus the filter and its window found. */
+ total:number;
+ /* Of those, how many were left out by hand. An id left out and then taken
+    off the list by the window is not counted: it is not on the list to be
+    missing from. */
+ leftOut:number;
+};
+export function quickFilterShareScope<T extends {id?:string}>(listed:T[],leftOutIds:Iterable<string>=[]):QuickFilterShareScope<T>{
+ /* An empty id is dropped from the set: a bus that has no id must never be
+    matched by one, and "" is what a missing id reads as below. */
+ const leftOut=new Set([...leftOutIds].map(String).filter(Boolean));
+ const buses:T[]=[],out:T[]=[];
+ for(const bus of listed)(leftOut.has(String(bus?.id||""))?out:buses).push(bus);
+ return {buses,out,total:listed.length,leftOut:out.length};
+}
+
+/* PUT ONE BUS BACK, the one whose row was pressed. The same array comes back
+   when that bus is not left out, so a stray press is not a re-render. */
+export function restoreLeftOutBus(leftOutIds:string[],id:string):string[]{
+ const clean=String(id||"");
+ return clean&&leftOutIds.includes(clean)?leftOutIds.filter(other=>other!==clean):leftOutIds;
+}
+
+/* EVERY BUS LEFT OUT IS A REFUSAL, NOT A SHARE. With nothing to send the text
+   reads "Defects Logged by CJ - 0 buses" and then "No buses currently match
+   this filter." - which is false, and says a shift with six reports had none.
+   The three outputs ask this first.
+
+   A list that is empty because nothing MATCHED is not this: that sentence is
+   then true, and it has always been shareable. */
+export function quickFilterShareIsEmpty(scope:QuickFilterShareScope<unknown>):boolean{
+ return scope.leftOut>0&&scope.buses.length===0;
+}
+
 /* One line per defect, with the exact duplicates collapsed.
 
    A repair photographed off the Down Sheet on three different days becomes
