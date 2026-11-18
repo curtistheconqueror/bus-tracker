@@ -26,6 +26,14 @@ export const JSONRPC="2.0";
    to change when the floor moves. */
 export const FALLBACK_PROTOCOL_VERSION="2025-06-18";
 
+/* THE REVISIONS THIS SERVER ACTUALLY SPEAKS. Under MCP lifecycle negotiation a
+   server echoes the offered version only if it supports it, and otherwise
+   answers with one it does support so the client can decide whether to carry
+   on. This echoed whatever it was handed — "2099-01-01" and "garbage" both came
+   straight back — which tells a newer client this server speaks its revision
+   and leaves it to find out otherwise on the first call it makes. */
+export const SUPPORTED_PROTOCOL_VERSIONS=["2025-06-18","2025-03-26","2024-11-05"];
+
 export const SERVER_INFO={name:"pace-south-fleet",version:"1.0.0"} as const;
 
 export type ToolContent={type:"text";text:string};
@@ -192,7 +200,7 @@ export async function handleRpc(request:RpcRequest,runner:ToolRunner):Promise<Rp
  if(method==="initialize"){
   const offered=params(request).protocolVersion;
   return rpcOk(id,{
-   protocolVersion:typeof offered==="string"&&offered?offered:FALLBACK_PROTOCOL_VERSION,
+   protocolVersion:typeof offered==="string"&&SUPPORTED_PROTOCOL_VERSIONS.includes(offered)?offered:FALLBACK_PROTOCOL_VERSION,
    capabilities:{tools:{}},
    serverInfo:SERVER_INFO,
   });

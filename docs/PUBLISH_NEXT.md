@@ -19,7 +19,7 @@ the branch is published and is not rebased. One file conflicted,
 `tests/helpers/modules.mjs`, where this branch and `main` had each appended
 export lines at the same end: resolved as the union of both, with every module
 path checked to exist. Measured on the merged tree, in a container rather than
-in CI: the production build succeeds, **509 of 509 tests pass** and ESLint is
+in CI: the production build succeeds, **512 of 512 tests pass** and ESLint is
 clean. CI must re-run on the actual merge SHA before anything is packaged, and
 the test count above moves with every change that adds one.
 
@@ -45,9 +45,23 @@ After publishing to the existing site, verify the frozen source and application
 and Sites versions; smoke the existing UI routes, unauthenticated rejection,
 authenticated MCP initialization/discovery, and actual authorized cloud tool
 reads without exposing credentials or private records. Record outcomes and
-remaining client/device checks. A handshake alone is insufficient. Rollback
-for this pending release is application 191 / Sites 187, source `b33775685b61acafdf4325807c82e92281c9fc2c`
-(`sites-v187`). Do not mark live until deployment and these checks complete.
+remaining client/device checks. A handshake alone is insufficient.
+
+**ROLLBACK IS THE LIVE BASELINE AT PUBLISH TIME, AND IT IS RE-PINNED WHENEVER
+`main` IS MERGED IN.** It read application 191 / Sites 187,
+`b33775685b61acafdf4325807c82e92281c9fc2c` (`sites-v187`) — written on 2026-11-02
+and carried through the merge of 2026-11-18 without being re-read. By then it was
+162 commits behind, so rolling this release back as written would have reverted
+application releases 192 through 197 as well, including 197's page-resume and
+hydration-readiness fix, when the only intent is to take `/api/mcp` away.
+Measured: `git rev-list --count b337756..origin/main` = 162.
+
+As of the merge at `19f0e90`, rollback for this pending release is the live
+baseline below — **Sites 194 / application 197, source
+`12822f60c7e5d76d3702108b33711cc116ca4f61`**. Re-read it against "Current live
+baseline" when this section is frozen; the two must name the same source, and a
+rollback that undoes unrelated releases is a defect rather than a stale note.
+Do not mark live until deployment and these checks complete.
 
 ## Current live baseline
 

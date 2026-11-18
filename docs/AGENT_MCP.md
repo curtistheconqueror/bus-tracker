@@ -82,8 +82,22 @@ already lives:
 | `MCP_TOKEN` | The bearer token an agent presents. Invent a long random one |
 | `SUPABASE_URL` | The shop's project URL, same value Settings → SHOP CLOUD holds |
 | `SUPABASE_ANON_KEY` | The shop's anon key, same value |
-| `SHOP_EMAIL` | The shared shop login's email |
-| `SHOP_PASSWORD` | Its password |
+| `SHOP_EMAIL` | A DEDICATED READER login's email — **never the shared shop writer**. See `MCP_SECURITY_FOLLOWUP.md` |
+| `SHOP_PASSWORD` | That reader login's password |
+
+**A NEW ACCOUNT IS NOT YET A READER, and this table used to say the opposite.**
+It named the shared shop login, while `MCP_SECURITY_FOLLOWUP.md` says in its own
+words not to configure the MCP with the existing writer's password — so anybody
+following the setup table configured exactly what the release gate forbids.
+
+Provisioning a separate identity is also not sufficient on its own.
+`supabase/migrations/0002_shared_records.sql` grants writes to EVERY
+authenticated user — `for insert to authenticated with check (true)` and
+`for update to authenticated using (true) with check (true)` — so a brand-new
+login can still insert and update every shared table. Read-only needs the
+restrictive policy migration, which is a write to the live database and
+therefore Curtis's call. Until that migration is applied, the reader gate is
+not met no matter which account is configured here.
 
 `MCP_TOKEN` has no issuer — it is a string you mint (`openssl rand -hex 32`),
 set in the Worker environment, and give to a client. Rotating it means changing
@@ -265,7 +279,7 @@ already do for old sheets.
 
 ## What was verified
 
-- 34 tests. Mutation-tested every round: each key assertion was checked by
+- 42 tests (`tests/mcp.test.mjs`), three of them added answering the 2026-11-18 gate: the route's auth driven rather than read, a blind read, and version negotiation. Mutation-tested every round: each key assertion was checked by
   breaking the code it guards and confirming the test went red.
 - The map **cannot** put a bus on the Down Sheet: a bus row whose `map_fields`
   claim `down`, `onDownSheet` and `downSheetReady`, with nothing on the sheet,

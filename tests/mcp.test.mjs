@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { BOARD_TABLES, FALLBACK_PROTOCOL_VERSION, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PAGE, TOOLS, TOOL_NAMES, boardFromRows, busDefects, discrepancies, downSheetView, findBus, fleetCounts, handleRpc, isReadOnlyToolSurface, locateBus, newestStamp, offeredToken, readBoardRows, readLiveRows, sameSecret, textResult, createSessionCache, sessionCacheKey } from "./helpers/modules.mjs";
+import { BOARD_TABLES, FALLBACK_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PAGE, TOOLS, TOOL_NAMES, boardFromRows, busDefects, discrepancies, downSheetView, findBus, fleetCounts, handleRpc, isReadOnlyToolSurface, locateBus, newestStamp, offeredToken, readBoardRows, readLiveRows, sameSecret, textResult, createSessionCache, sessionCacheKey } from "./helpers/modules.mjs";
 
 const FETCHED="2026-10-21T12:00:00.000Z";
 
@@ -198,10 +198,15 @@ test("a body that is not an object is an invalid request, not a notification",as
  }
 });
 
-test("initialize echoes the version the client offered and falls back when it offers none",async()=>{
+test("initialize answers with a version this server speaks, and falls back when it offers none",async()=>{
  const runner=async()=>textResult({});
- const echoed=await handleRpc({jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2099-01-01"}},runner);
- assert.equal(echoed.result.protocolVersion,"2099-01-01");
+ /* It used to echo "2099-01-01" straight back, which tells a client from the
+    future that this server speaks its revision. Negotiation means answering
+    with one we do support so the client can decide whether to carry on. */
+ const future=await handleRpc({jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2099-01-01"}},runner);
+ assert.equal(future.result.protocolVersion,FALLBACK_PROTOCOL_VERSION);
+ const echoed=await handleRpc({jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2025-03-26"}},runner);
+ assert.equal(echoed.result.protocolVersion,"2025-03-26","a revision we do speak is honoured");
  assert.deepEqual(echoed.result.capabilities,{tools:{}});
  const fallback=await handleRpc({jsonrpc:"2.0",id:2,method:"initialize",params:{}},runner);
  assert.equal(fallback.result.protocolVersion,FALLBACK_PROTOCOL_VERSION);
@@ -654,4 +659,94 @@ test("the token comparison reads every byte, asserted from its source",async()=>
  const loop=body.slice(body.indexOf("for("),body.indexOf("return difference===0"));
  assert.ok(loop.includes("difference|="),"the comparison must accumulate differences rather than branch");
  assert.ok(!loop.includes("return"),"the comparison loop must not return early — that is what leaks the token");
+});
+
+/* ---- THE AUTH GATE, DRIVEN. ----
+
+   Everything above reads the route's SOURCE. That is the right shape for
+   "there is no write code path", which is a property of the text — but it was
+   also the only thing standing over the route's authentication, and a source
+   check cannot tell a live gate from a dead one. Measured: deleting
+   `if(!offered||!sameSecret(offered,token))return json(...,401)` outright left
+   this file 39 of 39 green and the full suite 509 of 509 green. Three mutants
+   survived, including no authentication at all, on the one boundary between a
+   stranger and the shop's fleet data.
+
+   The route's own comment says it cannot be run without a Worker. The two
+   Worker-shaped things it touches — `cloudflare:workers` and the Supabase
+   client — are both DYNAMIC imports, so a resolve hook answers them and the
+   rest is ordinary code. No network: the Supabase stand-in records what it is
+   asked for, so a write or a sign-in that happened before the token was checked
+   shows up as a recorded call rather than as a request nobody sees. */
+test("the agent route refuses a caller the token does not match, and says so before it reads anything",async()=>{
+ const {register}=await import("node:module");
+ register("./helpers/mcp-route-hooks.mjs",import.meta.url);
+ const GOOD="correct-horse-battery-staple";
+ const ask=async(env,{header,query,body}={})=>{
+  globalThis.__MCP_TEST_ENV__=env;
+  globalThis.__MCP_TEST_CALLS__=[];
+  const {POST}=await import("@/app/api/mcp/route.ts");
+  const url="https://example.invalid/api/mcp"+(query?"?token="+encodeURIComponent(query):"");
+  const headers={"Content-Type":"application/json"};
+  if(header)headers.Authorization="Bearer "+header;
+  const response=await POST(new Request(url,{method:"POST",headers,body:JSON.stringify(body||{jsonrpc:"2.0",id:1,method:"tools/list"})}));
+  return {status:response.status,payload:await response.json(),calls:globalThis.__MCP_TEST_CALLS__};
+ };
+ const configured={MCP_TOKEN:GOOD,SUPABASE_URL:"https://shop.invalid",SUPABASE_ANON_KEY:"anon",SHOP_EMAIL:"reader@shop.invalid",SHOP_PASSWORD:"pw"};
+
+ /* No token offered at all, a wrong bearer, and a wrong token in the URL. */
+ assert.equal((await ask(configured)).status,401,"no credential is refused");
+ assert.equal((await ask(configured,{header:"wrong"})).status,401,"a wrong bearer is refused");
+ assert.equal((await ask(configured,{query:"wrong"})).status,401,"a wrong ?token is refused");
+ /* THE HEADER BEATS THE URL, so a good token in the address cannot rescue a
+    bad one in the header — otherwise the weaker carrier decides. */
+ assert.equal((await ask(configured,{header:"wrong",query:GOOD})).status,401,"a wrong header is not rescued by a good ?token");
+
+ /* NOTHING IS TOUCHED ON THE WAY TO A 401. A refused caller must not have
+    caused a sign-in, a read or a write — if the gate ran after the client was
+    built, a stranger would still be spending the shop's credentials. */
+ const refused=await ask(configured,{header:"wrong"});
+ assert.deepEqual(refused.calls,[],"a refused request reaches neither Supabase nor the network");
+
+ /* AND IT RUNS BEFORE THE BODY IS PARSED: unreadable JSON from a stranger is
+    still a 401, not a 400 that tells them the token was fine. */
+ globalThis.__MCP_TEST_ENV__=configured;globalThis.__MCP_TEST_CALLS__=[];
+ const {POST}=await import("@/app/api/mcp/route.ts");
+ const broken=await POST(new Request("https://example.invalid/api/mcp",{method:"POST",headers:{Authorization:"Bearer wrong","Content-Type":"application/json"},body:"{not json"}));
+ assert.equal(broken.status,401,"authentication is decided before the body is read");
+
+ /* NOT CONFIGURED IS 503 AND NEVER 401 — the route's own reasoning: a 401 here
+    sends whoever is wiring it up hunting for a token problem that is not real. */
+ assert.equal((await ask({},{header:GOOD})).status,503,"an unconfigured endpoint says so instead of refusing the caller");
+
+ /* And the good token still works, with the tool list the surface promises. */
+ const allowed=await ask(configured,{header:GOOD});
+ assert.equal(allowed.status,200,"the configured token is accepted");
+ assert.equal(allowed.payload.result.tools.length,TOOL_NAMES.length,"and the handshake lists every read tool");
+ assert.ok(allowed.calls.every(call=>!["insert","update","upsert","delete","rpc"].includes(call.kind)),"no write verb is ever called");
+});
+
+/* A LOGIN THAT SEES NOTHING IS NOT AN EMPTY GARAGE. RLS filtering is not an
+   error: a reader without select, or a SUPABASE_URL naming the wrong project,
+   returns [] with error:null. Every tool then answered downed:0 and found:false
+   — the "wrong in the worst direction" answer readBoardRows exists to prevent,
+   arriving by the one door its error guard cannot see. */
+test("a read that returns no buses at all is reported as unreadable, not as a quiet shop",async()=>{
+ const [buses,defects,entries]=BOARD_TABLES;
+ const blind=pagingClient({[buses.table]:[],[defects.table]:[{id:"d1",bus_number:"17501"}],[entries.table]:[]});
+ const result=await readBoardRows(blind);
+ assert.notEqual(result.error,"","no buses must be an error rather than an empty board");
+ assert.match(result.error,/RLS|select/i,"and it must say where to look");
+ assert.deepEqual(result.buses,[],"nothing is invented to fill the gap");
+});
+
+/* The handshake answers with a revision this server speaks. Echoing whatever
+   was offered told a newer client it was understood. */
+test("initialize negotiates the protocol version instead of echoing whatever it is handed",async()=>{
+ const runner=async()=>textResult({});
+ const version=async offered=>(await handleRpc({jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:offered}},runner)).result.protocolVersion;
+ assert.equal(await version("2099-01-01"),FALLBACK_PROTOCOL_VERSION,"a revision from the future is not claimed");
+ assert.equal(await version("garbage"),FALLBACK_PROTOCOL_VERSION,"and neither is a nonsense one");
+ assert.equal(await version(undefined),FALLBACK_PROTOCOL_VERSION,"none offered falls back");
+ for(const known of SUPPORTED_PROTOCOL_VERSIONS)assert.equal(await version(known),known,known+" is spoken here, so it is honoured");
 });

@@ -132,6 +132,19 @@ export async function readBoardRows(client:ReadableClient):Promise<BoardRows> {
  const empty={buses:[],defects:[],entries:[]};
  const busRows=await readLiveRows(client,buses.table,buses.key);
  if(busRows.error)return {...empty,error:busRows.error};
+ /* A SUCCESSFUL READ OF NO BUSES IS NOT A QUIET SHOP, it is a login that
+    cannot see the fleet — and it arrives as `[]` with `error:null`, so the
+    guard above never fires on it. That is the second way to the answer this
+    function's own comment calls wrong in the worst direction: every tool then
+    reports `downed:0`, `found:false` and no discrepancies, and nothing says
+    the read was blind.
+
+    It stopped being hypothetical with the reader gate. RLS filtering is not an
+    error, so a dedicated reader that has not been granted select, or a
+    `SUPABASE_URL` pointing at the wrong project, reads as an empty garage. A
+    real one never has zero buses; a cloud nobody has pushed to yet is better
+    described this way than as a fleet with nothing wrong with it. */
+ if(!busRows.rows.length)return {...empty,error:"The shop cloud returned no buses for this login. Check that it may select from the buses table (RLS) and that SUPABASE_URL names the shop's own project."};
  const defectRows=await readLiveRows(client,defects.table,defects.key);
  if(defectRows.error)return {...empty,error:defectRows.error};
  const entryRows=await readLiveRows(client,entries.table,entries.key);
