@@ -581,9 +581,10 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
      with no way to type a number at all, and copying this across would have
      made two of them. Asserted where it lives. */
   const picker=await readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8");
-  assert.match(picker,/className="bus-generations"/);
-  assert.match(picker,/input autoFocus=\{autoFocus\} inputMode="numeric"/);
-  assert.match(picker,/Choose generation first/);
+  /* ONE BUS BOX (Curtis's B): the shared picker's own control, numbers typed
+     on the number pad, and nothing focused when the form opens. */
+  assert.match(picker,/<ComboField label="BUS" className="wide bus-combo" coach=\{coach\} browseFirst typeAs="numeric"/);
+  assert.doesNotMatch(picker,/autoFocus/);
   assert.match(page,/<BusSelector /,"and the Defect Log uses it rather than its own copy");
   assert.match(page,/className="save-log-middle" disabled=\{Boolean\(recentDuplicate\)\}>\{saveLabel\}/);
   assert.match(page,/className="close-log-middle" onClick=\{close\}>CLOSE/);
@@ -9930,8 +9931,10 @@ test("every field the step-by-step helper names is drawn, and the ring's own att
     looks for is emitted in combo-field.tsx and bus-selector.tsx. Deleting
     `data-coach={coach}` from either left the whole suite green. A cold read
     found that, and it is the exact failure this test exists to stop. */
- for(const [name,code] of [["ComboField",combo],["BusSelector",picker]])
-  assert.match(code,/data-coach=\{coach\}/,name+" emits the attribute the ring is put on, not just the prop");
+ assert.match(combo,/data-coach=\{coach\}/,"ComboField emits the attribute the ring is put on, not just the prop");
+ /* The bus box IS a ComboField now, so it lands the attribute by handing its
+    own `coach` straight through — and nothing else may stand in its way. */
+ assert.match(picker,/<ComboField [^>]*coach=\{coach\}/,"BusSelector passes its coach to the ComboField that emits it");
 
  const drawn=new Set();
  for(const code of [page,combo,picker])for(const match of code.matchAll(/data-coach="([a-z]+)"/g))drawn.add(match[1]);

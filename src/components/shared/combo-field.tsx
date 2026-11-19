@@ -84,7 +84,7 @@ export type ComboOption={
    pages that draw this today ask for it: the Defect Log, and the Down Sheet's
    editor on Curtis's word, "make downsheet operate similarly". Without the
    flag every line below behaves exactly as it did. */
-export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen=""}:{
+export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen="",typeAs,exactPick}:{
  label:string;
  value:string;
  /* What the closed field shows. Passed in rather than looked up here, because
@@ -116,6 +116,13 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     only browsing: no keyboard comes with it. A person who would rather type
     taps the open box once and is typing — one tap, where it was two. */
  openWhen?:string;
+ /* The keyboard TYPE raises: "numeric" for a bus number, the phone's
+    ordinary keyboard when absent. */
+ typeAs?:"numeric";
+ /* AN ANSWER THAT NEEDS NO TAP. Called on every character typed; whatever it
+    returns is picked at once. For the bus box: a full fleet number IS the bus,
+    and the number pad a phone raises for it has no Enter key to confirm with. */
+ exactPick?:(query:string)=>ComboOption|null;
 }){
  const [open,setOpen]=useState(false);
  /* Only ever true with `browseFirst`. Mirrored in a ref because the focus and
@@ -265,7 +272,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   const input=inputRef.current;
   if(!input)return;
   input.readOnly=!on;
-  if(on)input.removeAttribute("inputmode");else input.setAttribute("inputmode","none");
+  if(!on)input.setAttribute("inputmode","none");else if(typeAs)input.setAttribute("inputmode",typeAs);else input.removeAttribute("inputmode");
  };
  /* A SHUT LIST ENDS TYPING, so the next tap opens the list again rather than
     the keyboard. The focus stays where it is: Escape on the shop computer
@@ -409,7 +416,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     type="text"
     className="combo-input"
     readOnly={browseFirst&&!typing}
-    inputMode={browseFirst&&!typing?"none":undefined}
+    inputMode={browseFirst&&!typing?"none":typeAs}
     role="combobox"
     aria-expanded={open}
     aria-controls={id+"-list"}
@@ -443,7 +450,11 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     }}
     /* TYPING LEAVES THE GROUP. A query searches every wording in the catalog,
        so staying inside one group would quietly hide most of what matched. */
-    onChange={event=>{setQuery(event.target.value);setActive(0);setBrowseGroup("");if(!open)setOpen(true);}}
+    onChange={event=>{
+     const exact=exactPick?.(event.target.value);
+     if(exact){pick(exact);return;}
+     setQuery(event.target.value);setActive(0);setBrowseGroup("");if(!open)setOpen(true);
+    }}
     onKeyDown={keys}/>
    {/* A REAL BUTTON, because it was a span with pointer-events:none and it looked
        exactly like a control. The list has one opener -- the input's onFocus --

@@ -155,11 +155,9 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
            `fleet` rather than `availableFleet`: typing a number that is already
            on the sheet has to RESOLVE, so the uniqueness rule below can say so
            in words. A number that silently matches nothing reads as the app not
-           knowing the bus.
-
-           autoFocus off, because this editor opens with the section and the
-           workflow above it and stealing focus moves the page under a thumb. */}
-          <BusSelector fleet={fleet} busId={draft.busId} listId="down-sheet-bus-numbers" autoFocus={false} typeAhead={false}
+           knowing the bus. Nothing is focused when
+           it opens: the bus box opens its list on a tap, without the keyboard. */}
+          <BusSelector fleet={fleet} busId={draft.busId}
            select={busId=>{const bus=fleet.find(item=>item.id===busId);setDraft(current=>({...current,busId,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}/>
           {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={()=>onOpenExisting(existingEntry.id)}>ADD TO THAT ENTRY</button>}</p>}
         <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>

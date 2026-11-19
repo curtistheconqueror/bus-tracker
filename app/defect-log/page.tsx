@@ -507,11 +507,10 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    {coach&&<FormCoachBar step={coach} hide={()=>setCoachHidden(true)}/>}
    <div className="log-form">
-    {/* NOTHING TAKES THE CURSOR WHEN THE FORM OPENS, and the typed number offers
-        no suggestions. Curtis, on the iPhone: the keyboard came up the moment
-        LOG DEFECT opened, and picking from the bus list left a grey card
-        repeating the number, which is how iOS draws a <datalist> suggestion. */}
-    <BusSelector fleet={fleet} busId={value.busId} select={pickBus} coach="bus" autoFocus={false} typeAhead={false}/>
+    {/* ONE BUS BOX, opened like the category: nothing takes the cursor when
+        the form opens, and there is no suggestion list for iOS to draw as the
+        grey card Curtis saw repeating the number. */}
+    <BusSelector fleet={fleet} busId={value.busId} select={pickBus} coach="bus"/>
     {/* TWO FIELDS, NOT FOUR. Curtis asked for a search beside each picker and
         named the risk in the same breath — "just try to make it look clean".
         One control per picker does both jobs: tap it and the whole list opens
