@@ -52,13 +52,15 @@ function BusSelector({fleet,busId,select,coach}:{fleet:PickerBus[];busId:string;
  /* THE FLEET DECIDES THESE, AND THE FLEET IS NOT WHAT CHANGES WHILE SOMEBODY
     TYPES. Sorted once per fleet; the picker only asks for rows while its list
     is open. */
- const sorted=useMemo(()=>[...fleet].sort((a,b)=>COLLATOR.compare(a.n,b.n)),[fleet]);
+ /* By generation first, then number: a numeric sort alone puts a four-digit
+    1750 before 15502, and the 17s row would come up above the 15s. */
+ const sorted=useMemo(()=>[...fleet].sort((a,b)=>COLLATOR.compare(busGeneration(a.n),busGeneration(b.n))||COLLATOR.compare(a.n,b.n)),[fleet]);
  const toOption=(bus:PickerBus,section?:string):ComboOption=>({value:bus.id,label:"Bus "+bus.n,hint:locationLabel(bus.l)||undefined,section});
  return <ComboField label="BUS" className="wide bus-combo" coach={coach} browseFirst typeAs="numeric"
   value={busId}
   display={selected?busPickerDisplay(selected):""}
   placeholder="Tap to pick a bus"
-  emptyText="No bus has that number"
+  emptyText={fleet.length?"No bus has that number":"No buses on the board yet"}
   /* Browsing, the generation is each row's section, so the list opens on one
      title per generation with its count. Typing, the rows are flat and ranked. */
   search={query=>query.trim()

@@ -1436,11 +1436,10 @@ test("no text field a touch device can tap is under 16px, outside the dense grid
     TOUCH, NOT PHONE. An iPad zooms the same way, and this garage has one, so a
     block is only out of scope above 1180.
 
-    A BLANKET RULE WAS THE OBVIOUS FIX AND IS WRONG. `.log-form
-    .type-bus-number>input` is deliberately 26px, 27px on a phone, because it
-    is the box somebody types a fleet number into with gloves on, and
-    `.part-prompt input` is 17px. A global `input{font-size:16px}` shrinks
-    both. So declarations are fixed one at a time and this list is the record
+    A BLANKET RULE WAS THE OBVIOUS FIX AND IS WRONG. The BUS box draws its
+    number at 18px bold, because it is what somebody reads and types with
+    gloves on, and `.part-prompt input` is 17px. A global
+    `input{font-size:16px}` shrinks both. So declarations are fixed one at a time and this list is the record
     of what is left. */
  const { readdir } = await import("node:fs/promises");
  const { cssRules, declaredFontSizePx, isTextEntrySelector, splitSelector } =

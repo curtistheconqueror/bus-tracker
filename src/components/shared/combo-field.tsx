@@ -287,18 +287,25 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  const pressedWith=useRef("");
  const pressedJustNow=()=>Date.now()-pressedAt.current<1000;
  const openBrowse=()=>{setOpen(true);setQuery("");setBrowseGroup("");setActive(0);};
+ const lastOpenWhen=useRef(openWhen);
+ /* WHEN THE LIST LAST OPENED BY ITSELF. The tap that picked the category
+    collapses that list, and this box can slide up under the same finger; on
+    the open list a click means TYPE. A click this soon after the list opened
+    itself belongs to the tap above, not to this box, and is ignored. Found by
+    a cold read; not measured on a phone. */
+ const openedItselfAt=useRef(0);
+ useEffect(()=>{
+  const before=lastOpenWhen.current;
+  lastOpenWhen.current=openWhen;
+  if(!browseFirst||disabled||!openWhen||openWhen===before||value)return;
+  openedItselfAt.current=Date.now();
+  setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
+ },[openWhen,value,browseFirst,disabled]);
  /* A KEYBOARD ALREADY UP FROM ANOTHER FIELD GOES DOWN. Type the bus number,
     then tap DEFECT CATEGORY: the tap is kept from focusing this field, so on
     an iPhone nothing would move focus off the number box and its keyboard
     would stay over the list just opened. Found by a cold read; not measured
     on a phone. */
- const lastOpenWhen=useRef(openWhen);
- useEffect(()=>{
-  const before=lastOpenWhen.current;
-  lastOpenWhen.current=openWhen;
-  if(!browseFirst||disabled||!openWhen||openWhen===before||value)return;
-  setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
- },[openWhen,value,browseFirst,disabled]);
  const releaseOtherField=()=>{
   const current=document.activeElement as HTMLElement|null;
   if(current&&current!==inputRef.current&&current.matches("input,textarea,select,[contenteditable='true']"))current.blur();
@@ -440,6 +447,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     onMouseDown={event=>{if(browseFirst&&!typingRef.current)event.preventDefault();}}
     onClick={()=>{
      if(!browseFirst||typingRef.current||disabled)return;
+     if(Date.now()-openedItselfAt.current<600)return;
      /* A MOUSE IS THE SHOP COMPUTER, where there is no keyboard to keep down:
         one click types, as it always did. Built first as two clicks for every
         pointer, and a cold read caught it — the list opened, the cursor was

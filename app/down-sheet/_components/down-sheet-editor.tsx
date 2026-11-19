@@ -148,9 +148,9 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
            This was a bare <select> over `availableFleet` — no way to type a
            fleet number at all, and the list additionally hid every bus that
            already had an active entry, so a bus could be both un-typable and
-           un-listable. The Defect Log had solved this twice over already, with
-           generation chips and a typed box backed by a datalist, and copying it
-           across would have made two of them to keep in step.
+           un-listable. The Defect Log had solved this already, and copying it
+           across would have made two of them to keep in step. It is one BUS
+           box now on both (Curtis's B): browse by generation, or type.
 
            `fleet` rather than `availableFleet`: typing a number that is already
            on the sheet has to RESOLVE, so the uniqueness rule below can say so

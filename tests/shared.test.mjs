@@ -249,6 +249,14 @@ test("the defect form asks for the bus the way a mechanic reaches for it",async(
  assert.equal(generationLabel(busGeneration("17507")),"17s");
  assert.equal(generationLabel(busGeneration("X1")),"OTHER","a number with no generation is filed, not dropped");
  assert.match(picker,/from "@\/src\/lib\/fleet\/bus-search"/,"the picker draws these rules rather than a copy of them");
+ /* THE ORDER THE BOX SHOWS: generation first, then number, so a four-digit
+    1750 does not put the 17s row above the 15s. */
+ assert.match(picker,/sort\(\(a,b\)=>COLLATOR\.compare\(busGeneration\(a\.n\),busGeneration\(b\.n\)\)\|\|COLLATOR\.compare\(a\.n,b\.n\)\)/);
+ /* A click right after the symptom list opened itself is the category tap's,
+    landing on a box that slid up under the finger — not a request to type. */
+ const combo=await readFile(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8");
+ assert.match(combo,/openedItselfAt\.current=Date\.now\(\);\s*setOpen\(true\)/);
+ assert.match(combo,/if\(Date\.now\(\)-openedItselfAt\.current<600\)return;/);
 
  // THE NUMBER STILL READS BIGGEST. It was a 26px box; the BUS box draws the
  // number bigger and heavier than a category, and its placeholder plain.
@@ -861,7 +869,7 @@ test("the bus picker does not rebuild the fleet on every character",async()=>{
     B). What it taught still holds: nothing about the fleet is rebuilt per
     character. The fleet is sorted once per fleet, and the rows are only built
     while the BUS box's list is open — ComboField asks for none while shut. */
- assert.match(code,/const sorted=useMemo\(\(\)=>\[\.\.\.fleet\]\.sort\(\(a,b\)=>COLLATOR\.compare\(a\.n,b\.n\)\),\[fleet\]\);/,
+ assert.match(code,/const sorted=useMemo\(\(\)=>\[\.\.\.fleet\]\.sort\([^\n]*\),\[fleet\]\);/,
   "the sorted fleet is computed from the fleet, not from the keystroke");
  assert.doesNotMatch(code,/<option|<datalist/,"no option list drawn twice, open or shut");
 
@@ -1227,7 +1235,7 @@ test("picking a category opens the symptom list by itself, without the keyboard"
     answer, never for a disabled field, and only on a browse-first field —
     browsing, so no keyboard comes with it. */
  assert.match(code,/const lastOpenWhen=useRef\(openWhen\);/);
- assert.match(code,/if\(!browseFirst\|\|disabled\|\|!openWhen\|\|openWhen===before\|\|value\)return;\s*setOpen\(true\);setQuery\(""\);setBrowseGroup\(""\);setActive\(0\);/);
+ assert.match(code,/if\(!browseFirst\|\|disabled\|\|!openWhen\|\|openWhen===before\|\|value\)return;\s*openedItselfAt\.current=Date\.now\(\);\s*setOpen\(true\);setQuery\(""\);setBrowseGroup\(""\);setActive\(0\);/);
  assert.doesNotMatch(code.slice(code.indexOf("const lastOpenWhen"),code.indexOf("const releaseOtherField")),/focus\(\)|setTypingMode\(true\)/,"it never starts typing");
  assert.match(log,/coach="issue" browseFirst\n\s*openWhen=\{value\.defect\.category\}/);
  assert.match(sheet,/<ComboField label="SPECIFIC REPAIR" className="wide" browseFirst\n\s*openWhen=\{item\.category\}/);
