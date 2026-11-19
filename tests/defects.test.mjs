@@ -588,7 +588,13 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(page,/className="save-log-middle" disabled=\{Boolean\(recentDuplicate\)\}>\{saveLabel\}/);
   assert.match(page,/className="close-log-middle" onClick=\{close\}>CLOSE/);
   assert.doesNotMatch(page,/className="log-header-save/);
-  assert.ok(page.indexOf('className="save-log-middle-actions"')<page.indexOf('className="wide downsheet-check"'));
+  /* Curtis's E: the Down Sheet decision is asked under the defect it is about,
+     after the symptom and before the optional notes — not below ADVANCED
+     DETAILS. DEFERRED stays at the bottom. */
+  assert.ok(page.indexOf('label="SPECIFIC DEFECT OR SYMPTOM"')<page.indexOf('className="wide downsheet-check downsheet-recommend-check"'));
+  assert.ok(page.indexOf('className="wide downsheet-check downsheet-recommend-check"')<page.indexOf('className="wide downsheet-check"'),"RECOMMEND first, then DOWN SHEET, together");
+  assert.ok(page.indexOf('className="wide downsheet-check"')<page.indexOf('className="wide description-label"'));
+  assert.ok(page.indexOf('className="save-log-middle-actions"')<page.indexOf('className="wide downsheet-check deferred-check"'));
   assert.match(page,/lockPageScroll\("defect-editor-open"\)/);
   assert.match(page,/const closeEditor=\(\)=>\{const left=window\.scrollX,top=window\.scrollY/);
   assert.match(page,/window\.requestAnimationFrame\(\(\)=>\{restore\(\);window\.requestAnimationFrame\(restore\)\}\)/);

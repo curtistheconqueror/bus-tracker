@@ -952,7 +952,9 @@ test("phone layouts expose large primary controls and category-only defect entry
   assert.match(defectPage, /<details className="advanced-defect-details"/);
   assert.match(defectPage, /<b>ADVANCED DETAILS<\/b><small>Diagnosis, repair, parts and initials<\/small>/);
   assert.ok(defectPage.indexOf('className="save-log-middle-actions"')<defectPage.indexOf('className="advanced-defect-details"'));
-  assert.ok(defectPage.indexOf('className="advanced-defect-details"')<defectPage.indexOf('className="wide downsheet-check"'));
+  assert.ok(defectPage.indexOf('className="wide downsheet-check"')<defectPage.indexOf('className="advanced-defect-details"'),
+    "the Down Sheet ticks moved up under the symptom (Curtis's E)");
+  assert.ok(defectPage.indexOf('className="advanced-defect-details"')<defectPage.indexOf('className="wide downsheet-check deferred-check"'));
   assert.match(defectCss, /\.advanced-defect-details summary\{[^}]*min-height:46px/);
   assert.match(defectPage, /save-log-middle-actions[\s\S]*\{saveLabel\}[\s\S]*>CLOSE</);
   assert.doesNotMatch(defectPage, /SAVE & CLOSE/);
