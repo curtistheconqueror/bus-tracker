@@ -529,6 +529,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
         Accessories before he could log one. Now he types "wiper motor", picks
         it, and the category fills itself in behind him. */}
     <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide" coach="issue" browseFirst
+     openWhen={value.defect.category}
      value={value.quickIssue}
      display={value.quickIssue?issueDisplay(value.quickIssue,value.defect.category):""}
      /* SHORT ENOUGH TO FIT. The old wording needed 403px in a 276px box and was

@@ -1120,7 +1120,7 @@ test("on the Defect Log a picker opens its list without the keyboard, and typing
  /* Curtis, on the iPhone: pickers should not raise the keyboard "unless I tap
     to type". Asked how typing is reached, he chose both doors — "tap the box
     again to type" plus the TYPE button — and LIST to get the list back. */
- assert.match(code,/browseFirst=false\}/,"off unless a page asks, so the Down Sheet is untouched");
+ assert.match(code,/browseFirst=false[,}]/,"off unless a page asks for it");
  assert.match(code,/readOnly=\{browseFirst&&!typing\}/,"read-only until typing is asked for: no keyboard on a phone");
  assert.match(code,/inputMode=\{browseFirst&&!typing\?"none":undefined\}/);
  /* THE TAP THAT ASKS TO TYPE FOCUSES INSIDE ITS OWN HANDLER, with the flag
@@ -1216,4 +1216,26 @@ test("on the Defect Log a picker opens its list without the keyboard, and typing
  }
  assert.ok(num(phone,/\.combo-mode\{[^}]*width:(\d+)px/,"phone TYPE width")>=44,"a gloved thumb");
  assert.match(logCss,/\.log-form \.combo-mode\{[^}]*color:var\(--log-accent/,"TYPE takes the page's accent, so the themes keep it");
+});
+
+test("picking a category opens the symptom list by itself, without the keyboard",async()=>{
+ const [combo,log,sheet]=await Promise.all([
+  readFile(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8"),
+ ]);
+ const code=combo.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ /* Curtis's C, on his question "what if a person wants to type the symptoms
+    to get to them quicker?": the list is already open, so one tap on the box
+    types — where it took two. */
+ assert.match(code,/openWhen=""\}/,"off unless a page names what it follows");
+ /* On a CHANGE only: the first draw records the value and opens nothing, so
+    reopening an old defect does not throw a list at anybody. Never over an
+    answer, never for a disabled field, and only on a browse-first field —
+    browsing, so no keyboard comes with it. */
+ assert.match(code,/const lastOpenWhen=useRef\(openWhen\);/);
+ assert.match(code,/if\(!browseFirst\|\|disabled\|\|!openWhen\|\|openWhen===before\|\|value\)return;\s*setOpen\(true\);setQuery\(""\);setBrowseGroup\(""\);setActive\(0\);/);
+ assert.doesNotMatch(code.slice(code.indexOf("const lastOpenWhen"),code.indexOf("const releaseOtherField")),/focus\(\)|setTypingMode\(true\)/,"it never starts typing");
+ assert.match(log,/coach="issue" browseFirst\n\s*openWhen=\{value\.defect\.category\}/);
+ assert.match(sheet,/<ComboField label="SPECIFIC REPAIR" className="wide" browseFirst\n\s*openWhen=\{item\.category\}/);
 });

@@ -197,6 +197,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
                     "make downsheet operate similarly". The list opens without
                     the keyboard; tap the box again, or TYPE, to type. */}
                 <ComboField label="SPECIFIC REPAIR" className="wide" browseFirst
+                 openWhen={item.category}
                  value={item.repair}
                  display={item.repair?(CATALOG_OPTIONS.find(row=>row.value===item.repair&&(!item.category||row.category===item.category))?.label||CATALOG_OPTIONS.find(row=>row.value===item.repair)?.label||item.repair):""}
                  /* SHORTER THAN THE DEFECT LOG'S, because this box sits inside a

@@ -84,7 +84,7 @@ export type ComboOption={
    pages that draw this today ask for it: the Defect Log, and the Down Sheet's
    editor on Curtis's word, "make downsheet operate similarly". Without the
    flag every line below behaves exactly as it did. */
-export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false}:{
+export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen=""}:{
  label:string;
  value:string;
  /* What the closed field shows. Passed in rather than looked up here, because
@@ -109,6 +109,13 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     every caller that does not use the helper, which is all but one. */
  coach?:string;
  browseFirst?:boolean;
+ /* OPENS ITSELF WHEN THIS CHANGES — the category above it, for the symptom
+    picker. Curtis's C: pick a category and the next list is already in front
+    of you. Only on a field with no answer yet, only on a change (never on the
+    first draw, so reopening an old defect does not throw a list at you), and
+    only browsing: no keyboard comes with it. A person who would rather type
+    taps the open box once and is typing — one tap, where it was two. */
+ openWhen?:string;
 }){
  const [open,setOpen]=useState(false);
  /* Only ever true with `browseFirst`. Mirrored in a ref because the focus and
@@ -278,6 +285,13 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     an iPhone nothing would move focus off the number box and its keyboard
     would stay over the list just opened. Found by a cold read; not measured
     on a phone. */
+ const lastOpenWhen=useRef(openWhen);
+ useEffect(()=>{
+  const before=lastOpenWhen.current;
+  lastOpenWhen.current=openWhen;
+  if(!browseFirst||disabled||!openWhen||openWhen===before||value)return;
+  setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
+ },[openWhen,value,browseFirst,disabled]);
  const releaseOtherField=()=>{
   const current=document.activeElement as HTMLElement|null;
   if(current&&current!==inputRef.current&&current.matches("input,textarea,select,[contenteditable='true']"))current.blur();
