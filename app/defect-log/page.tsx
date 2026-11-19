@@ -507,15 +507,19 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    {coach&&<FormCoachBar step={coach} hide={()=>setCoachHidden(true)}/>}
    <div className="log-form">
-    <BusSelector fleet={fleet} busId={value.busId} select={pickBus} coach="bus"/>
+    {/* NOTHING TAKES THE CURSOR WHEN THE FORM OPENS, and the typed number offers
+        no suggestions. Curtis, on the iPhone: the keyboard came up the moment
+        LOG DEFECT opened, and picking from the bus list left a grey card
+        repeating the number, which is how iOS draws a <datalist> suggestion. */}
+    <BusSelector fleet={fleet} busId={value.busId} select={pickBus} coach="bus" autoFocus={false} typeAhead={false}/>
     {/* TWO FIELDS, NOT FOUR. Curtis asked for a search beside each picker and
         named the risk in the same breath — "just try to make it look clean".
         One control per picker does both jobs: tap it and the whole list opens
         the way the <select> did, type in it and the same list narrows. */}
-    <ComboField label="DEFECT CATEGORY" className="wide" coach="category"
+    <ComboField label="DEFECT CATEGORY" className="wide" coach="category" browseFirst
      value={value.defect.category}
      display={value.defect.category?repairCategoryLabel(value.defect.category):""}
-     placeholder="Type or tap to choose a category"
+     placeholder="Tap to choose a category"
      emptyText="No category matches that"
      search={query=>searchCategories(query).map(row=>({value:row.value,label:row.label}))}
      onPick={category=>chooseCategory(category)}/>
@@ -524,12 +528,15 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
         you anything, so a mechanic had to know a wiper motor lives under Bus
         Accessories before he could log one. Now he types "wiper motor", picks
         it, and the category fills itself in behind him. */}
-    <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide" coach="issue"
+    <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide" coach="issue" browseFirst
      value={value.quickIssue}
      display={value.quickIssue?issueDisplay(value.quickIssue,value.defect.category):""}
-     placeholder={value.defect.category?"Type or tap — or leave it and save the category alone":"Type what is wrong, or tap to browse"}
+     /* SHORT ENOUGH TO FIT. The old wording needed 403px in a 276px box and was
+        cut off mid-word; the half that says the defect is optional moved to the
+        line under the box, where it has room. */
+     placeholder={value.defect.category?"Tap to choose, or type":"Tap to browse, or type"}
      emptyText="Nothing in the catalog matches that"
-     footnote={value.defect.category?undefined:"Searching every category. Picking one sets the category for you."}
+     footnote={value.defect.category?"Optional. You can save the category alone.":"Searching every category. Picking one sets the category for you."}
      search={query=>{
       const {inCategory,elsewhere}=searchCatalogForCategory(query,value.defect.category,query.trim()?40:BROWSE_ALL);
       /* HEADINGS WHEN BROWSING, THE GROUP ON EACH ROW WHEN SEARCHING, and that

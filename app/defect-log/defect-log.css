@@ -1188,6 +1188,8 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-form .combo-option>small,.log-form .combo-footnote,.log-form .combo-clear{color:var(--log-muted,#74819a)}
 /* Not muted with the rest: this one is a button a mechanic has to find. */
 .log-form .combo-caret{color:var(--log-text,#42597d)}
+/* TYPE / LIST in the page's accent, so Tactical and the dark themes keep it. */
+.log-form .combo-mode{border-left-color:var(--log-border,#b7c3d5);background:color-mix(in srgb,var(--log-accent,#0b64bd) 8%,var(--log-surface,#fff));color:var(--log-accent,#0b64bd)}
 
 
 /* THE RECOMMENDED ROW IN THE QUICK FILTER DRAWER.

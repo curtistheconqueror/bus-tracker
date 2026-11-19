@@ -55,7 +55,34 @@ export type ComboOption={
  category?:string;
 };
 
-export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach}:{
+/* ── BROWSE FIRST: the list without the keyboard ──────────────────────────────
+   Curtis, on the iPhone: pickers should not raise the keyboard "unless I tap to
+   type". Tapping this field focused the input, so every pick of a category
+   threw the keyboard over the bottom half of the list it had just opened.
+
+   With `browseFirst` the input is READ-ONLY until somebody asks to type, which
+   on a phone is what keeps the keyboard down even if the input takes focus:
+
+     FIRST TAP      the list opens, no keyboard
+     SECOND TAP     on the box, with the list open: typing, keyboard up
+     TYPE / LIST    the button at the right end does the same, both ways:
+                    TYPE raises the keyboard, LIST puts it away and shows the
+                    whole list again. Curtis chose both doors: "tap the box
+                    again to type" plus the button.
+
+   A hardware keyboard needs no second tap: a printable key, Tab or an arrow
+   reaching the field switches it to typing the moment it arrives, so the shop
+   computer types as it always did.
+
+   The read-only flag is also written straight onto the element, not left for
+   the next render: iOS raises the keyboard only for a focus made inside the
+   tap's own handler, and an input still marked read-only at that instant
+   raises nothing.
+
+   OPT-IN, because the Down Sheet's editor draws this same control and whether
+   it changes too is a separate decision Curtis has not made. Without the flag
+   every line below behaves exactly as it did. */
+export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false}:{
  label:string;
  value:string;
  /* What the closed field shows. Passed in rather than looked up here, because
@@ -79,8 +106,13 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     grid item and the `wide` class inside it would stop spanning. Absent on
     every caller that does not use the helper, which is all but one. */
  coach?:string;
+ browseFirst?:boolean;
 }){
  const [open,setOpen]=useState(false);
+ /* Only ever true with `browseFirst`. Mirrored in a ref because the focus and
+    key handlers run inside the same event that changed it, before any render. */
+ const [typing,setTyping]=useState(false);
+ const typingRef=useRef(false);
  const [query,setQuery]=useState("");
  /* WHICH GROUP IS OPEN, while browsing. Empty means the list is showing its
     group titles and nothing else — see the row builder below. */
@@ -141,6 +173,20 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  const browsing=!query.trim();
  const groupCounts=new Map<string,number>();
  if(browsing)for(const option of options)if(option.section)groupCounts.set(option.section,(groupCounts.get(option.section)||0)+1);
+ /* ONE TITLE IS NOT A CHOICE. Pick Engine and the list used to open on a single
+    row, "Engine 23", that had to be pressed before any engine defect showed —
+    16 of the 21 categories have no sub-groups and every one of them did this.
+    Curtis flagged it off his own screenshot. When every row sits in the same
+    one group, the list opens inside it, with no way back to draw because there
+    is nowhere else to go. Not when anything is ungrouped: that is the as-logged
+    wording of an old record, and it has to stay reachable beside the title. */
+ /* TYPE and × TAKE TURNS at the right-hand end. The × only shows on a shut
+    field holding an answer, and that is exactly when TYPE is not needed: a tap
+    opens the list, and the answer gets the field's full width to be read in.
+    Measured at 360 wide, both at once left 158px for "Engine runs hot (207F+)". */
+ const showMode=browseFirst&&(open||!value);
+ const onlyGroup=browseFirst&&browsing&&!browseGroup&&groupCounts.size===1&&options.every(option=>option.section)?[...groupCounts.keys()][0]:"";
+ const openGroup=browseGroup||onlyGroup;
  type Row=
   |{kind:"group";name:string;count:number}
   |{kind:"option";option:ComboOption};
@@ -149,7 +195,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   if(!browsing)return options.map(option=>({kind:"option",option}));
   /* Inside a group: its defects. The way back out is drawn above them and is
      NOT one of these rows — see the row it renders for why. */
-  if(browseGroup)return options.filter(option=>option.section===browseGroup).map(option=>({kind:"option" as const,option}));
+  if(openGroup)return options.filter(option=>option.section===openGroup).map(option=>({kind:"option" as const,option}));
   /* The top of the browse: one row per group, in catalog order, with anything
      ungrouped left in place. Built in one pass over the options so the order is
      the catalog's rather than a Set's. */
@@ -174,7 +220,12 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  useEffect(()=>{
   if(!open)return;
   const away=(event:MouseEvent|TouchEvent)=>{
-   if(boxRef.current&&!boxRef.current.contains(event.target as Node)){setOpen(false);setQuery("");}
+   if(boxRef.current&&!boxRef.current.contains(event.target as Node)){
+    setOpen(false);setQuery("");
+    /* A tap on bare form does not blur an input on iOS, so the keyboard would
+       stay up over a list that has gone. */
+    if(browseFirst)inputRef.current?.blur();
+   }
   };
   /* CAPTURE, AND THE REASON IS A RACE THIS CHANGE CREATED.
 
@@ -189,11 +240,46 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   document.addEventListener("mousedown",away,true);
   document.addEventListener("touchstart",away,true);
   return ()=>{document.removeEventListener("mousedown",away,true);document.removeEventListener("touchstart",away,true);};
- },[open]);
+ },[open,browseFirst]);
 
  /* A SHUT LIST REMEMBERS NOTHING. Reopening starts at the titles, because the
     group somebody browsed into last time is not where the next defect lives. */
  useEffect(()=>{if(!open)setBrowseGroup("")},[open]);
+
+ /* The read-only flag and the keyboard hint are written onto the element as
+    well as rendered, for the reason in the note above the component: the tap
+    that asks to type focuses the input in the same handler, before React has
+    drawn anything. */
+ const setTypingMode=(on:boolean)=>{
+  typingRef.current=on;
+  setTyping(on);
+  const input=inputRef.current;
+  if(!input)return;
+  input.readOnly=!on;
+  if(on)input.removeAttribute("inputmode");else input.setAttribute("inputmode","none");
+ };
+ /* A SHUT LIST ENDS TYPING, so the next tap opens the list again rather than
+    the keyboard. The focus stays where it is: Escape on the shop computer
+    should not throw the cursor out of the field. */
+ useEffect(()=>{if(!open&&typingRef.current){typingRef.current=false;setTyping(false)}},[open]);
+ /* Set by a finger or a mouse landing on the input, so a focus that arrives
+    WITHOUT one — Tab, or the arrows above an iPhone keyboard — can be told
+    apart and go straight to typing. */
+ const pointerRef=useRef(false);
+ const openBrowse=()=>{setOpen(true);setQuery("");setBrowseGroup("");setActive(0);};
+ const startTyping=()=>{
+  if(disabled)return;
+  setTypingMode(true);
+  openBrowse();
+  inputRef.current?.focus();
+ };
+ /* LIST: the keyboard goes, the whole list comes back, and whatever had been
+    typed is dropped because the list it narrowed is the thing being asked for. */
+ const stopTyping=()=>{
+  setTypingMode(false);
+  openBrowse();
+  inputRef.current?.blur();
+ };
 
  /* OPENING SCROLLS THE WHOLE CONTROL INTO VIEW, not just the input. The list is
     in flow, so opening it makes this box suddenly ~300px taller — and the form
@@ -248,6 +334,12 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  const leaveGroup=()=>{setBrowseGroup("");setActive(0)};
 
  const keys=(event:React.KeyboardEvent<HTMLInputElement>)=>{
+  /* A hardware keyboard types straight in: the first printable key lifts the
+     read-only flag before the browser inserts it, so nothing is swallowed. */
+  if(browseFirst&&!typingRef.current&&!disabled&&event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey){
+   setTypingMode(true);
+   if(!open)openBrowse();
+  }
   if(event.key==="ArrowDown"||event.key==="ArrowUp"){
    event.preventDefault();
    if(!open){setOpen(true);setActive(0);return;}
@@ -273,13 +365,19 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   }
  };
 
- return <label className={className?"combo-field "+className:"combo-field"} data-coach={coach}>
+ return <label className={className?"combo-field "+className:"combo-field"} data-coach={coach}
+  /* ONLY THE BOX TAKES A TAP. A tap on the label's words, its hint line or the
+     space around them used to put the cursor in the field, raise the keyboard
+     and scroll the form — a stray thumb moving the page. */
+  onClick={event=>{if(browseFirst&&boxRef.current&&!boxRef.current.contains(event.target as Node))event.preventDefault();}}>
   {label}
-  <div className={open?"combo-box open":"combo-box"} ref={boxRef}>
+  <div className={"combo-box"+(open?" open":"")+(showMode?" with-mode":"")} ref={boxRef}>
    <input
     ref={inputRef}
     type="text"
     className="combo-input"
+    readOnly={browseFirst&&!typing}
+    inputMode={browseFirst&&!typing?"none":undefined}
     role="combobox"
     aria-expanded={open}
     aria-controls={id+"-list"}
@@ -290,7 +388,23 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     /* Closed, the field reads as the answer. Open, it is the question. */
     value={open?query:display}
     placeholder={placeholder||"Type or tap to choose"}
-    onFocus={()=>{if(!disabled){setOpen(true);setQuery("");setBrowseGroup("");setActive(0);}}}
+    onFocus={()=>{
+     if(disabled)return;
+     /* A tap is decided by the click below. A focus with no tap behind it is a
+        keyboard arriving, and a keyboard means typing. */
+     if(browseFirst&&!typingRef.current){if(pointerRef.current)return;setTypingMode(true);}
+     setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
+    }}
+    onPointerDown={()=>{pointerRef.current=true}}
+    onPointerCancel={()=>{pointerRef.current=false}}
+    /* No focus from a tap while the field is browsing: the click decides what
+       the tap meant. */
+    onMouseDown={event=>{if(browseFirst&&!typingRef.current)event.preventDefault();}}
+    onClick={()=>{
+     pointerRef.current=false;
+     if(!browseFirst||typingRef.current||disabled)return;
+     if(!open)openBrowse();else startTyping();
+    }}
     /* TYPING LEAVES THE GROUP. A query searches every wording in the catalog,
        so staying inside one group would quietly hide most of what matched. */
     onChange={event=>{setQuery(event.target.value);setActive(0);setBrowseGroup("");if(!open)setOpen(true);}}
@@ -323,10 +437,29 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     onMouseDown={event=>{
      event.preventDefault();
      if(disabled)return;
+     /* Browsing first, the arrow never raises the keyboard: closing takes it
+        down, opening leaves it down. */
+     if(browseFirst&&open)inputRef.current?.blur();
      if(open){setOpen(false);setQuery("");return;}
      setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
-     inputRef.current?.focus();
+     if(!browseFirst)inputRef.current?.focus();
     }}>▾</button>
+   {/* TYPE, and LIST while typing: the one control that always says how to get
+       the other way. Out of the tab order like the arrow — a keyboard reaches
+       typing by typing. */}
+   {showMode&&<button
+    type="button"
+    className="combo-mode"
+    aria-label={typing?"LIST "+label+" choices":"TYPE "+label}
+    tabIndex={-1}
+    disabled={disabled}
+    onMouseDown={event=>event.preventDefault()}
+    onClick={()=>{if(typing)stopTyping();else startTyping();}}>
+    <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true">{typing
+     ?<path d="M2 3h14M2 7h14M2 11h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+     :<><rect x="1" y="1" width="16" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="M4 5h1M7 5h1M10 5h1M13 5h1M5 9h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></>}</svg>
+    {typing?"LIST":"TYPE"}
+   </button>}
    {value&&!open&&!disabled&&<button type="button" className="combo-clear" aria-label={"Clear "+label}
     onClick={event=>{event.preventDefault();onPick("",null);}}>×</button>}
    {open&&<ul className={grouped?"combo-list grouped":"combo-list"} id={id+"-list"} role="listbox" ref={listRef}>
