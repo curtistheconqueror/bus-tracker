@@ -66,8 +66,8 @@ function generationLabel(value:string){return value==="OTHER"?"OTHER":value+"s"}
 /* `typeAhead` is the <datalist> under TYPE BUS #. On an iPhone that list is
    drawn as a grey card offering back the number already in the box — Curtis
    saw it after every pick from the bus list. Typing a number finds the bus
-   without it (`typeNumber` matches the whole number), so the Defect Log turns
-   it off; the Down Sheet keeps it until Curtis decides that form too. */
+   without it (`typeNumber` matches the whole number), so the Defect Log and
+   the Down Sheet's editor both turn it off. On by default for anything else. */
 function BusSelector({fleet,busId,select,listId="bus-number-options",autoFocus=true,coach,typeAhead=true}:{fleet:PickerBus[];busId:string;select:(busId:string)=>void;listId?:string;autoFocus?:boolean;coach?:string;typeAhead?:boolean}){
  const selected=fleet.find(bus=>bus.id===busId);
  /* THE FLEET DECIDES THESE, AND THE FLEET IS NOT WHAT CHANGES WHILE SOMEBODY

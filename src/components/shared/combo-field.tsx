@@ -70,18 +70,20 @@ export type ComboOption={
                     whole list again. Curtis chose both doors: "tap the box
                     again to type" plus the button.
 
-   A hardware keyboard needs no second tap: a printable key, Tab or an arrow
-   reaching the field switches it to typing the moment it arrives, so the shop
-   computer types as it always did.
+   The shop computer is not asked for a second click: a MOUSE click types
+   straight away, as it always did, because there is no on-screen keyboard to
+   keep down. Tab into the field types too, and on a field that is browsing
+   the first printable key lifts the read-only flag before it is inserted.
 
    The read-only flag is also written straight onto the element, not left for
    the next render: iOS raises the keyboard only for a focus made inside the
    tap's own handler, and an input still marked read-only at that instant
    raises nothing.
 
-   OPT-IN, because the Down Sheet's editor draws this same control and whether
-   it changes too is a separate decision Curtis has not made. Without the flag
-   every line below behaves exactly as it did. */
+   OPT-IN, so a page that has not asked keeps the old typing-first field. Both
+   pages that draw this today ask for it: the Defect Log, and the Down Sheet's
+   editor on Curtis's word, "make downsheet operate similarly". Without the
+   flag every line below behaves exactly as it did. */
 export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false}:{
  label:string;
  value:string;
@@ -262,11 +264,24 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     the keyboard. The focus stays where it is: Escape on the shop computer
     should not throw the cursor out of the field. */
  useEffect(()=>{if(!open&&typingRef.current){typingRef.current=false;setTyping(false)}},[open]);
- /* Set by a finger or a mouse landing on the input, so a focus that arrives
-    WITHOUT one — Tab, or the arrows above an iPhone keyboard — can be told
-    apart and go straight to typing. */
- const pointerRef=useRef(false);
+ /* WHEN A FINGER OR A MOUSE LAST LANDED ON THE INPUT, and with what. A focus
+    that arrives with no press just before it is a keyboard — Tab — and goes
+    straight to typing. A time rather than a flag: a press that never became a
+    click (dragged off, held) would otherwise leave the flag up and swallow the
+    next Tab, which a cold read found. */
+ const pressedAt=useRef(0);
+ const pressedWith=useRef("");
+ const pressedJustNow=()=>Date.now()-pressedAt.current<1000;
  const openBrowse=()=>{setOpen(true);setQuery("");setBrowseGroup("");setActive(0);};
+ /* A KEYBOARD ALREADY UP FROM ANOTHER FIELD GOES DOWN. Type the bus number,
+    then tap DEFECT CATEGORY: the tap is kept from focusing this field, so on
+    an iPhone nothing would move focus off the number box and its keyboard
+    would stay over the list just opened. Found by a cold read; not measured
+    on a phone. */
+ const releaseOtherField=()=>{
+  const current=document.activeElement as HTMLElement|null;
+  if(current&&current!==inputRef.current&&current.matches("input,textarea,select,[contenteditable='true']"))current.blur();
+ };
  const startTyping=()=>{
   if(disabled)return;
   setTypingMode(true);
@@ -368,8 +383,11 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  return <label className={className?"combo-field "+className:"combo-field"} data-coach={coach}
   /* ONLY THE BOX TAKES A TAP. A tap on the label's words, its hint line or the
      space around them used to put the cursor in the field, raise the keyboard
-     and scroll the form — a stray thumb moving the page. */
-  onClick={event=>{if(browseFirst&&boxRef.current&&!boxRef.current.contains(event.target as Node))event.preventDefault();}}>
+     and scroll the form — a stray thumb moving the page.
+     Anything that is not the input itself — the words, the hint, the list's
+     border, the "nothing matches" line — would otherwise be handed to the
+     input as a tap of its own, and with the list open that tap means TYPE. */
+  onClick={event=>{if(browseFirst&&event.target!==inputRef.current)event.preventDefault();}}>
   {label}
   <div className={"combo-box"+(open?" open":"")+(showMode?" with-mode":"")} ref={boxRef}>
    <input
@@ -392,17 +410,21 @@ export default function ComboField({label,value,display,search,onPick,placeholde
      if(disabled)return;
      /* A tap is decided by the click below. A focus with no tap behind it is a
         keyboard arriving, and a keyboard means typing. */
-     if(browseFirst&&!typingRef.current){if(pointerRef.current)return;setTypingMode(true);}
+     if(browseFirst&&!typingRef.current){if(pressedJustNow())return;setTypingMode(true);}
      setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
     }}
-    onPointerDown={()=>{pointerRef.current=true}}
-    onPointerCancel={()=>{pointerRef.current=false}}
+    onPointerDown={event=>{pressedAt.current=Date.now();pressedWith.current=event.pointerType}}
     /* No focus from a tap while the field is browsing: the click decides what
        the tap meant. */
     onMouseDown={event=>{if(browseFirst&&!typingRef.current)event.preventDefault();}}
     onClick={()=>{
-     pointerRef.current=false;
      if(!browseFirst||typingRef.current||disabled)return;
+     /* A MOUSE IS THE SHOP COMPUTER, where there is no keyboard to keep down:
+        one click types, as it always did. Built first as two clicks for every
+        pointer, and a cold read caught it — the list opened, the cursor was
+        nowhere, and what was typed went to the page. */
+     if(pressedWith.current==="mouse"&&pressedJustNow()){startTyping();return;}
+     releaseOtherField();
      if(!open)openBrowse();else startTyping();
     }}
     /* TYPING LEAVES THE GROUP. A query searches every wording in the catalog,
@@ -441,6 +463,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
         down, opening leaves it down. */
      if(browseFirst&&open)inputRef.current?.blur();
      if(open){setOpen(false);setQuery("");return;}
+     if(browseFirst)releaseOtherField();
      setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
      if(!browseFirst)inputRef.current?.focus();
     }}>▾</button>
