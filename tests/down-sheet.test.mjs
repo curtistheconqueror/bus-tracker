@@ -3894,3 +3894,18 @@ test("moving a bus never writes its Down Sheet membership",async()=>{
     was reachable, and Curtis's rule is about what a foreman sees, not only
     about what is stored. It is gone; the test above holds that. */
 });
+
+test("ADD TO THAT ENTRY opens the entry it names, not a heading over the blank draft",async()=>{
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ const editor=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
+ /* The editor seeds its draft ONCE, from the entry it mounted with. */
+ assert.match(editor,/const \[draft,setDraft\]=useState\(\(\)=>\(\{\.\.\.entry,/,
+  "if the draft ever follows the prop instead, this test's reason is gone and it should be rewritten");
+ /* So the page must hand a different entry to a NEW editor. Without the key,
+    ADD TO THAT ENTRY changed the heading to the bus and SAVE UPDATE while the
+    form kept the blank draft, and the save was refused as a second entry for
+    the bus — measured on main. */
+ assert.match(page,/\{editing&&<DownSheetEditor key=\{editing\.id\} onOpenExisting=\{/);
+ /* And what it is handed is the existing entry plus one blank card to add to. */
+ assert.match(page,/if\(found\)setEditing\(\{\.\.\.found,repairItems:\[\.\.\.normalizeRepairItems\(found\.repairItems[^)]*\),blankRepairItem\(\)\]\}\)/);
+});
