@@ -4,7 +4,9 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 191 / application release 196 | Live | a9f610d42123cd6cfaaf32b61d8c78048d585c82 | Defect Log starts Advanced Actions collapsed; Detailed card view is default and appears before Compact. Explicit saved card choices remain. |
+| 194 / application release 197 | Live | 12822f60c7e5d76d3702108b33711cc116ca4f61 | Safe installed-app last-page restoration and Doors group display mark. |
+| 192, 193 | Saved only; never deployed | Superseded review candidates | Do not deploy; use reviewed194. |
+| 191 / application release 196 | Previous live; rollback | a9f610d42123cd6cfaaf32b61d8c78048d585c82 | Defect Log starts Advanced Actions collapsed; Detailed card view is default and appears before Compact. Explicit saved card choices remain. |
 | 190 / application releases 194 and 195 | Previous live; rollback | a1d90e85a6489ab9c6ff636e50ed813d98363978 | Preserves queued maintenance/scanner work; adds shared compact mobile navigation, grouped map controls, visible shifts and remembered Compact / Detailed defect cards. |
 | 189 / application release 193 | Previous live; rollback | a009c08fad02aa6859ec6445784f744c6e269c8d | ADVANCED ACTIONS drawers take their button colours; larger openers and reshaped DAILY STATS; service worker unchanged. |
 | 188 / application release 192 | Previous live; rollback | 2ddc026c139c45acec7c24128633841d96e7dee3 | Device-local Incidents and Shop Talk, wrapping navigation, grouped HVAC Heating and No Heat Buses, with preserved estimates and operator aliases. |
@@ -274,3 +276,10 @@ When a release is published, update this table and PROJECT_HANDOFF.md in the sam
 - Rollback: Sites 190 / `sites-v190`, `a1d90e85a6489ab9c6ff636e50ed813d98363978`.
 
 Live verification: home, Defect Log and Down Sheet returned HTTP 200; Defect Log server output starts Detailed with Advanced Actions collapsed and drawer absent; all 27 referenced emitted JavaScript assets matched the release build byte-for-byte. This is HTTP/source verification, not fresh browser interaction.
+
+
+## 2026-11-18: application197 / Sites194
+
+Sites Version 194 / application release 197 deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Installed copies reopen the remembered page after safe document/hydration readiness; Doors picker receives its display-only emoji. PR50 CodeRabbit final review covered this exact SHA with no actionable comments; CI451 (44229747699) passed. Production build and 470 tests passed; ESLint zero errors and one preexisting warning. Browser loopback regression proved delayed-script/stalled-destination recovery; live HTTP200 and exact corrected inline script verified on Map, Defect Log, Down Sheet and Settings. Live Defect Log rendering checked. Physical iOS/Home Screen and real garage network behavior remain unverified. The initial service-worker document request remains unbounded; readiness taking more than the 2.5-second script budget falls back to map for that run. Sites192 and193 were saved candidates, never deployed. Rollback: Sites191 at a9f610d42123cd6cfaaf32b61d8c78048d585c82.
+
+Deployment: `appgdep_6afd1b66b3288191956117ec62aff973`. Rollback tag for new release: `sites-v194`.

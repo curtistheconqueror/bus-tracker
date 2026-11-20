@@ -93,7 +93,7 @@ branding.** Counted at this commit —
 | | what it is | where |
 | --- | --- | --- |
 | the yard's geometry | six independent descriptions of one building that must agree, plus **179 slot-prefix literals across 17 files** (`grep -rhoE` over `app src`, see below), some carrying BEHAVIOUR (`smart-status`, `mystery-buses`, `road-calls`) | `docs/roadmap/facility-config.md`, scoped and not built |
-| 52 storage keys | all prefixed `pace-`, and renaming one is forbidden above | the key list below |
+| 52 listed storage keys (50 in use, 2 retired) | all prefixed `pace-`, and renaming one is forbidden above | the key list below |
 | the Shop Cloud | one project, one shop login, and RLS grants any authenticated user full insert and update | `supabase/migrations/0002_shared_records.sql` |
 | the MCP | one `MCP_TOKEN` with no issuer and no per-organisation identity | `docs/AGENT_MCP.md` |
 
@@ -284,7 +284,7 @@ per-device view state — which panel is open, what has been dismissed
   pace-down-sheet-soft-collapsed-v1    the DOWN SHEET's SOFT DOWN board, collapsed by default
   pace-down-sheet-idot-collapsed-v1    the DOWN SHEET's IDOT board, collapsed by default
   pace-defect-log-stats-open-v1
-  pace-defect-log-advanced-open-v1     ADVANCED ACTIONS, open or closed
+  pace-defect-log-advanced-open-v1     NO LONGER READ — ADVANCED ACTIONS starts collapsed on every visit (#49)
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
   pace-status-report-picks-v1          which boxes are ticked on the STATUS REPORT
@@ -299,9 +299,10 @@ It went back to the map because the manifest's start address is `/` and a
 phone closes a backgrounded app without saying so; the next tap on the icon is
 a fresh start there. The manifest cannot fix it: iOS reads the start address
 once, when the icon is made. So `src/lib/settings/last-page.ts` has two halves.
-**Remembering** is `pageMemory`, driven from an effect
-(`app/_components/last-page-live.tsx`), so a page is remembered only once it
-has come up. **Reopening** is a script the root layout writes at the top of
+**Remembering** is `pageMemory`, run by `watchPage`, which an effect in
+`app/_components/last-page-live.tsx` starts - so a page is remembered only once
+it has come up. That component holds no rule: everything is in the module,
+where a test can run it. **Reopening** is a script the root layout writes at the top of
 every page, which runs before the page is drawn.
 
 **It only turns round a FRESH START OF AN INSTALLED COPY**, and all of these
@@ -329,11 +330,44 @@ read their records in effects AFTER the first draw, so one that throws on its
 own data had already been cleared, and was reopened on every start with no way
 to the map.
 
-**The network is asked first.** Pages load network-first, and wifi that is
-joined but dead hangs a request instead of failing it. The script asks for the
-page's headers and goes only when something answers or the request fails
-outright; a server answering with an error of its own is not gone to. After
-2.5 seconds of nothing it shows the map and stays for that run. A move that
+**The network is asked first, and the map has to be whole before it is left.**
+Pages load network-first, and wifi that is joined but dead hangs a request
+instead of failing it. The script asks for the page's headers and goes only
+when something answers or the request fails outright - a server answering
+with an error of its own is not gone to - **and only once the map document has
+loaded and the page has signalled ready.** Otherwise it shows the map at 2.5
+seconds without stopping it, and stays for that run. Leaving a map that is
+still loading aborts the loading, and stopping the move later cannot put it
+back; that is what the two extra conditions are for (release 197, from a
+review of the first cut).
+
+**THE READY SIGNAL IS SENT WHEN THE MAP IS DRAWN, by `watchPage`, and not from
+the probation timer.** In release 197 it was sent from the two-second timer,
+inside the 2.5-second wait, which left under half a second for the map's code
+to arrive and draw. A review measured that reopening nothing at eight times
+CPU slowdown or with scripts half a second late, and the same was measured
+here on the production build: holding each script file back by 100 ms was
+enough to stop it (ready at 2620 ms), where the fix says ready at 91 ms with
+nothing slow and still reopens with each file held back 400 ms. **Probation and
+readiness are two questions** - has the page gone TO stayed up, is the map
+being LEFT whole - and one timer had been made to answer both. The signal had
+also lived in the component, where the only check on it was a test that read
+the file's text; it was switched off in review and nothing failed. It is in
+the module now and the tests run it. **The component's one line that starts it
+is still checked as text** - nothing in the suite mounts a component - so its
+whole body is held to the character.
+
+**"Whole" means the document has loaded and the map has been drawn once.** The
+two seconds had also been covering, by accident, whatever the map starts in
+its own first effects. A move can now begin with the map's first Shop Cloud
+pull in flight, and a stalled move is stopped about 2.5 seconds after the map
+was drawn where it was 4.5. `stop()` ends that pull; the board is drawn from
+the device's own records and the pull is retried. Read, not measured.
+
+**A phone slow enough to miss the 2.5 seconds stays on the map for that run**,
+with the page still remembered for the next. That limit is the one thing here
+that trades reopening against a blank screen, and it has not been tuned on a
+real phone. A move that
 was started and has not arrived in another 2.5 seconds is stopped with
 `window.stop()` before the map is shown, so the map is not handed over and
 then taken away. **Where a browser will not stop a move, it still can be** -

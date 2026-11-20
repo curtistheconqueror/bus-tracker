@@ -1,126 +1,83 @@
 "use client";
 
-/* THE BUS PICKER, shared.
+/* THE BUS PICKER, shared by the Defect Log and the Down Sheet's editor.
 
-   Lifted out of the Defect Log unchanged, because the Down Sheet's own "add a
-   bus" was a bare <select> over the fleet with no way to type a number at all —
-   and the Defect Log had already solved that, twice over, with generation chips
-   and a typed box backed by a datalist.
+   ONE BOX NOW, and it is the same control the category and the defect are
+   picked with. Curtis's B, from the mockups: the bus used to be three things
+   stacked — BUS GENERATIONS chips, a BUS LIST drop-down and a TYPE BUS # box —
+   about a third of a phone screen before the defect was even named. He was
+   clear about the one thing it must not lose: "I don't want to get rid of the
+   flexibility of typing in the bus number."
 
-   Copying it across would have made two of them, and this project has paid for
-   duplicated logic more than once: five copies of the location table, all five
-   carrying the same bug, and two road-call records that had quietly drifted
-   apart. So there is one, and both surfaces import it.
+     TAP BUS        the generations open as rows — 15s, 17s, 18s, 20s, each
+                    with how many buses are behind it — and a row opens its
+                    buses. A fleet with one generation opens straight on its
+                    buses. No keyboard.
+     TAP AGAIN      or TYPE: the number pad. A full fleet number picks the bus
+                    by itself, because the number pad has no Enter key.
+     PICKED         the box reads "Bus 17507 · Main Garage". Tap it to change.
 
-   The only things made configurable are the two that genuinely differ: the
-   datalist id, because two of these on one page would otherwise share an id,
-   and autoFocus, because the Down Sheet's editor opens with other fields above
-   this one and stealing focus there moves the page under somebody's thumb. */
+   It is ComboField rather than a second copy of its keyboard rules, which were
+   fixed twice by a cold read in one day; a bus box with its own copy would
+   have needed both fixes again.
 
-import {memo,useEffect,useMemo,useState} from "react";
+   The generations are the first two digits of the fleet number — the four this
+   property runs, plus any other prefix actually in the fleet, so one 16xxx bus
+   adds a 16s row rather than vanishing. */
+
+import {memo,useMemo,useRef} from "react";
 
 import {locationLabel} from "@/src/lib/fleet/location-label";
+import {busGeneration,busPickerDisplay,exactBus,generationLabel,searchBuses,type SearchableBus} from "@/src/lib/fleet/bus-search";
+import ComboField,{type ComboOption} from "./combo-field";
 import "./bus-selector.css";
 
-/* ONE COLLATOR FOR THE LIFE OF THE PAGE, not one per sort.
-
-   `a.n.localeCompare(b.n,undefined,{numeric:true})` builds a fresh collator on
-   every comparison, and this list is sorted on every render of the picker.
-   Measured on 84 buses: 0.439ms a sort with localeCompare, 0.017ms through a
-   collator made once — twenty-six times the work for the same order. Numeric
-   collation is what keeps 17509 before 175010, so the rule stays; only the
-   rebuilding goes. */
+/* ONE COLLATOR FOR THE LIFE OF THE PAGE, not one per sort. Measured on 84
+   buses: 0.439ms a sort with localeCompare, 0.017ms through a collator made
+   once. Numeric collation is what keeps 17509 before 175010. */
 const COLLATOR=new Intl.Collator(undefined,{numeric:true});
-
-/* The generations this property runs, in the order the chips read. Module scope
-   rather than a literal inside the component: it never varies, and a fresh
-   array each render is a dependency the memo below would have to either list —
-   defeating itself — or disable the rule over. Hoisting it is the honest
-   spelling of "this does not change". */
-const STANDARD_GENERATIONS=["15","17","18","20"];
 
 /* Structurally typed rather than importing either page's bus: the picker needs
    an id, a number and a location, and neither surface should have to reshape
    its records to use it. */
-export type PickerBus={id:string;n:string;l:string};
+export type PickerBus=SearchableBus;
 
-/* The first two digits of a fleet number are its generation at this property —
-   15xxx, 17xxx, 18xxx, 20xxx. Lives here with the chips it draws rather than on
-   either page, which is where it was. */
-export function busGeneration(number:string){const value=String(number??"").slice(0,2);return /^\d{2}$/.test(value)?value:"OTHER"}
-
-function generationLabel(value:string){return value==="OTHER"?"OTHER":value+"s"}
 /* MEMOISED, because the form around it redraws on every character typed in any
-   other field and this is the biggest thing in that form: 174 of the editor's
-   312 nodes are this picker's two option lists. Its props — the fleet, the
-   chosen bus id, and one callback — do not move while somebody types a
-   sentence into DETAILS, so there is nothing here to re-render.
-
-   The callback has to be stable for this to bite at all; see the useCallback
-   where it is passed. Given an inline arrow it would be a new prop every
-   render and the memo would do nothing but cost a comparison. */
-/* `coach` names the BUS NUMBER box for the step-by-step helper to ring —
-   that fieldset rather than the generation chips above it, because the number
-   is the thing the step is asking for and the chips only narrow the list.
-   Absent on the Down Sheet, which does not draw the helper. */
-function BusSelector({fleet,busId,select,listId="bus-number-options",autoFocus=true,coach}:{fleet:PickerBus[];busId:string;select:(busId:string)=>void;listId?:string;autoFocus?:boolean;coach?:string}){
+   other field and its props — the fleet, the chosen bus id, one callback — do
+   not move while somebody types a sentence into DETAILS. The callback has to be
+   stable for this to bite; see the useCallback where it is passed. */
+/* `coach` names this box for the step-by-step helper to ring. */
+function BusSelector({fleet,busId,select,coach}:{fleet:PickerBus[];busId:string;select:(busId:string)=>void;coach?:string}){
  const selected=fleet.find(bus=>bus.id===busId);
  /* THE FLEET DECIDES THESE, AND THE FLEET IS NOT WHAT CHANGES WHILE SOMEBODY
-    TYPES. Every list below was rebuilt on every keystroke — see the measurement
-    above this component's own options. The dependency is `fleet`, which is the
-    page's state and holds its identity between renders, so typing recomputes
-    none of it and a bus arriving or leaving still recomputes all of it. */
- const generations=useMemo(()=>{
-  const available=[...new Set(fleet.map(bus=>busGeneration(bus.n)))];
-  return [...STANDARD_GENERATIONS,...available.filter(value=>!STANDARD_GENERATIONS.includes(value)).sort()];
- },[fleet]);
- const [generation,setGeneration]=useState(selected?busGeneration(selected.n):"");
- const [number,setNumber]=useState(selected?.n||"");
- useEffect(()=>{const bus=fleet.find(item=>item.id===busId);if(bus){setNumber(bus.n);setGeneration(busGeneration(bus.n))}},[busId,fleet]);
- const candidates=useMemo(()=>[...fleet].filter(bus=>!generation||busGeneration(bus.n)===generation).sort((a,b)=>COLLATOR.compare(a.n,b.n)),[fleet,generation]);
- const chooseGeneration=(next:string)=>{setGeneration(next);const current=fleet.find(bus=>bus.id===busId);if(current&&busGeneration(current.n)!==next)select("");if(!number.startsWith(next))setNumber("")};
- const typeNumber=(raw:string)=>{const digits=raw.replace(/\D/g,"");setNumber(digits);const prefix=digits.slice(0,2);if(digits.length>=2&&generations.includes(prefix))setGeneration(prefix);const exact=fleet.find(bus=>bus.n===digits);select(exact?.id||"")};
- const chooseBus=(id:string)=>{const bus=fleet.find(item=>item.id===id);select(id);setNumber(bus?.n||"");if(bus)setGeneration(busGeneration(bus.n))};
- /* Two boxes, because the old single box was called BUS NUMBER and the first
-    thing in it was a row of generations. The chips narrow the fleet; the number
-    names one bus. Naming each box for what it does is the whole change.
-
-    They stay wired the way they always were - a generation filters the list AND
-    the type-ahead, typing a number lights its generation, picking from the list
-    fills the number - so the split is what a person reads, not what the code
-    does. */
- /* THE SAME 84 BUSES, DRAWN TWICE, AND REBUILT ON EVERY CHARACTER.
-
-    The editor holds its own draft, so a keystroke in the number box re-renders
-    this picker and nothing above it. Measured in the production build: that
-    subtree is 312 nodes and 174 of them are `<option>` — an 85-option BUS LIST
-    and an 84-option type-ahead `<datalist>`, the one fleet listed twice. Built
-    from `candidates`, which only moves when the fleet or the generation does,
-    so they are built when that happens and not once per character.
-
-    Elements, not data: a memo over `candidates` alone would still hand React
-    169 new elements a keystroke to diff. */
- const busListOptions=useMemo(()=>candidates.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n} - {locationLabel(bus.l)}</option>),[candidates]);
- const numberOptions=useMemo(()=>candidates.map(bus=><option value={bus.n} key={bus.id}/>),[candidates]);
- return <>
-  <fieldset className="wide bus-picker bus-picker-generations"><legend>BUS GENERATIONS</legend>
-   <div className="bus-generations" aria-label="Bus generation">{generations.map(value=><button type="button" className={generation===value?"active":""} aria-pressed={generation===value} onClick={()=>chooseGeneration(value)} key={value}>{generationLabel(value)}</button>)}</div>
-   <small>{generation?candidates.length+" buses in "+generationLabel(generation):"Narrows the bus list below. Skip it if you know the number."}</small>
-  </fieldset>
-  <fieldset className="wide bus-picker bus-picker-number" data-coach={coach}><legend>BUS NUMBER</legend>
-   <div className="bus-picker-fields">
-    <label>BUS LIST<select value={busId} disabled={!generation} onChange={event=>chooseBus(event.target.value)}><option value="">{generation?"Choose a "+generationLabel(generation)+" bus":"Choose generation first"}</option>{busListOptions}</select></label>
-    {/* The typed number is the way in that gets used, so it is the biggest
-        thing in the form and it reads in the page's own text colour rather
-        than the muted grey every other field uses. */}
-    <label className="type-bus-number">TYPE BUS #<input autoFocus={autoFocus} inputMode="numeric" value={number} onChange={event=>typeNumber(event.target.value)} list={listId} placeholder="Enter full bus number"/><datalist id={listId}>{numberOptions}</datalist></label>
-   </div>
-   {/* The list is disabled until a generation is picked, and that control now
-       lives in the box above, so the reason has to be said here or it reads as
-       broken. */}
-   {!generation&&<small>Pick a generation above to use the bus list, or type the full number.</small>}
-  </fieldset>
- </>;
+    TYPES. Sorted once per fleet; the picker only asks for rows while its list
+    is open. */
+ /* By generation first, then number: a numeric sort alone puts a four-digit
+    1750 before 15502, and the 17s row would come up above the 15s. */
+ const sorted=useMemo(()=>[...fleet].sort((a,b)=>COLLATOR.compare(busGeneration(a.n),busGeneration(b.n))||COLLATOR.compare(a.n,b.n)),[fleet]);
+ /* The bus typing let go of, until a pick replaces it or a cancel gives it back. */
+ const letGo=useRef("");
+ const toOption=(bus:PickerBus,section?:string):ComboOption=>({value:bus.id,label:"Bus "+bus.n,hint:bus.l?locationLabel(bus.l):undefined,section});
+ return <ComboField label="BUS" className="wide bus-combo" coach={coach} browseFirst typeAs="numeric"
+  value={busId}
+  display={selected?busPickerDisplay(selected):""}
+  placeholder="Tap to pick a bus"
+  emptyText={fleet.length?"No bus has that number":"No buses on the board yet"}
+  /* Browsing, the generation is each row's section, so the list opens on one
+     title per generation with its count. Typing, the rows are flat and ranked. */
+  search={query=>query.trim()
+   ?searchBuses(sorted,query).map(bus=>toOption(bus))
+   :sorted.map(bus=>toOption(bus,generationLabel(busGeneration(bus.n))))}
+  /* TYPING OVER A BUS LETS IT GO, as TYPE BUS # always did: a number that is
+     not a bus leaves no bus chosen, and the save says so, rather than keeping
+     the old one under the new number (CodeRabbit on PR 54). Opening the list
+     or backing out of it keeps the bus. */
+  onType={()=>{if(busId){letGo.current=busId;select("")}}}
+  /* Backed out without picking - Escape, LIST, the arrow or a tap away - the
+     bus typing let go of comes back (SDET review, BT54-F7). */
+  onCancel={()=>{const back=letGo.current;letGo.current="";if(back&&!busId&&fleet.some(bus=>bus.id===back))select(back)}}
+  exactPick={query=>{const bus=exactBus(fleet,query);return bus?toOption(bus):null}}
+  onPick={id=>{letGo.current="";select(id)}}/>;
 }
 
 export default memo(BusSelector);

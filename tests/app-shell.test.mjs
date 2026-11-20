@@ -1436,11 +1436,10 @@ test("no text field a touch device can tap is under 16px, outside the dense grid
     TOUCH, NOT PHONE. An iPad zooms the same way, and this garage has one, so a
     block is only out of scope above 1180.
 
-    A BLANKET RULE WAS THE OBVIOUS FIX AND IS WRONG. `.log-form
-    .type-bus-number>input` is deliberately 26px, 27px on a phone, because it
-    is the box somebody types a fleet number into with gloves on, and
-    `.part-prompt input` is 17px. A global `input{font-size:16px}` shrinks
-    both. So declarations are fixed one at a time and this list is the record
+    A BLANKET RULE WAS THE OBVIOUS FIX AND IS WRONG. The BUS box draws its
+    number at 18px bold, because it is what somebody reads and types with
+    gloves on, and `.part-prompt input` is 17px. A global
+    `input{font-size:16px}` shrinks both. So declarations are fixed one at a time and this list is the record
     of what is left. */
  const { readdir } = await import("node:fs/promises");
  const { cssRules, declaredFontSizePx, isTextEntrySelector, splitSelector } =
@@ -1538,10 +1537,12 @@ test("no text field a touch device can tap is under 16px, outside the dense grid
   selector + " in " + file + " must stay at 16px or above");
 
  /* THE TWO THAT ARE DELIBERATELY LARGER, which is why there is no blanket
-    rule. If either ever falls to 16, somebody has reached for one. */
+    rule. If either ever falls to 16, somebody has reached for one. The bus
+    number was a 26px TYPE BUS # box; it is the BUS box now (Curtis's B), and
+    still reads bigger and heavier than a category. */
  const log = await read("app/defect-log/defect-log.css");
- assert.match(log, /\.log-form \.type-bus-number>input\{[^}]*font-size:26px/);
- assert.match(log, /\.log-form \.type-bus-number>input\{font-size:27px/);
+ const bus = await read("src/components/shared/bus-selector.css");
+ assert.match(bus, /\.combo-field\.bus-combo \.combo-input\{font-size:18px;font-weight:800/);
  assert.match(log, /\.part-prompt input\{[^}]*font-size:17px/);
 
  /* AND NOTHING MAY BE CLIPPED BY AN ANCESTOR, which is the failure raising
@@ -1690,30 +1691,15 @@ test("nothing in app/ or src/ names an identifier that does not exist", async ()
   "a name that is not there — if it is used as a value, that line throws the moment it runs:\n  " + real.join("\n  "));
 });
 
-test("the bus generation chips are sized for their label, not for the box", async () => {
- /* Curtis: "I want this strip of bus drop downs to be slimmer because it's more
-    than wide enough for the bus numbers. Then move it slightly to the right."
-
-    Measured before: `repeat(4,minmax(0,1fr))` stretched each chip to fill the
-    fieldset — 177px apiece at 820 and 1180, 169px at 390 — for a label three
-    characters long ("15s"). After: 64px at every width, with the spare space on
-    the left, which is the nudge right. The chips start at 93 rather than 23 at
-    390, and at 679 rather than 47 at 1180. */
- const css = await readFile(new URL("../src/components/shared/bus-selector.css", import.meta.url), "utf8");
- assert.match(css, /\.bus-generations\{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px\}/,
-  "the spare width goes on the left, and the strip wraps rather than overflowing");
- assert.match(css, /\.bus-generations button\{flex:0 0 64px\}/,
-  "64px fits the label and still clears a 44px thumb target");
- assert.equal(/\.bus-generations\{[^}]*1fr/.test(css), false,
-  "a 1fr track is what stretched a 3-character chip to 177px");
-
- /* FLEX RATHER THAN FOUR FIXED COLUMNS, because the count is not four: the
-    chips are the four standard generations plus any other first-two-digits
-    present in the fleet, so one 16xxx bus makes it five. Measured with five:
-    two rows at 320 and 360, one row from 390 up. */
+test("the bus generations are rows in the BUS box, and the fleet decides which", async () => {
+ /* The chips Curtis had slimmed — "I want this strip of bus drop downs to be
+    slimmer" — went with the three-control picker they belonged to (his B). The
+    generations are the first rows of the BUS box now, each with its count, the
+    way the category picker opens on its groups. What must survive is the rule
+    the chips carried: the four standard generations are not a fixed list, and
+    a prefix the fleet actually holds — one 16xxx bus — gets a row of its own. */
  const selector = await readFile(new URL("../src/components/shared/bus-selector.tsx", import.meta.url), "utf8");
- assert.match(selector, /STANDARD_GENERATIONS,\s*\.\.\.available\.filter/,
-  "the chip list is the standard four plus whatever else the fleet holds");
- assert.equal(/grid-template-columns:repeat\(4/.test(css), false,
-  "a four-column grid would drop the fifth chip onto a row of its own");
+ assert.match(selector, /sorted\.map\(bus=>toOption\(bus,generationLabel\(busGeneration\(bus\.n\)\)\)\)/,
+  "browsing, every bus sits under its own generation, whatever that is");
+ assert.doesNotMatch(selector, /STANDARD_GENERATIONS/, "no fixed list of four for a fifth to fall off");
 });

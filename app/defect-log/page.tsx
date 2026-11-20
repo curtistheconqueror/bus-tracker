@@ -63,7 +63,7 @@ import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
    deferred quick-filter drawer, and two copies of that form would drift. */
 import {MysteryMoveModal} from "@/src/components/down-sheet/mystery-board";
 import {candidateBusNumbers,resolveBusNumberList} from "@/src/lib/fleet/bus-number-resolver";
-import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from "@/src/lib/defects/quick-filter-share";
+import {quickFilterCanLeaveOut,quickFilterShareFilename,quickFilterShareHtml,quickFilterShareIsEmpty,quickFilterShareScope,quickFilterShareText,restoreLeftOutBus,focusShareRow,type FocusRowWindow} from "@/src/lib/defects/quick-filter-share";
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
 import {defectPartsText,normalizeDefectParts,partToLearn,withDefectParts,type DefectPart} from "@/src/lib/defects/defect-parts";
 import PartsUsedList from "@/src/components/defects/parts-used-list";
@@ -190,6 +190,13 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
  const pickBus=useCallback((busId:string)=>{onBusPicked(busId);setValue(current=>({...current,busId}))},[onBusPicked]);
  const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined||draft.defect.finding));
  useEffect(()=>lockPageScroll("defect-editor-open"),[]);
+ /* THE FORM TAKES FOCUS, NOT A FIELD. Nothing in it is focused when it opens,
+    so a phone raises no keyboard - and on the shop computer the cursor stayed
+    on the LOG DEFECT button behind it, where the first Tab went to the board's search
+    box under the editor (SDET review, BT53-F2). Focusing the form itself
+    raises no keyboard anywhere, and the next Tab is the first field. */
+ const editorRef=useRef<HTMLFormElement|null>(null);
+ useEffect(()=>{editorRef.current?.focus({preventScroll:true})},[]);
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
  const repairs=REPAIR_OPTIONS[value.defect.category]||[];
  /* A record can hold wording the picker no longer offers: a merged category kept
@@ -503,19 +510,22 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
    initial={value.defect.partNumber||""}
    close={()=>setPartPrompt(false)}
    confirm={number=>{setPartPrompt(false);/* ALWAYS `partsUsed:true`, WHICH IS WHAT ENTER LATER PROMISES. The prompt says in as many words that the repair "is marked MISSING PART # on the Fixed Repairs page until the number is added", and ENTER LATER arrives here with an empty number - which the assembler read as "no parts were used", so the repair saved completed with no flag at all and the promise on screen was false. The third argument is the checkbox's answer and ENTER LATER is somebody saying a part WAS used. THROUGH THE ASSEMBLER. This patched `{partsUsed:true,partNumber}` straight onto the record, so on a repair that already held a `parts` array the mirrored pair said one thing and the array another - and the number typed here was never learned, because the save reads the array. It becomes the FIRST row now, which is the one the memory takes. */const rows=normalizeDefectParts(value.defect.parts,value.defect);const first=rows[0];/* ENTER LATER MUST NOT ERASE A NUMBER ALREADY TYPED. It arrives here with an EMPTY number, and writing that over the first row wiped a part the mechanic had entered on the form a moment earlier - the prompt even opens prefilled with it. "I will enter it later" is a statement about a number that is NOT there; with one on the record it is a press of the wrong button, and losing the number is the expensive reading. Only a number given here replaces the row. */const next=number?[{id:first?first.id:"part-0",partNumber:number,...(first?.partName?{partName:first.partName}:{})},...rows.slice(1)]:rows;validateAndSave(true,{},{rows:next,used:true});}}/>}
-  <form className="log-editor" onSubmit={submit}>
+  <form className="log-editor" onSubmit={submit} ref={editorRef} tabIndex={-1}>
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    {coach&&<FormCoachBar step={coach} hide={()=>setCoachHidden(true)}/>}
    <div className="log-form">
+    {/* ONE BUS BOX, opened like the category: nothing takes the cursor when
+        the form opens, and there is no suggestion list for iOS to draw as the
+        grey card Curtis saw repeating the number. */}
     <BusSelector fleet={fleet} busId={value.busId} select={pickBus} coach="bus"/>
     {/* TWO FIELDS, NOT FOUR. Curtis asked for a search beside each picker and
         named the risk in the same breath — "just try to make it look clean".
         One control per picker does both jobs: tap it and the whole list opens
         the way the <select> did, type in it and the same list narrows. */}
-    <ComboField label="DEFECT CATEGORY" className="wide" coach="category"
+    <ComboField label="DEFECT CATEGORY" className="wide" coach="category" browseFirst
      value={value.defect.category}
      display={value.defect.category?repairCategoryLabel(value.defect.category):""}
-     placeholder="Type or tap to choose a category"
+     placeholder="Tap to choose a category"
      emptyText="No category matches that"
      search={query=>searchCategories(query).map(row=>({value:row.value,label:row.label}))}
      onPick={category=>chooseCategory(category)}/>
@@ -524,12 +534,16 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
         you anything, so a mechanic had to know a wiper motor lives under Bus
         Accessories before he could log one. Now he types "wiper motor", picks
         it, and the category fills itself in behind him. */}
-    <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide" coach="issue"
+    <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide" coach="issue" browseFirst
+     openWhen={value.defect.category}
      value={value.quickIssue}
      display={value.quickIssue?issueDisplay(value.quickIssue,value.defect.category):""}
-     placeholder={value.defect.category?"Type or tap — or leave it and save the category alone":"Type what is wrong, or tap to browse"}
+     /* SHORT ENOUGH TO FIT. The old wording needed 403px in a 276px box and was
+        cut off mid-word; the half that says the defect is optional moved to the
+        line under the box, where it has room. */
+     placeholder={value.defect.category?"Tap to choose, or type":"Tap to browse, or type"}
      emptyText="Nothing in the catalog matches that"
-     footnote={value.defect.category?undefined:"Searching every category. Picking one sets the category for you."}
+     footnote={value.defect.category?"Optional. You can save the category alone.":"Searching every category. Picking one sets the category for you."}
      search={query=>{
       const {inCategory,elsewhere}=searchCatalogForCategory(query,value.defect.category,query.trim()?40:BROWSE_ALL);
       /* HEADINGS WHEN BROWSING, THE GROUP ON EACH ROW WHEN SEARCHING, and that
@@ -640,6 +654,17 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
      extraFluids.length?"QUANTITY — "+pickedFluid.toUpperCase():"QUANTITY"
     }<input type="number" min="0.5" step="0.5" inputMode="decimal" value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}/></label><label>UNIT<select value={value.defect.unit||"quarts"} onChange={event=>updateDefect("unit",event.target.value)}><option value="quarts">Quarts</option><option value="gallons">Gallons</option><option value="liters">Liters</option></select></label></>}
     {countField&&<label className="defect-count-field" data-coach="count">{countField.label}<select value={value.defect.quantity||""} onChange={event=>setValue(current=>({...current,defect:{...current.defect,quantity:event.target.value?Number(event.target.value):undefined,unit:countField.unit}}))}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={count} key={count}>{count}</option>)}</select></label>}
+    {/* THE DOWN SHEET DECISION SITS UNDER THE DEFECT IT IS ABOUT. Curtis's E:
+        the symptom is the reason for a referral, so whether it goes to the
+        sheet is asked straight after it — after the count and the pickers that
+        belong to the symptom itself, before the optional notes. It lived below
+        ADVANCED DETAILS, about two and a half screens down on a phone.
+
+        The two rows stay together and in this order: apart, somebody reaches
+        for the wrong one, because they read almost identically and do very
+        different things. DEFERRED and NOT DUPLICATED stay at the bottom. */}
+    <label className="wide downsheet-check downsheet-recommend-check"><input type="checkbox" checked={recommended} onChange={event=>toggleDownSheetRecommendation(event.target.checked)}/><span><b>RECOMMEND FOR DOWN SHEET</b><small>{recommended&&recommendedBy?"Put forward by "+recommendedBy+".":"Put it forward for the sheet. Not added yet."}</small></span></label>
+    <label className="wide downsheet-check"><input type="checkbox" checked={value.onDownSheet} disabled={value.defect.state==="completed"} onChange={event=>toggleOnDownSheet(event.target.checked)}/><span><b>DOWN SHEET</b><small>Add it to the sheet now.</small></span></label>
     {/* BULLET starts a new line with a dot on it, which is the whole feature:
         the breaks somebody types are kept now, so a dot at the start of a line
         IS a bullet and nothing has to parse anything. It appends rather than
@@ -786,13 +811,6 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
       :"Decimal hours: .5 is half an hour. Diagnostic time starts at "+MINIMUM_DIAGNOSTIC_HOURS+" hour and only goes up. Leave blank if no time is being billed."}</small>
     </fieldset>
     </div></details>}
-    {/* Both rows stay below ADVANCED DETAILS, where the Down Sheet control has
-        always lived and where anyone looking for a Down Sheet thing looks. The
-        recommendation goes directly above the escalation rather than up with
-        the work states: apart, somebody reaches for the wrong one, because the
-        two read almost identically and do very different things. */}
-    <label className="wide downsheet-check downsheet-recommend-check"><input type="checkbox" checked={recommended} onChange={event=>toggleDownSheetRecommendation(event.target.checked)}/><span><b>RECOMMEND FOR DOWN SHEET</b><small>{recommended&&recommendedBy?"Put forward by "+recommendedBy+".":"Put it forward for the sheet. Not added yet."}</small></span></label>
-    <label className="wide downsheet-check"><input type="checkbox" checked={value.onDownSheet} disabled={value.defect.state==="completed"} onChange={event=>toggleOnDownSheet(event.target.checked)}/><span><b>DOWN SHEET</b><small>Add it to the sheet now.</small></span></label>
     {/* Disabled while the repair is on the sheet, because the Down Sheet has
         a "Deferred" workflow of its own that writes this same state. Left
         enabled, the two boxes both read as ticked and the form claims a
@@ -894,6 +912,37 @@ export default function DefectLog(){
  const [quickFilterExpandedBusIds,setQuickFilterExpandedBusIds]=useState<string[]>([]);
  const [downSheetBadgeColors,setDownSheetBadgeColors]=useState({badge:"#7c3aed",text:"#fff"});
  const [quickFilterShareStatus,setQuickFilterShareStatus]=useState<""|"copied"|"shared"|"error">("");
+ /* LEFT OUT OF THIS SHARE, FOR THIS LOOK AT THIS LIST ONLY. Bus ids, newest
+    last, held here and nowhere else - never a field on a bus or a defect, and
+    never stored. The rule and its reasons are in quick-filter-share.ts. Gone
+    when the filter changes or the drawer closes: a bus left out of one list
+    is not left out of the next one somebody opens. */
+ const [quickFilterLeftOut,setQuickFilterLeftOut]=useState<string[]>([]);
+ /* What a LEAVE OUT or a PUT BACK did, read out for somebody who cannot see
+    the row change. Its own region rather than the share status beside it,
+    because the two say different things: this one names a bus. (Unlike the
+    FOCUS panel's hide, a leave-out DOES clear COPIED - see the handler.) */
+ const [quickFilterLeaveNote,setQuickFilterLeaveNote]=useState("");
+ useEffect(()=>{setQuickFilterLeftOut([]);setQuickFilterLeaveNote("")},[quickFilter]);
+ /* AFTER A PRESS, FOCUS GOES TO THE OTHER BUTTON IN THE SAME ROW - PUT BACK
+    after LEAVE OUT, LEAVE OUT after PUT BACK - because the pressed one is
+    replaced by its row's other state. Found by a data attribute, after the
+    commit, since the element is one this render creates. */
+ const focusQuickFilterRow=(attribute:"data-leave-out"|"data-put-back",busId:string)=>focusShareRow(window as unknown as FocusRowWindow,attribute,busId);
+ /* THE HEIGHT A CARD HAD WHEN IT WAS LEFT OUT, so its LEFT OUT row keeps it.
+    The row was the collapsed height, so leaving out a bus with its detail
+    open moved every row below it up - 89px at 390 - and PUT BACK moved them
+    down again (SDET review, BT52-LS-F1). Written by every LEAVE OUT before
+    the row is drawn, so a height from another list is never the one used. */
+ const [quickFilterLeftOutHeights,setQuickFilterLeftOutHeights]=useState<Record<string,number>>({});
+ /* WHICH LIST A SHARE WAS STARTED FOR. A copy still in flight when a bus is
+    left out finished afterwards and put COPIED! over the new list, about a
+    clipboard holding the old one (CodeRabbit on PR 52). The list is named by
+    the filter and the buses it would send, kept current by an effect below;
+    a share reports only if that name is unchanged when it finishes. Naming
+    the list rather than counting LEAVE OUT and PUT BACK means a change of
+    filter or of time window counts too, which the count missed (cold read). */
+ const quickFilterShareKey=useRef("");
  /* The focus view's own, kept apart from the drawer's: both can be open at
     once and a shared status would have one of them reporting the other's
     outcome. Cleared when the focus view closes, so reopening a bus never
@@ -1408,6 +1457,17 @@ export default function DefectLog(){
  const loggedWindowedCount=fleet.filter(bus=>loggedCandidateIds.has(bus.id)&&withinTimeWindow(loggedAgeMinutes(bus),loggedCountWindow,shiftWindowMinutes)).length;
  const quickFilterMenuCounts={...quickFilterCounts,logged:loggedWindowedCount};
  const quickFilterBuses=quickFilterWindowed?quickFilterAllBuses.filter(bus=>withinTimeWindow(quickFilterAgeMinutes(bus),quickFilterWindow,shiftWindowMinutes)):quickFilterAllBuses;
+ /* WHAT WILL ACTUALLY BE SENT, which is the list above less any bus somebody
+    left out by hand. The drawer lists this, the count is this, and COPY LIST,
+    SHARE and SHARE PAGE all read this - one list, so the screen and the three
+    outputs cannot disagree about a bus. `quickFilterBuses` stays what the
+    filter and the window found, and the window's own "N outside this window"
+    is still counted from it. */
+ const quickFilterLeaveOutOffered=quickFilterCanLeaveOut(quickFilter);
+ const quickFilterScope=quickFilterShareScope(quickFilterBuses,quickFilterLeaveOutOffered?quickFilterLeftOut:[]);
+ const quickFilterShareListKey=(quickFilter||"")+"|"+quickFilterScope.buses.map(bus=>bus.id).join(",");
+ useEffect(()=>{quickFilterShareKey.current=quickFilterShareListKey},[quickFilterShareListKey]);
+ const quickFilterShareEmpty=quickFilterShareIsEmpty(quickFilterScope);
  /* HOW FAR BACK THE PRINTED LINES MAY REACH, for `logged` alone. The window
     picked the buses; this stops a bus that qualified on a 14:20 defect from
     printing Monday's underneath it in a list headed 2ND SHIFT. The other
@@ -1472,7 +1532,10 @@ export default function DefectLog(){
    and matchesSearch can answer honestly: type "brake", log a brake defect on
    any bus at all, and the search still describes it and stays. */
  const clearSearchIfBusIsOutside=(busId:string)=>{
-  if(!search.trim()||busSearch.kind!=="numbers")return;
+  /* No bus is not another bus. Typing over a chosen bus lets it go with an
+     empty id, and that cleared a bus-number search it does not contradict
+     (CodeRabbit on PR 54). */
+  if(!busId||!search.trim()||busSearch.kind!=="numbers")return;
   if(!busSearchIds.has(busId))setSearch("");
  };
  const clearSearchIfItHides=(busId:string,defect:StructuredDefect)=>{
@@ -1827,7 +1890,36 @@ export default function DefectLog(){
  const leaveForOperator=()=>confirm("AI OPERATOR runs on the Facility Map, so this leaves the Defect Log."+(boardIsNarrowed?"\n\nThe way you have this board set — the search, the filters and WHEN LOGGED — goes back to showing everything when you come back.":"")+"\n\nOpen it on the map?");
   const removeFromLog=(record:DefectLogRecord)=>{if(!confirm("Remove this repair from the Defect Log only? Bus status, location, defects, and Down Sheet records will stay unchanged."))return;persist(hideDefectLogRecords(fleet,[{busId:record.bus.id,defectId:record.defect.id}]),downEntries)};
  const cleanUpLog=()=>{const cleanable=records.filter(record=>isDefectLogCleanupCandidate(record,activeDownBusIdSet));if(!cleanable.length){alert("Nothing is ready for cleanup. Active repairs that started in this log stay until that repair is fixed.");return}if(!confirm("Clean up "+cleanable.length+" fixed, out-of-service, or Down Sheet record"+(cleanable.length===1?"":"s")+"? Repair data and every bus status will stay unchanged."))return;persist(hideDefectLogRecords(fleet,cleanable.map(record=>({busId:record.bus.id,defectId:record.defect.id}))),downEntries)};
- const copyQuickFilterList=async()=>{if(!quickFilter)return;try{await copyText(quickFilterShareText(quickFilterShareLabel,quickFilterBuses,quickFilter,quickFilterShareOptions));setQuickFilterShareStatus("copied")}catch{setQuickFilterShareStatus("error")}};
+ /* ALL THREE READ `quickFilterScope.buses` AND ALL THREE REFUSE AN EMPTIED
+    LIST, each in its own body: SHARE falls back to COPY, so a guard on one
+    path would be a guard on the path somebody happened to take. */
+ const quickFilterShareReport=(started:string,status:Parameters<typeof setQuickFilterShareStatus>[0])=>{if(started===quickFilterShareKey.current)setQuickFilterShareStatus(status)};
+ const copyQuickFilterList=async()=>{if(!quickFilter||quickFilterShareEmpty)return;const started=quickFilterShareListKey;try{await copyText(quickFilterShareText(quickFilterShareLabel,quickFilterScope.buses,quickFilter,quickFilterShareOptions));quickFilterShareReport(started,"copied")}catch{quickFilterShareReport(started,"error")}};
+ /* LEAVE A BUS OUT OF WHAT GETS SHARED. It writes to nothing but this page's
+    own state: the bus, its defects and the log are not touched, which is the
+    whole of what was asked - "not delete the defect report itself".
+
+    THE SHARE STATUS IS CLEARED, because COPIED! over a list that has just
+    changed is a claim about a clipboard that now holds a different list.
+
+    THE ROW STAYS WHERE IT WAS, as a LEFT OUT row with its own PUT BACK, so
+    nothing below it moves and a second tap lands on PUT BACK rather than on
+    the next bus's LEAVE OUT. */
+ const leaveQuickFilterBusOut=(busId:string,busNumber:string,card?:Element|null)=>{
+  const height=card?card.getBoundingClientRect().height:0;
+  setQuickFilterLeftOutHeights(current=>({...current,[busId]:height}));
+  setQuickFilterLeftOut(current=>excludeFromFocusShare(current,busId));
+  setQuickFilterLeaveNote("LEFT OUT OF THIS SHARE \u2014 BUS "+busNumber);
+  setQuickFilterShareStatus("");
+  focusQuickFilterRow("data-put-back",busId);
+ };
+ /* THE BUS WHOSE ROW WAS PRESSED COMES BACK - not the last one left out. */
+ const putQuickFilterBusBack=(busId:string,busNumber:string)=>{
+  setQuickFilterLeftOut(current=>restoreLeftOutBus(current,busId));
+  setQuickFilterLeaveNote("PUT BACK \u2014 BUS "+busNumber);
+  setQuickFilterShareStatus("");
+  focusQuickFilterRow("data-leave-out",busId);
+ };
 /* The same list as a page rather than a paragraph.
 
     Text is right for pasting into a group message. It is wrong for a list
@@ -1905,14 +1997,15 @@ export default function DefectLog(){
   setFocusShareStatus(outcome==="cancelled"?"":outcome==="shared"?"shared":"saved");
  };
  const shareQuickFilterPage=async()=>{
-  if(!quickFilter)return;
+  if(!quickFilter||quickFilterShareEmpty)return;
   const stamp=new Date().toLocaleString();
-  const html=quickFilterShareHtml(quickFilterShareLabel,quickFilterBuses,quickFilter,stamp,quickFilterShareOptions);
+  const html=quickFilterShareHtml(quickFilterShareLabel,quickFilterScope.buses,quickFilter,stamp,quickFilterShareOptions);
   const blob=new Blob([html],{type:"text/html"});
+  const started=quickFilterShareListKey;
   const outcome=await shareOrDownloadFile(blob,quickFilterShareFilename(quickFilterShareLabel),quickFilterShareLabel+" bus list");
-  setQuickFilterShareStatus(outcome==="cancelled"?null:outcome==="shared"?"shared":"copied");
+  quickFilterShareReport(started,outcome==="cancelled"?null:outcome==="shared"?"shared":"copied");
  };
- const shareQuickFilterList=async()=>{if(!quickFilter)return;const text=quickFilterShareText(quickFilterShareLabel,quickFilterBuses,quickFilter,quickFilterShareOptions);if(typeof navigator.share!=="function"){await copyQuickFilterList();return}try{await navigator.share({title:quickFilterShareLabel+" bus list",text});setQuickFilterShareStatus("shared")}catch(error){if((error as Error).name!=="AbortError")setQuickFilterShareStatus("error")}};
+ const shareQuickFilterList=async()=>{if(!quickFilter||quickFilterShareEmpty)return;const text=quickFilterShareText(quickFilterShareLabel,quickFilterScope.buses,quickFilter,quickFilterShareOptions);if(typeof navigator.share!=="function"){await copyQuickFilterList();return}const started=quickFilterShareListKey;try{await navigator.share({title:quickFilterShareLabel+" bus list",text});quickFilterShareReport(started,"shared")}catch(error){if((error as Error).name!=="AbortError")quickFilterShareReport(started,"error")}};
  
  /* Colours come from displayStyleVars, which OMITS any left at the shipped
     default so the theme-aware fallback behind it in defect-log.css can answer.
@@ -2079,7 +2172,7 @@ export default function DefectLog(){
     decoration, so it carries its name and is shaped like the buttons beside it. */}
    
   </section>
-  {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header className="quick-filter-head"><span><small>QUICK FILTER</small><b>{quickFilterOwnedLabel}</b></span><strong aria-label={quickFilterBuses.length+" buses"}>{quickFilterBuses.length}</strong><button className="quick-filter-close" onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header>{quickFilterWindowed&&quickFilterAllBuses.length>0&&<TimeWindowChips value={quickFilterWindow} onChange={value=>{setQuickFilterWindow(value);if(quickFilter==="logged")setLoggedCountWindow(value)}} hidden={quickFilterAllBuses.length-quickFilterBuses.length} label={quickFilterLabel.toLowerCase()+" buses"} windows={quickFilterWindowChoices}/>}{quickFilter==="logged"&&!myInitials&&<p className="quick-filter-initials-note">NO INITIALS SET — SHOWING EVERYONE'S REPORTS. ADD YOUR INITIALS IN DEFECT LOG SETTINGS TO SEE ONLY YOURS.</p>}{quickFilter==="logged"&&<p className="quick-filter-initials-note quick-filter-source-note">LOGGED BY HAND ONLY — BUSES READ OFF A SCANNED DOWN SHEET ARE NOT LISTED HERE. THE DOWN SHEET PAGE SHARES ITS OWN LIST.</p>}<div className="quick-filter-share-actions"><button type="button" onClick={copyQuickFilterList} aria-label="Copy filtered bus list">{quickFilterShareStatus==="copied"?"COPIED!":"COPY LIST"}</button><button type="button" onClick={shareQuickFilterList} aria-label="Share filtered bus list as text">SHARE</button><button type="button" onClick={shareQuickFilterPage} aria-label="Share filtered bus list as a page">SHARE PAGE</button>{quickFilterShareStatus==="shared"&&<small>SHARED</small>}{quickFilterShareStatus==="error"&&<small>COULD NOT SHARE — TRY COPY LIST</small>}</div><div className="quick-filter-results">{quickFilterBuses.length?quickFilterBuses.map(bus=>{/* The same lines the share will carry, narrowed by the same window — a drawer that shows more than it sends is how somebody learns not to trust the heading. */const defects=quickFilterDefects(bus,quickFilter,new Date().toISOString(),quickFilterShareOptions),fallback=quickFilterFallbackLabel(quickFilter),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):fallback,expanded=quickFilterExpandedBusIds.includes(bus.id),/* Floored at zero: a device with a wrong clock, or a record synced from
+  {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header className="quick-filter-head"><span><small>QUICK FILTER</small><b>{quickFilterOwnedLabel}</b></span><strong className={quickFilterLeaveOutOffered?"leave-out-offered":undefined} aria-label={quickFilterScope.buses.length+" buses"+(quickFilterScope.leftOut?" to share, "+quickFilterScope.leftOut+" left out":"")}>{quickFilterScope.buses.length}{quickFilterScope.leftOut>0&&<small> OF {quickFilterScope.total}</small>}</strong><button className="quick-filter-close" onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header>{quickFilterWindowed&&quickFilterAllBuses.length>0&&<TimeWindowChips value={quickFilterWindow} onChange={value=>{setQuickFilterWindow(value);if(quickFilter==="logged")setLoggedCountWindow(value)}} hidden={quickFilterAllBuses.length-quickFilterBuses.length} label={quickFilterLabel.toLowerCase()+" buses"} windows={quickFilterWindowChoices}/>}{quickFilter==="logged"&&!myInitials&&<p className="quick-filter-initials-note">NO INITIALS SET — SHOWING EVERYONE'S REPORTS. ADD YOUR INITIALS IN DEFECT LOG SETTINGS TO SEE ONLY YOURS.</p>}{quickFilter==="logged"&&<p className="quick-filter-initials-note quick-filter-source-note">LOGGED BY HAND ONLY — BUSES READ OFF A SCANNED DOWN SHEET ARE NOT LISTED HERE. THE DOWN SHEET PAGE SHARES ITS OWN LIST.</p>}<div className="quick-filter-share-actions"><button type="button" onClick={copyQuickFilterList} disabled={quickFilterShareEmpty} aria-label="Copy filtered bus list">{quickFilterShareStatus==="copied"?"COPIED!":"COPY LIST"}</button><button type="button" onClick={shareQuickFilterList} disabled={quickFilterShareEmpty} aria-label="Share filtered bus list as text">SHARE</button><button type="button" onClick={shareQuickFilterPage} disabled={quickFilterShareEmpty} aria-label="Share filtered bus list as a page">SHARE PAGE</button>{quickFilterLeaveOutOffered&&<small className="quick-filter-leave-live" role="status" aria-live="polite">{quickFilterLeaveNote}</small>}{quickFilterShareStatus==="shared"&&<small>SHARED</small>}{quickFilterShareStatus==="error"&&<small>COULD NOT SHARE — TRY COPY LIST</small>}</div><div className="quick-filter-results">{quickFilterBuses.length?quickFilterBuses.map(bus=>{/* A BUS LEFT OUT KEEPS ITS PLACE, as a slim row that names it and puts it back - see quick-filter-share.ts. Same height as a bus row, so nothing below it moves. */if(quickFilterScope.out.includes(bus))return <article className="quick-filter-bus-card left-out" key={bus.id} style={quickFilterLeftOutHeights[bus.id]?{minHeight:quickFilterLeftOutHeights[bus.id]+"px"}:undefined}><span className="quick-filter-left-out-bus"><small>BUS</small><b>{bus.n}</b></span><span className="quick-filter-left-out-note">LEFT OUT OF THIS SHARE</span><button type="button" className="quick-filter-put-back" data-put-back={bus.id} onClick={()=>putQuickFilterBusBack(bus.id,bus.n||"")} aria-label={"Put back bus "+bus.n+" into this share"}><span aria-hidden="true">&#8629;</span> PUT BACK</button></article>;/* The same lines the share will carry, narrowed by the same window — a drawer that shows more than it sends is how somebody learns not to trust the heading. */const defects=quickFilterDefects(bus,quickFilter,new Date().toISOString(),quickFilterShareOptions),fallback=quickFilterFallbackLabel(quickFilter),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):fallback,expanded=quickFilterExpandedBusIds.includes(bus.id),/* Floored at zero: a device with a wrong clock, or a record synced from
       one, can carry a deferredAt in the future, and "DEFERRED -120M" is the
       kind of number that makes somebody stop trusting every other number on
       the card. The comparisons that matter — the 90-minute alert and the
@@ -2092,7 +2185,7 @@ export default function DefectLog(){
       row's count is made of. */
    recommendedDefects=quickFilter==="down-sheet-recommended"?recommendedDefectsFor(bus.id):[],
    recommendedMinutes=recommendedDefects.length?busRecommendedMinutes(recommendedDefects):null,
-   recommendedBy=workStateStampLabel(recommendedDefects[0]?.downSheetRecommendation);return <article className={"quick-filter-bus-card"+(expanded?" expanded":"")} key={bus.id}><button className="quick-filter-bus" aria-expanded={expanded} onClick={()=>setQuickFilterExpandedBusIds(current=>current.includes(bus.id)?[]:[bus.id])}><span><small>BUS</small><b>{bus.n}</b></span><span><strong>{locationLabel(bus.l)}</strong><small>{preview}</small></span><i>{expanded?"HIDE":"VIEW"}</i></button>{quickFilter==="deferred"&&<div className="quick-filter-deferred-row"><small className={deferredMinutes!==null&&deferredMinutes>=90?"deferred-overdue":""}>DEFERRED {deferredMinutes===null?"":deferredMinutes>=60?Math.floor(deferredMinutes/60)+"H "+Math.round(deferredMinutes%60)+"M":Math.round(deferredMinutes)+"M"}</small><button type="button" className="end-deferral" onClick={()=>endDeferralForBus(bus,defects)} disabled={!defects.length} title={defects.length>1?"Ends all "+defects.length+" deferred repairs on this bus":"Returns this repair to Open and takes the bus off Deferred"}>END DEFERRAL</button><button type="button" className="mystery-move" onClick={()=>setMovingMysteryBusId(bus.id)}>MOVE / LOCATION</button></div>}{quickFilter==="down-sheet-recommended"&&<div className="quick-filter-deferred-row quick-filter-recommended-row">
+   recommendedBy=workStateStampLabel(recommendedDefects[0]?.downSheetRecommendation);return <article className={"quick-filter-bus-card"+(expanded?" expanded":"")+(quickFilterLeaveOutOffered?" can-leave-out":"")} key={bus.id}><button className="quick-filter-bus" aria-expanded={expanded} onClick={()=>setQuickFilterExpandedBusIds(current=>current.includes(bus.id)?[]:[bus.id])}><span><small>BUS</small><b>{bus.n}</b></span><span><strong>{locationLabel(bus.l)}</strong><small>{preview}</small></span><i>{expanded?"HIDE":"VIEW"}</i></button>{/* NOT CALLED HIDE OR REMOVE. HIDE is already on this row and means "close the detail"; REMOVE is on the recommended list and takes a bus off it for good. This changes what is SENT and nothing else, and the label has to say so on a row where the other two words are taken. */}{quickFilterLeaveOutOffered&&bus.id&&<button type="button" className="quick-filter-leave-out" data-leave-out={bus.id} onClick={event=>leaveQuickFilterBusOut(bus.id,bus.n||"",event.currentTarget.closest("article"))} aria-label={"Leave out bus "+bus.n+" from this share"} title={"Leaves bus "+bus.n+" out of what you copy or share. Its defects stay in the log."}><span aria-hidden="true">&times;</span><b>LEAVE OUT</b></button>}{quickFilter==="deferred"&&<div className="quick-filter-deferred-row"><small className={deferredMinutes!==null&&deferredMinutes>=90?"deferred-overdue":""}>DEFERRED {deferredMinutes===null?"":deferredMinutes>=60?Math.floor(deferredMinutes/60)+"H "+Math.round(deferredMinutes%60)+"M":Math.round(deferredMinutes)+"M"}</small><button type="button" className="end-deferral" onClick={()=>endDeferralForBus(bus,defects)} disabled={!defects.length} title={defects.length>1?"Ends all "+defects.length+" deferred repairs on this bus":"Returns this repair to Open and takes the bus off Deferred"}>END DEFERRAL</button><button type="button" className="mystery-move" onClick={()=>setMovingMysteryBusId(bus.id)}>MOVE / LOCATION</button></div>}{quickFilter==="down-sheet-recommended"&&<div className="quick-filter-deferred-row quick-filter-recommended-row">
    {/* HOW LONG IT HAS BEEN WAITING, which the stamp has always recorded and
        nothing has ever shown. No overdue styling on purpose: Curtis said a bus
        "could be in that status for a while, which is fine", so this reports the

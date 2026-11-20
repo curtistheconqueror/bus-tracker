@@ -54,6 +54,22 @@ export default function ShopCloudLive(){
     round: a device that believes it is being told about changes stops asking,
     and then never hears anything again. */
  const live=useRef(false);
+ /* A PULL STAYS OWED UNTIL ONE LANDS. While the channel is live the sweep is
+    push-only, so a pull that did not finish was never asked for again: the
+    first pull of a page that reopening cut short with window.stop(), one that
+    failed on dead wifi, or one a change notification asked for while another
+    sync was running (sync returns early then, and the notification was
+    simply dropped). CodeRabbit on PR 51. The board then sat on what it had
+    until the next notification or a trip away from the app. Owed, the next
+    sweep pulls whatever the channel says. */
+ const pullOwed=useRef(false);
+ /* Pull requests that arrived while a sync was running. A cold read found the
+    gap the flag alone left: a pull already under way set the flag itself,
+    a notification landing mid-pull set the same flag again, and the pull -
+    whose tables were read before that other device's write - then cleared
+    it. Counted, a pull pays off only what was asked before it began, and
+    anything asked during it runs again as soon as it ends. */
+ const askedMidSync=useRef(0);
 
  useEffect(()=>{
   let stopped=false;
@@ -65,7 +81,11 @@ export default function ShopCloudLive(){
      keep — the exact data loss the guard exists to prevent. */
   const sync=async(pullToo:boolean)=>{
    const config=readCloudConfig(localStorage);
-   if(cloudConfigProblem(config)||running.current||stopped)return;
+   if(cloudConfigProblem(config)||stopped)return;
+   if(running.current){if(pullToo){pullOwed.current=true;askedMidSync.current++}return}
+   const wantPull=pullToo||pullOwed.current;
+   if(wantPull)pullOwed.current=true;
+   const askedBefore=askedMidSync.current;
    running.current=true;
    try{
     const fleet=readFleetStorage<Record<string,unknown>>(localStorage);
@@ -92,17 +112,25 @@ export default function ShopCloudLive(){
        the incoming copy for a bus both devices know, so pulling over unsent work
        would lay the server's older copy on top of it — and the next sweep would
        push that overwritten version up as though it were the truth. */
-    if(!pullToo||!pushed.ok||stopped)return;
+    if(!wantPull||!pushed.ok||stopped)return;
     const got=await cloudPull(config,new Date().toISOString(),readMergedAway(localStorage),readRemovedEntries(localStorage));
     if(stopped||!got.ok||!got.map||!got.defects||!got.sheet){
      if(!got.ok)writeCloudState(localStorage,{...readCloudState(localStorage),phase:got.phase,lastError:got.message});
      return;
     }
     const applied=applyCloudPull(localStorage,{map:got.map,defects:got.defects,sheet:got.sheet,deleted:got.deleted,removedEntries:got.removedEntries});
+    /* Paid only if nobody asked again while it ran. A board that cannot take
+       the pull at all - unreadable, or a phone too full to write - is not
+       owed another every 45 seconds: the error is on screen, and the next
+       notification or return to the app asks again (cold read). */
+    if(askedMidSync.current===askedBefore)pullOwed.current=false;
     writeCloudState(localStorage,applied.ok
      ?{phase:"idle",lastSyncedAt:new Date().toISOString(),lastError:"",pending:0}
      :{...readCloudState(localStorage),phase:"error",lastError:applied.error});
-   }finally{running.current=false}
+   }finally{
+    running.current=false;
+    if(!stopped&&askedMidSync.current!==askedBefore)window.setTimeout(()=>sync(true),0);
+   }
   };
 
   /* One device pressing SEND MY CHANGES produces a burst — a hundred rows across
@@ -149,8 +177,10 @@ export default function ShopCloudLive(){
    live.current=false;
    window.clearInterval(interval);
    window.clearTimeout(timer.current);
-   document.removeEventListener("visibilitychange",sweep);
-   window.removeEventListener("online",sweep);
+   /* The listeners added were `resume`. These removed `sweep`, which was
+      never added, so every page that unmounted this left its two behind. */
+   document.removeEventListener("visibilitychange",resume);
+   window.removeEventListener("online",resume);
    unsubscribe?.();
   };
  },[]);

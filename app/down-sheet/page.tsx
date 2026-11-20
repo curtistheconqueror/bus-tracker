@@ -243,6 +243,14 @@ export default function DownSheet(){
  const [fixedToday,setFixedToday]=useState(false);
  const [hydrated,setHydrated]=useState(false);
  const [editing,setEditing]=useState<DownEntry|null>(null);
+ /* Initials typed in the editor before ADD TO THAT ENTRY, handed to the
+    editor that opens on the existing entry. Forgotten when the editor shuts,
+    so the next entry opened starts the ordinary way. */
+ const [carriedInitials,setCarriedInitials]=useState("");
+ /* Set when the editor was reopened by ADD TO THAT ENTRY, so the new editor
+    can put the keyboard on the blank card. Forgotten with the editor. */
+ const [reopened,setReopened]=useState(false);
+ useEffect(()=>{if(!editing){setCarriedInitials("");setReopened(false)}},[editing]);
  /* Absent means closed, like the Defect Log's. A device that has never opened
     the panel does not have to write anything to say so. */
  useEffect(()=>{setAdvancedOpen(localStorage.getItem(ADVANCED_OPEN_KEY)==="1")},[]);
@@ -1212,7 +1220,13 @@ export default function DownSheet(){
   {/* "we just add to it" — the existing entry is opened with a fresh blank
       repair card on the end, so the new work is typed straight into the row
       that is already there rather than refused. */}
-  {editing&&<DownSheetEditor onOpenExisting={entryId=>{const found=entries.find(item=>item.id===entryId);if(found)setEditing({...found,repairItems:[...normalizeRepairItems(found.repairItems,{category:found.category,repair:found.repair,details:found.customReason,timeEstimate:found.timeEstimate}),blankRepairItem()]})}} entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
+  {/* KEYED TO THE ENTRY IT SHOWS. The editor copies its entry into a draft
+      once, when it mounts, so swapping the entry under a mounted editor changed
+      nothing on screen: ADD TO THAT ENTRY flipped the heading to "Bus 17507"
+      and SAVE UPDATE, kept the blank draft, and the save was refused as a
+      second entry for the bus. Measured on main with one entry seeded. A new
+      key is a new editor, opened on the entry it was handed. */}
+  {editing&&<DownSheetEditor key={editing.id} carriedInitials={carriedInitials} reopened={reopened} onOpenExisting={(entryId,typedInitials)=>{const found=entries.find(item=>item.id===entryId);if(found)setCarriedInitials(typedInitials);if(found)setReopened(true);if(found)setEditing({...found,repairItems:[...normalizeRepairItems(found.repairItems,{category:found.category,repair:found.repair,details:found.customReason,timeEstimate:found.timeEstimate}),blankRepairItem()]})}} entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
   
   {scannerOpen&&<DownSheetScanner fleet={fleet} currentEntries={active} defaultShift={defaultShift} handed={handed} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}
   {paperOpen&&<ScanPaper here={PAPER_HERE} onClose={()=>setPaperOpen(false)} onHere={openPaperHere}/>}
