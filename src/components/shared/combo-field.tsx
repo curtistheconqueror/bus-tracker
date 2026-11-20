@@ -421,6 +421,12 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  const leaveGroup=()=>{setBrowseGroup("");setActive(0)};
 
  const keys=(event:React.KeyboardEvent<HTMLInputElement>)=>{
+  /* Tab deliberately abandons an unresolved bus edit. Do not use blur here:
+     a pointer Save must still refuse raw text, not revive a stale bus. Let
+     the browser perform ordinary forward/backward focus traversal. */
+  if(event.key==="Tab"&&open&&exactPick&&onCancel&&!value){
+   onCancel();setOpen(false);setQuery("");setTypingMode(false);return;
+  }
   /* Deliberate clear, including an optional symptom. Enter on a normal Tab
      stop never clears. The shortcut is exposed on the combobox itself. */
   if(browseFirst&&!disabled&&(event.ctrlKey||event.metaKey)&&event.key==="Backspace"){

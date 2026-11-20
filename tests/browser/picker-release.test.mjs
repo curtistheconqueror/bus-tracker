@@ -373,3 +373,72 @@ for(const count of [1,5])for(const mode of ['keyboard','mouse','touch','hybrid']
   const added=saved[0].repairItems.find(r=>!r.id.startsWith('old-'));assert.match(added.repair,/misfire/i);assert.equal(Boolean(added.done),false);
  }finally{await context.close()}
 });
+
+async function busDraft(route,selected=true){
+ const opened=await open(route),{page,form}=opened;
+ const c=field(form,route==='/defect-log'?'DEFECT CATEGORY':'CATEGORY');await c.click();await c.fill('engine');await c.press('Enter');
+ const symptom=field(form,route==='/defect-log'?'SPECIFIC DEFECT':'SPECIFIC REPAIR');await page.keyboard.type('misfire');await symptom.press('Enter');
+ if(route==='/down-sheet')await form.getByLabel('UPDATED BY - INITIALS',{exact:false}).fill('ZZ');
+ const b=selected?await bus(form,'18505'):field(form,'BUS');
+ return {...opened,b,save:()=>route==='/defect-log'?page.locator('.save-log').click():form.getByRole('button',{name:'SAVE UPDATE',exact:true}).click()};
+}
+const persistedBusDraft=page=>page.evaluate(()=>[localStorage.getItem('pace-board-v1'),localStorage.getItem('pace-down-sheet-v1')]);
+async function refusedBusSave({page,form,save}){
+ const before=await persistedBusDraft(page);let message='';
+ page.once('dialog',async dialog=>{message=dialog.message();await dialog.dismiss()});await save();
+ assert.match(message,/Select a bus number/);assert.equal(await form.isVisible(),true);assert.deepEqual(await persistedBusDraft(page),before);
+}
+async function savedBusDraft({page,form,save},route,number){
+ await save();await form.waitFor({state:'hidden'});
+ const value=await page.evaluate(()=>({buses:JSON.parse(localStorage.getItem('pace-board-v1')).buses,entries:JSON.parse(localStorage.getItem('pace-down-sheet-v1')).entries}));
+ if(route==='/down-sheet'){assert.equal(value.entries.length,1);assert.equal(value.entries[0].busNumber,number);assert.match(value.entries[0].repair,/misfire/i)}
+ else{const changed=value.buses.filter(item=>item.defects.length);assert.equal(changed.length,1);assert.equal(changed[0].n,number);assert.match(changed[0].defects[0].issue,/misfire/i)}
+}
+async function rememberTabTarget(b,backward){
+ await b.evaluate((el,backward)=>{
+  const all=[...document.querySelectorAll('button,input,select,textarea,a[href],[tabindex]')].filter(item=>item.tabIndex>=0&&!item.disabled&&!item.closest('[inert]')&&item.getClientRects().length);
+  const index=all.indexOf(el);window.fixtureExpectedTabTarget=all[(index+(backward?-1:1)+all.length)%all.length];
+ },backward);
+}
+for(const route of ['/defect-log','/down-sheet'])for(const backward of [false,true])test(route+': unresolved bus '+(backward?'Shift+Tab':'Tab')+' restores prior bus and preserves native traversal',async()=>{
+ const draft=await busDraft(route),{page,context,b}=draft;
+ try{
+  await b.click();await b.fill('99999');await rememberTabTarget(b,backward);await b.press(backward?'Shift+Tab':'Tab');
+  assert.match(await b.inputValue(),/18505/);assert.equal(await b.getAttribute('aria-expanded'),'false');
+  assert.equal(await page.evaluate(()=>document.activeElement===window.fixtureExpectedTabTarget),true);
+  await savedBusDraft(draft,route,'18505');
+ }finally{await context.close()}
+});
+for(const route of ['/defect-log','/down-sheet'])test(route+': Escape/caret restore; LIST/outside/Save never revive unresolved identity; valid pick stays chosen',async()=>{
+ for(const action of ['Escape','caret','LIST','outside','Save','valid']){
+  const draft=await busDraft(route),{page,context,form,b}=draft;
+  try{
+   await b.click();await b.fill(action==='valid'?'20500':'99999');
+   if(action==='Escape')await b.press('Escape');
+   if(action==='caret')await form.getByRole('button',{name:'Hide BUS choices',exact:true}).click();
+   if(action==='LIST')await form.getByRole('button',{name:'LIST BUS choices',exact:true}).click();
+   if(action==='outside')await page.locator(route==='/defect-log'?'.log-editor-head h2':'.repair-editor-head h2').click();
+   if(['Escape','caret','valid'].includes(action)){
+    const expected=action==='valid'?'20500':'18505';assert.match(await b.inputValue(),new RegExp(expected));await savedBusDraft(draft,route,expected);
+   }else await refusedBusSave(draft);
+  }finally{await context.close()}
+ }
+});
+for(const route of ['/defect-log','/down-sheet'])test(route+': Tab cannot restore an absent/deleted prior bus',async()=>{
+ for(const prior of ['none','deleted'])for(const backward of [false,true]){
+  const draft=await busDraft(route,prior!=='none'),{page,context,b}=draft;
+  try{
+   await b.click();await b.fill('99999');
+   if(prior==='deleted'){
+    await page.evaluate(()=>{
+     const payload=JSON.parse(localStorage.getItem('pace-board-v1'));payload.buses=payload.buses.filter(bus=>bus.n!=='18505');
+     const newValue=JSON.stringify(payload);localStorage.setItem('pace-board-v1',newValue);
+     dispatchEvent(new StorageEvent('storage',{key:'pace-board-v1',newValue}));
+    });
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+   }
+   await b.press(backward?'Shift+Tab':'Tab');assert.equal(await b.inputValue(),'');assert.equal(await b.getAttribute('aria-expanded'),'false');
+   await refusedBusSave(draft);
+  }finally{await context.close()}
+ }
+});
