@@ -1656,3 +1656,61 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    tint. Both sit above the share buttons, which is the last place somebody
    looks before sending the list on. */
 .quick-filter-source-note{background:color-mix(in srgb,var(--log-accent,#0b64bd) 10%,var(--log-surface,#fff));color:var(--log-muted,#60728c)}
+
+/* ── LEAVE A BUS OUT OF THE SHARE (the Defects Logged drawer) ─────────────────
+   Checked against what already styles these before a size was given to them:
+   `.quick-filter-share-actions button` sets every button in that row (36px,
+   44px on a phone, the accent border) and `button+button` gives all but the
+   first the outline look. `.quick-filter-bus-card` is a plain block with
+   `overflow:hidden` and a 62px floor (66px on a phone); its row button is
+   given `width:100%` further up, which the grid below keeps to its own column.
+
+   THE CARD BECOMES TWO COLUMNS ONLY WHERE THE BUTTON IS OFFERED. The row's own
+   button keeps the first; LEAVE OUT has the second, the full height of the
+   row; and everything a card grows underneath - the deferred row, the
+   recommended row, the open detail - spans both, which is what `>*` is for.
+   On a list that does not offer it the card is the block it always was. */
+.quick-filter-bus-card.can-leave-out{display:grid;grid-template-columns:minmax(0,1fr) auto}
+.quick-filter-bus-card.can-leave-out>*{grid-column:1/-1}
+.quick-filter-bus-card.can-leave-out>.quick-filter-bus{grid-column:1}
+.quick-filter-bus-card.can-leave-out>.quick-filter-leave-out{grid-column:2;min-width:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;border-left:1px solid var(--log-border);background:color-mix(in srgb,var(--log-page) 45%,var(--log-surface));color:var(--log-muted);padding:0 6px;font-family:inherit;cursor:pointer;touch-action:manipulation}
+.quick-filter-leave-out>span{font-size:16px;line-height:1}
+.quick-filter-leave-out>b{font-size:7px;font-weight:900;letter-spacing:.4px;line-height:1.1;white-space:nowrap}
+.quick-filter-leave-out:hover,.quick-filter-leave-out:focus-visible{background:color-mix(in srgb,var(--log-accent) 12%,var(--log-surface));color:var(--log-accent);outline:2px solid var(--log-accent);outline-offset:-2px}
+/* A BUS LEFT OUT KEEPS ITS PLACE as a slim, dashed row: the number, what
+   happened to it, and PUT BACK. It keeps the card's own height floor, so the
+   rows below do not move when one is left out or put back. */
+.quick-filter-bus-card.left-out{display:grid;grid-template-columns:52px minmax(0,1fr) auto;align-items:center;gap:8px;border-style:dashed;border-left-width:1px;background:color-mix(in srgb,var(--log-page) 45%,var(--log-surface));padding:0 0 0 10px}
+.quick-filter-left-out-bus{display:flex;flex-direction:column;color:var(--log-muted)}
+.quick-filter-left-out-bus>small{font-size:7px;font-weight:900;letter-spacing:.4px}
+.quick-filter-left-out-bus>b{font-size:15px;text-decoration:line-through;text-decoration-thickness:1px}
+.quick-filter-left-out-note{color:var(--log-muted);font-size:8px;font-weight:900;letter-spacing:.4px;line-height:1.3}
+.quick-filter-bus-card.left-out>.quick-filter-put-back{align-self:stretch;min-width:64px;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;border-left:1px dashed var(--log-border);background:var(--log-surface);color:var(--log-accent);padding:0 8px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.4px;white-space:nowrap;cursor:pointer;touch-action:manipulation}
+.quick-filter-bus-card.left-out>.quick-filter-put-back>span{font-size:14px;line-height:1}
+.quick-filter-bus-card.left-out>.quick-filter-put-back:hover,.quick-filter-bus-card.left-out>.quick-filter-put-back:focus-visible{background:color-mix(in srgb,var(--log-accent) 12%,var(--log-surface));outline:2px solid var(--log-accent);outline-offset:-2px}
+/* A share button that will not send says so by looking it. */
+.quick-filter-share-actions button:disabled{opacity:.45;cursor:not-allowed}
+/* What a LEAVE OUT did is read out, never drawn: the row going is the visible
+   answer. Out of the grid's flow, or it would be a fifth cell and a new row. */
+.quick-filter-share-actions>small.quick-filter-leave-live{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* "OF 6" beside the count, once a bus has been left out. The badge is a 30px
+   circle that only has a MIN width, so "5 OF 6" filled it edge to edge and the
+   rounded ends cut into the letters - measured at 390. It gets side padding
+   while it carries the total, and stays a circle for a plain number. */
+/* THE BADGE KEEPS ONE WIDTH while the list offers LEAVE OUT. It was a 30px
+   circle that grew into a pill on the first LEAVE OUT - 17.7px sideways with
+   six buses, 28.6px with twelve - and shrank back on the last PUT BACK (SDET
+   review, BT52-LS-F2). Reserved for the whole time, in tabular figures so the
+   digits do not wobble it. 76px holds still up to three-digit totals - "104 OF 105" measured 74.5px - which an ALL window can reach (SDET re-gate, BT52-LS-F4). */
+.quick-filter-head strong.leave-out-offered{min-width:76px;padding:0 10px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.quick-filter-head strong>small{margin-left:3px;font-size:.55em;font-weight:900;letter-spacing:.4px;opacity:.8}
+@media(max-width:760px){
+ .quick-filter-bus-card.can-leave-out>.quick-filter-leave-out{min-width:56px}
+ .quick-filter-leave-out>b{font-size:8px}
+ /* A bus row is its 66px button plus the card's 2px of border; the LEFT OUT
+    row has no button holding it open, so it is given the same 68 here.
+    Measured 66 against 68 without it, and every row below moved 2px. */
+ .quick-filter-bus-card.left-out{min-height:68px}
+ .quick-filter-bus-card.left-out>.quick-filter-put-back{min-width:72px;font-size:9px}
+ .quick-filter-left-out-note{font-size:9px}
+}
