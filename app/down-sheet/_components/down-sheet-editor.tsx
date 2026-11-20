@@ -148,18 +148,16 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
            This was a bare <select> over `availableFleet` — no way to type a
            fleet number at all, and the list additionally hid every bus that
            already had an active entry, so a bus could be both un-typable and
-           un-listable. The Defect Log had solved this twice over already, with
-           generation chips and a typed box backed by a datalist, and copying it
-           across would have made two of them to keep in step.
+           un-listable. The Defect Log had solved this already, and copying it
+           across would have made two of them to keep in step. It is one BUS
+           box now on both (Curtis's B): browse by generation, or type.
 
            `fleet` rather than `availableFleet`: typing a number that is already
            on the sheet has to RESOLVE, so the uniqueness rule below can say so
            in words. A number that silently matches nothing reads as the app not
-           knowing the bus.
-
-           autoFocus off, because this editor opens with the section and the
-           workflow above it and stealing focus moves the page under a thumb. */}
-          <BusSelector fleet={fleet} busId={draft.busId} listId="down-sheet-bus-numbers" autoFocus={false} typeAhead={false}
+           knowing the bus. Nothing is focused when
+           it opens: the bus box opens its list on a tap, without the keyboard. */}
+          <BusSelector fleet={fleet} busId={draft.busId}
            select={busId=>{const bus=fleet.find(item=>item.id===busId);setDraft(current=>({...current,busId,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}/>
           {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={()=>onOpenExisting(existingEntry.id)}>ADD TO THAT ENTRY</button>}</p>}
         <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
@@ -197,6 +195,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
                     "make downsheet operate similarly". The list opens without
                     the keyboard; tap the box again, or TYPE, to type. */}
                 <ComboField label="SPECIFIC REPAIR" className="wide" browseFirst
+                 openWhen={item.category}
                  value={item.repair}
                  display={item.repair?(CATALOG_OPTIONS.find(row=>row.value===item.repair&&(!item.category||row.category===item.category))?.label||CATALOG_OPTIONS.find(row=>row.value===item.repair)?.label||item.repair):""}
                  /* SHORTER THAN THE DEFECT LOG'S, because this box sits inside a

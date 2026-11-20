@@ -952,7 +952,9 @@ test("phone layouts expose large primary controls and category-only defect entry
   assert.match(defectPage, /<details className="advanced-defect-details"/);
   assert.match(defectPage, /<b>ADVANCED DETAILS<\/b><small>Diagnosis, repair, parts and initials<\/small>/);
   assert.ok(defectPage.indexOf('className="save-log-middle-actions"')<defectPage.indexOf('className="advanced-defect-details"'));
-  assert.ok(defectPage.indexOf('className="advanced-defect-details"')<defectPage.indexOf('className="wide downsheet-check"'));
+  assert.ok(defectPage.indexOf('className="wide downsheet-check"')<defectPage.indexOf('className="advanced-defect-details"'),
+    "the Down Sheet ticks moved up under the symptom (Curtis's E)");
+  assert.ok(defectPage.indexOf('className="advanced-defect-details"')<defectPage.indexOf('className="wide downsheet-check deferred-check"'));
   assert.match(defectCss, /\.advanced-defect-details summary\{[^}]*min-height:46px/);
   assert.match(defectPage, /save-log-middle-actions[\s\S]*\{saveLabel\}[\s\S]*>CLOSE</);
   assert.doesNotMatch(defectPage, /SAVE & CLOSE/);
@@ -2442,12 +2444,12 @@ test("the Down Sheet uses the Defect Log's bus picker, and adds to a bus already
  assert.match(page,/onOpenExisting=\{entryId=>/);
  assert.match(page,/\.\.\.normalizeRepairItems\(found\.repairItems[^)]*\),blankRepairItem\(\)\]/);
 
- /* autoFocus off here: this editor opens with the section and the workflow
-    above the picker, and stealing focus moves the page under a thumb. */
- assert.match(editor,/autoFocus=\{false\}/);
- /* Two of these on one page would otherwise share a datalist id. */
- assert.match(editor,/listId="down-sheet-bus-numbers"/);
- assert.match(picker,/listId="bus-number-options"/,"and the default is its own");
+ /* NOTHING STEALS FOCUS when this editor opens — it opens with the section
+    and the workflow above the picker, and a cursor there would move the page
+    under a thumb. The one-box picker (Curtis's B) never focuses on its own,
+    and it has no <datalist> for two of them on one page to share an id. */
+ assert.doesNotMatch(strip(picker),/autoFocus|datalist|listId/);
+ assert.match(editor,/<BusSelector fleet=\{fleet\} busId=\{draft\.busId\}\n/);
 });
 
 test("ADD DOWN BUS opens with no bus chosen, so a save cannot land on a random one",async()=>{

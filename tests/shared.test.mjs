@@ -228,42 +228,50 @@ test("the defect form asks for the bus the way a mechanic reaches for it",async(
     declaration — a control with no edges on the surface nobody tested. */
  assert.equal(/var\(--[a-z-]+\)/.test(css),false,"no bare var survives into the shared picker stylesheet");
 
- // TWO BOXES, NAMED FOR WHAT THEY DO. The one box used to be called BUS NUMBER
- // and the first thing inside it was a row of generations.
- const generations=picker.slice(picker.indexOf('bus-picker-generations'),picker.indexOf('bus-picker-number'));
- const number=picker.slice(picker.indexOf('bus-picker-number'),picker.indexOf('</fieldset>\n </>'));
- assert.match(generations,/<legend>BUS GENERATIONS<\/legend>/);
- assert.match(number,/<legend>BUS NUMBER<\/legend>/);
- // The chips belong to the generations box, and only to it.
- assert.match(generations,/className="bus-generations"/);
- assert.equal(/className="bus-generations"/.test(number),false);
- // Both ways of naming one bus sit together under BUS NUMBER, with the list first.
- assert.ok(number.indexOf("TYPE BUS #")>=0&&number.indexOf("BUS LIST")>=0);
- assert.ok(number.indexOf("BUS LIST")<number.indexOf("TYPE BUS #"),"the bus list comes first");
+ // ONE BOX NOW (Curtis's B). It was two boxes — BUS GENERATIONS chips over a
+ // BUS NUMBER box holding a list and a typed number — about a third of a
+ // phone screen. He kept one thing non-negotiable: "I don't want to get rid
+ // of the flexibility of typing in the bus number."
+ assert.match(picker,/<ComboField label="BUS" className="wide bus-combo" coach=\{coach\} browseFirst typeAs="numeric"/,
+  "one BUS box, browsed like the category, typed on the number pad");
+ assert.doesNotMatch(picker.replace(/\/\*[\s\S]*?\*\//g,""),/<fieldset|BUS GENERATIONS|TYPE BUS #|BUS LIST/,"the three old controls are gone");
+ /* THE RULES, RUN. Typing finds by fleet number, start first; a full number
+    is the bus, but not while a longer number still starts with it. */
+ const {searchBuses,exactBus,busGeneration,generationLabel}=await import("../src/lib/fleet/bus-search.ts");
+ const fleet=[{id:"a",n:"15502",l:""},{id:"b",n:"17507",l:""},{id:"c",n:"17509",l:""},{id:"d",n:"21750",l:""},{id:"e",n:"1750",l:""}];
+ assert.deepEqual(searchBuses(fleet,"175").map(bus=>bus.n),["17507","17509","1750","21750"],"the start of the number first, then anywhere in it");
+ assert.deepEqual(searchBuses(fleet,"bus 1550").map(bus=>bus.n),["15502"],"words are ignored, digits are searched");
+ assert.equal(searchBuses(fleet,"").length,5,"nothing typed is the whole list");
+ /* BT54-F1: letters typed with no digit find no bus. They found the whole
+    fleet, and Enter picked the first bus - a repair on the wrong bus. */
+ assert.deepEqual(searchBuses(fleet,"abc"),[]);
+ assert.deepEqual(searchBuses(fleet,"brakes"),[]);
+ assert.deepEqual(searchBuses(fleet,"   ").map(bus=>bus.n).length,5,"spaces alone are nothing typed");
+ /* A bus with no location is just its number, not "Location not set". */
+ const {busPickerDisplay}=await import("../src/lib/fleet/bus-search.ts");
+ assert.equal(busPickerDisplay({id:"x",n:"15502",l:""}),"Bus 15502");
+ assert.equal(exactBus(fleet,"17509")?.id,"c","a full number picks its bus");
+ assert.equal(exactBus(fleet,"1750"),null,"not while 17507 and 17509 still start with it");
+ assert.equal(exactBus(fleet,"1751"),null,"a number that is no bus picks nothing");
+ assert.equal(exactBus([...fleet,{id:"f",n:"15502",l:""}],"15502"),null,"two buses on one number is a guess, so nothing");
+ assert.equal(generationLabel(busGeneration("17507")),"17s");
+ assert.equal(generationLabel(busGeneration("X1")),"OTHER","a number with no generation is filed, not dropped");
+ assert.match(picker,/from "@\/src\/lib\/fleet\/bus-search"/,"the picker draws these rules rather than a copy of them");
+ /* THE ORDER THE BOX SHOWS: generation first, then number, so a four-digit
+    1750 does not put the 17s row above the 15s. */
+ assert.match(picker,/sort\(\(a,b\)=>COLLATOR\.compare\(busGeneration\(a\.n\),busGeneration\(b\.n\)\)\|\|COLLATOR\.compare\(a\.n,b\.n\)\)/);
+ /* A click right after the symptom list opened itself is the category tap's,
+    landing on a box that slid up under the finger — not a request to type. */
+ const combo=await readFile(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8");
+ assert.match(combo,/openedItselfAt\.current=Date\.now\(\);\s*setOpen\(true\)/);
+ assert.match(combo,/if\(Date\.now\(\)-openedItselfAt\.current<600\)return;/);
 
- // THE TYPED NUMBER IS THE ONE THAT GETS USED, so it is the biggest control in
- // the form and it carries the page's own text colour, not the muted grey.
- // Scoped to .log-form on purpose: the generic `.log-form input{font-size:16px}`
- // rule below sits LATER in this file at the same specificity, so an unscoped
- // `.type-bus-number>input` loses the tie and silently renders at 16px. That
- // exact bug was measured in a browser before this test existed.
- /* That override is genuinely the Defect Log's - it is scoped to .log-form -
-    so it stayed behind when the shared rules moved out. */
+ // THE NUMBER STILL READS BIGGEST. It was a 26px box; the BUS box draws the
+ // number bigger and heavier than a category, and its placeholder plain.
+ assert.match(css,/\.combo-field\.bus-combo \.combo-input\{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums\}/);
+ assert.match(css,/\.combo-field\.bus-combo \.combo-input::placeholder\{font-weight:400\}/);
  const logCss=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
- assert.match(logCss,/\.log-form \.type-bus-number>input\{[^}]*font-size:26px/);
- assert.match(logCss,/\.log-form \.type-bus-number>input\{[^}]*color:var\(--log-text\)/);
- /* Both sides of this specificity fight live in defect-log.css: the generic
-    .log-form input rule and the .log-form .type-bus-number>input that has to
-    outrank it. Moving the SHARED picker rules out did not separate them, and
-    this reads the file they are both in. */
- assert.match(logCss,/\.log-form input,\.log-form select[^}]*font-size:16px\}/,
-  "the generic rule this one has to outrank must still be here");
- assert.ok(logCss.indexOf(".log-form .type-bus-number>input")<logCss.indexOf("font-size:16px}")
-  ||true,"scoping wins regardless of order, which is the point");
-
- // The list is disabled until a generation is picked, and that control now
- // lives in the other box, so the reason has to be stated here.
- assert.match(number,/Pick a generation above to use the bus list/);
+ assert.doesNotMatch(logCss,/type-bus-number/,"no rule left styling a box that is not drawn");
 
  // THE STAMP IS NOT A FIELD. It used to sit between the bus and the category,
  // where it read like something to fill in.
@@ -784,7 +792,7 @@ test("the picker's drop-down arrow is a real control, and the component carries 
  assert.doesNotMatch(combo,/<span className="combo-caret"/);
  assert.doesNotMatch(css,/\.combo-caret\{[^}]*pointer-events:\s*none/);
  /* Toggles, so the arrow that asks for the list also puts it away. */
- assert.match(combo,/if\(open\)\{setOpen\(false\);setQuery\(""\);return;\}/);
+ assert.match(combo,/if\(open\)\{setOpen\(false\);setQuery\(""\);onCancel\?\.\(\);return;\}/);
  /* Out of the tab order on purpose: the input owns the keyboard, where
     ArrowDown already opens the list. This adds a touch target, not a tab stop. */
  assert.match(combo,/className="combo-caret"[\s\S]*?tabIndex=\{-1\}/);
@@ -883,16 +891,13 @@ test("the bus picker does not rebuild the fleet on every character",async()=>{
     a bare input in the same browser, and a quarter of all keystrokes crossed
     50ms. Latency that tracks CPU speed while barely moving with board size is
     work this code does per character, not the platform's input pipeline. */
- assert.match(code,/const generations=useMemo\(/,"the generation list is not rebuilt per character");
- assert.match(code,/const candidates=useMemo\(/);
- assert.match(code,/\.sort\(\(a,b\)=>COLLATOR\.compare\(a\.n,b\.n\)\),\[fleet,generation\]\)/,
-  "the filtered, sorted fleet is computed from the fleet and the generation, not from the keystroke");
- assert.match(code,/const busListOptions=useMemo\(/);
- assert.match(code,/const numberOptions=useMemo\(/);
- assert.match(code,/<datalist id=\{listId\}>\{numberOptions\}<\/datalist>/,
-  "the type-ahead takes the built list");
- assert.doesNotMatch(code,/\{candidates\.map\(/,
-  "no option list is mapped inline, which would hand React new elements every character");
+ /* The three-control picker that measurement was taken on is gone (Curtis's
+    B). What it taught still holds: nothing about the fleet is rebuilt per
+    character. The fleet is sorted once per fleet, and the rows are only built
+    while the BUS box's list is open — ComboField asks for none while shut. */
+ assert.match(code,/const sorted=useMemo\(\(\)=>\[\.\.\.fleet\]\.sort\([^\n]*\),\[fleet\]\);/,
+  "the sorted fleet is computed from the fleet, not from the keystroke");
+ assert.doesNotMatch(code,/<option|<datalist/,"no option list drawn twice, open or shut");
 
  /* ONE COLLATOR, MADE ONCE. `localeCompare` with numeric collation builds a
     fresh collator per comparison: measured at 0.439ms a sort over 84 buses
@@ -903,13 +908,14 @@ test("the bus picker does not rebuild the fleet on every character",async()=>{
  assert.doesNotMatch(code,/localeCompare/,
   "a per-comparison collator is the thing this replaced");
 
- /* AND THE BEHAVIOUR IS UNTOUCHED, which is the whole claim of a performance
-    change. `typeNumber` still reports on every character, including the empty
-    id for a number that matches no bus — that call is what clears a page search
-    the chosen bus would hide, and skipping it when the id has not changed is
-    worth about 6ms more but is a CHANGE, so it is not smuggled in here. */
- assert.match(code,/const exact=fleet\.find\(bus=>bus\.n===digits\);select\(exact\?\.id\|\|""\)/,
-  "every character still reports its resolved bus, exactly as before");
+ /* WHAT A NUMBER DOES NOW. The old box reported on every character, the
+    empty id included, and the page's clearSearchIfBusIsOutside cleared a
+    number search a chosen bus would hide. The bus is CHOSEN now, by a tap or
+    by a full number: nothing is reported until then, and the page still hears
+    the bus that was picked — which is the only one that search can hide. */
+ assert.match(code,/onPick=\{id=>\{letGo\.current="";select\(id\)\}\}/,"the picked bus is what the page hears");
+ assert.match(code,/exactPick=\{query=>\{const bus=exactBus\(fleet,query\);return bus\?toOption\(bus\):null\}\}/,
+  "a full fleet number picks its bus without a tap");
 });
 
 test("the picker opens on group titles, and typing still searches everything",async()=>{
@@ -1041,7 +1047,7 @@ test("a form redrawing around a text field does not drag the picker with it",asy
     option lists; its props do not move while somebody types a sentence. */
  assert.match(pickerCode,/^function BusSelector\(/m,"declared, so it can be wrapped");
  assert.match(pickerCode,/^export default memo\(BusSelector\);$/m);
- assert.match(pickerCode,/import \{memo,useEffect,useMemo,useState\} from "react"/);
+ assert.match(pickerCode,/import \{memo,useMemo,useRef\} from "react"/);
  /* A memo over an inline arrow is a comparison that can never pass. */
  assert.match(log,/const pickBus=useCallback\(\(busId:string\)=>\{onBusPicked\(busId\);setValue\(current=>\(\{\.\.\.current,busId\}\)\)\},\[onBusPicked\]\)/,
   "the callback is held still, or the memo does nothing but cost a comparison");
@@ -1138,9 +1144,14 @@ test("on the Defect Log a picker opens its list without the keyboard, and typing
  /* Curtis, on the iPhone: pickers should not raise the keyboard "unless I tap
     to type". Asked how typing is reached, he chose both doors — "tap the box
     again to type" plus the TYPE button — and LIST to get the list back. */
- assert.match(code,/browseFirst=false\}/,"off unless a page asks, so the Down Sheet is untouched");
+ assert.match(code,/browseFirst=false[,}]/,"off unless a page asks for it");
  assert.match(code,/readOnly=\{browseFirst&&!typing\}/,"read-only until typing is asked for: no keyboard on a phone");
- assert.match(code,/inputMode=\{browseFirst&&!typing\?"none":undefined\}/);
+ assert.match(code,/inputMode=\{browseFirst&&!typing\?"none":typeAs\}/);
+ /* The keyboard TYPE raises is the one the field names: the number pad for
+    the bus box. Written onto the element too, with the read-only flag. */
+ assert.match(code,/if\(!on\)input\.setAttribute\("inputmode","none"\);else if\(typeAs\)input\.setAttribute\("inputmode",typeAs\);else input\.removeAttribute\("inputmode"\);/);
+ /* A full answer picks itself: exactPick runs on every character typed. */
+ assert.match(code,/const exact=exactPick\?\.\(event\.target\.value\);\s*if\(exact\)\{pick\(exact,true\);return;\}/);
  /* THE TAP THAT ASKS TO TYPE FOCUSES INSIDE ITS OWN HANDLER, with the flag
     already lifted on the element. iOS raises the keyboard only for a focus
     made inside the tap, and only onto an input that is not read-only then. */
@@ -1148,10 +1159,10 @@ test("on the Defect Log a picker opens its list without the keyboard, and typing
  /* AND THE KEYBOARD HINT GOES WITH IT. Swapped, inputmode="none" would stay
     on while typing and an iPhone would raise no keyboard at all - a mutant
     the first version of this test let through (SDET review, BT53-F3). */
- assert.match(code,/if\(on\)input\.removeAttribute\("inputmode"\);else input\.setAttribute\("inputmode","none"\);/,"typing drops inputmode=none, or iOS shows no keyboard");
+ assert.match(code,/if\(!on\)input\.setAttribute\("inputmode","none"\);else if\(typeAs\)input\.setAttribute\("inputmode",typeAs\);else input\.removeAttribute\("inputmode"\);/,"typing drops inputmode=none, or iOS shows no keyboard");
  /* A mouse on the arrow types, as a mouse on the box does (BT53-F1). */
  assert.match(code,/else if\(pressedWith\.current==="mouse"&&pressedJustNow\(\)\)\{setTypingMode\(true\);inputRef\.current\?\.focus\(\);\}/);
- assert.equal((code.match(/onPointerDown=\{event=>\{pressedAt\.current=Date\.now\(\);pressedWith\.current=event\.pointerType\}\}/g)||[]).length,2,"the box and the arrow both record what pressed them");
+ assert.equal((code.match(/onPointerDown=\{event=>\{pressedAt\.current=Date\.now\(\);pressedWith\.current=event\.pointerType\}\}/g)||[]).length,3,"the box, the arrow and TYPE all record what pressed them");
  assert.match(code,/const startTyping=\(\)=>\{\s*if\(disabled\)return;\s*setTypingMode\(true\);\s*openBrowse\(\);\s*inputRef\.current\?\.focus\(\);/);
  /* First tap opens, second tap types — for a finger. A tap never focuses the
     input while it is browsing; the click decides. */
@@ -1204,12 +1215,10 @@ test("on the Defect Log a picker opens its list without the keyboard, and typing
 
  /* NO KEYBOARD AS THE FORM OPENS, AND NO GREY CARD. The grey card is iOS's
     drawing of a <datalist> suggestion offering back the number in the box. */
- assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\} coach="bus" autoFocus=\{false\} typeAhead=\{false\}\/>/);
- assert.match(picker,/list=\{typeAhead\?listId:undefined\}/);
- assert.match(picker,/\{typeAhead&&<datalist id=\{listId\}>\{numberOptions\}<\/datalist>\}/);
- assert.match(picker,/typeAhead=true\}/,"on by default, for any page that has not asked");
- assert.match(sheet,/<BusSelector fleet=\{fleet\} busId=\{draft\.busId\} listId="down-sheet-bus-numbers" autoFocus=\{false\} typeAhead=\{false\}/,
-  "and the Down Sheet has no grey card either");
+ assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\} coach="bus"\/>/);
+ assert.match(sheet,/<BusSelector fleet=\{fleet\} busId=\{draft\.busId\}\n/);
+ const pickerCode=picker.replace(/\/\*[\s\S]*?\*\//g,"");
+ assert.doesNotMatch(pickerCode,/autoFocus|<datalist|list=\{/,"no focus taken, and no suggestion list for iOS to draw");
 
  /* THE WORDS IN THE BOX FIT. The old symptom placeholder needed 403px in a
     276px box at 390 wide; the box is narrower still with TYPE in it. */
@@ -1241,4 +1250,66 @@ test("on the Defect Log a picker opens its list without the keyboard, and typing
  }
  assert.ok(num(phone,/\.combo-mode\{[^}]*width:(\d+)px/,"phone TYPE width")>=44,"a gloved thumb");
  assert.match(logCss,/\.log-form \.combo-mode\{[^}]*color:var\(--log-accent/,"TYPE takes the page's accent, so the themes keep it");
+});
+
+test("picking a category opens the symptom list by itself, without the keyboard",async()=>{
+ const [combo,log,sheet]=await Promise.all([
+  readFile(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8"),
+ ]);
+ const code=combo.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ /* Curtis's C, on his question "what if a person wants to type the symptoms
+    to get to them quicker?": the list is already open, so one tap on the box
+    types — where it took two. */
+ assert.match(code,/openWhen=""[,}]/,"off unless a page names what it follows");
+ /* On a CHANGE only: the first draw records the value and opens nothing, so
+    reopening an old defect does not throw a list at anybody. Never over an
+    answer, never for a disabled field, and only on a browse-first field —
+    browsing, so no keyboard comes with it. */
+ assert.match(code,/const lastOpenWhen=useRef\(openWhen\);/);
+ assert.match(code,/if\(!browseFirst\|\|disabled\|\|!openWhen\|\|openWhen===before\|\|value\|\|typingRef\.current\)return;\s*openedItselfAt\.current=Date\.now\(\);\s*setOpen\(true\);setQuery\(""\);setBrowseGroup\(""\);setActive\(0\);/);
+ assert.doesNotMatch(code.slice(code.indexOf("const lastOpenWhen"),code.indexOf("const releaseOtherField")),/focus\(\)|setTypingMode\(true\)/,"it never starts typing");
+ assert.match(log,/coach="issue" browseFirst\n\s*openWhen=\{value\.defect\.category\}/);
+ assert.match(sheet,/<ComboField label="SPECIFIC REPAIR" className="wide" browseFirst\n\s*openWhen=\{item\.category\}/);
+});
+
+test("the bus box cannot leave a repair on a bus nobody chose",async()=>{
+ const [combo,picker]=await Promise.all([
+  readFile(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8"),
+ ]);
+ const code=combo.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ /* CodeRabbit on PR 54: a number typed over a chosen bus kept the old bus
+    under it, and the Down Sheet could save the repair there. Typing lets the
+    bus go, as TYPE BUS # did; opening or backing out of the list keeps it. */
+ assert.match(code,/onType\?\.\(event\.target\.value\);\s*const exact=exactPick\?\.\(event\.target\.value\);\s*if\(exact\)\{pick\(exact,true\);return;\}/,"told of each character before any pick");
+ assert.match(picker,/onType=\{\(\)=>\{if\(busId\)\{letGo\.current=busId;select\(""\)\}\}\}/);
+ /* BT54-F7: an accidental digit then Escape left an old defect with no bus.
+    Backing out without a pick gives back the bus typing let go of - from
+    Escape, LIST, the arrow and a tap away alike. */
+ assert.match(picker,/onCancel=\{\(\)=>\{const back=letGo\.current;letGo\.current="";if\(back&&!busId&&fleet\.some\(bus=>bus\.id===back\)\)select\(back\)\}\}/);
+ assert.match(code,/setOpen\(false\);setQuery\(""\);onCancel\?\.\(\);\s*\}/,"Escape is a cancel");
+ assert.match(code,/const stopTyping=\(\)=>\{[^}]*onCancel\?\.\(\);/,"LIST is a cancel");
+ assert.match(code,/cancelRef\.current\?\.\(\);/,"a tap away is a cancel");
+ /* BT54-F4: keeping focus after every pick let typing meant for the symptom
+    list change the category. Only a typed exact answer keeps it. */
+ assert.match(code,/const keepFocus=browseFirst&&typedExact&&/);
+ /* BT54-F5: with nothing typed, Backspace or Delete empties an answer. */
+ assert.match(code,/if\(browseFirst&&!disabled&&\(event\.key==="Backspace"\|\|event\.key==="Delete"\)&&!query&&value\)\{event\.preventDefault\(\);onPick\("",null\);return;\}/);
+ /* And the × is not the next Tab stop after a pick: Enter there cleared the
+    bus just typed. Measured at 1180 before the fix. */
+ assert.match(code,/className="combo-clear" aria-label=\{"Clear "\+label\} tabIndex=\{browseFirst\?-1:undefined\}/);
+ /* SDET BT54-F2: after a typed number picked the bus, the blur threw the
+    shop computer's cursor out of the form and Tab went back into the box.
+    A finger still lets go - that is what takes a phone keyboard down. */
+ assert.match(code,/const keepFocus=browseFirst&&typedExact&&\(pressedWith\.current==="mouse"\|\|\(pressedWith\.current===""&&!\(typeof matchMedia==="function"&&matchMedia\("\(pointer: coarse\)"\)\.matches\)\)\);\s*if\(!keepFocus\)inputRef\.current\?\.blur\(\);/,
+  "a mouse or a hardware keyboard keeps focus; a finger, a pen, or a phone's own keyboard arrows let go");
+ /* Cold read: with focus kept, an Enter out of habit right after typing a
+    full bus number submitted the Down Sheet form with no repair on it. */
+ assert.match(code,/else if\(browseFirst&&Date\.now\(\)-pickedAt\.current<2000\)event\.preventDefault\(\);/);
+ assert.match(code,/pickedAt\.current=Date\.now\(\);/);
+ /* CodeRabbit on PR 54: the list opening itself must not wipe a query
+    somebody is typing in that box. */
+ assert.match(code,/if\(!browseFirst\|\|disabled\|\|!openWhen\|\|openWhen===before\|\|value\|\|typingRef\.current\)return;/);
 });

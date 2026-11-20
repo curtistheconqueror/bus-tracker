@@ -514,11 +514,10 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    {coach&&<FormCoachBar step={coach} hide={()=>setCoachHidden(true)}/>}
    <div className="log-form">
-    {/* NOTHING TAKES THE CURSOR WHEN THE FORM OPENS, and the typed number offers
-        no suggestions. Curtis, on the iPhone: the keyboard came up the moment
-        LOG DEFECT opened, and picking from the bus list left a grey card
-        repeating the number, which is how iOS draws a <datalist> suggestion. */}
-    <BusSelector fleet={fleet} busId={value.busId} select={pickBus} coach="bus" autoFocus={false} typeAhead={false}/>
+    {/* ONE BUS BOX, opened like the category: nothing takes the cursor when
+        the form opens, and there is no suggestion list for iOS to draw as the
+        grey card Curtis saw repeating the number. */}
+    <BusSelector fleet={fleet} busId={value.busId} select={pickBus} coach="bus"/>
     {/* TWO FIELDS, NOT FOUR. Curtis asked for a search beside each picker and
         named the risk in the same breath — "just try to make it look clean".
         One control per picker does both jobs: tap it and the whole list opens
@@ -536,6 +535,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
         Accessories before he could log one. Now he types "wiper motor", picks
         it, and the category fills itself in behind him. */}
     <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide" coach="issue" browseFirst
+     openWhen={value.defect.category}
      value={value.quickIssue}
      display={value.quickIssue?issueDisplay(value.quickIssue,value.defect.category):""}
      /* SHORT ENOUGH TO FIT. The old wording needed 403px in a 276px box and was
@@ -654,6 +654,17 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
      extraFluids.length?"QUANTITY — "+pickedFluid.toUpperCase():"QUANTITY"
     }<input type="number" min="0.5" step="0.5" inputMode="decimal" value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}/></label><label>UNIT<select value={value.defect.unit||"quarts"} onChange={event=>updateDefect("unit",event.target.value)}><option value="quarts">Quarts</option><option value="gallons">Gallons</option><option value="liters">Liters</option></select></label></>}
     {countField&&<label className="defect-count-field" data-coach="count">{countField.label}<select value={value.defect.quantity||""} onChange={event=>setValue(current=>({...current,defect:{...current.defect,quantity:event.target.value?Number(event.target.value):undefined,unit:countField.unit}}))}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={count} key={count}>{count}</option>)}</select></label>}
+    {/* THE DOWN SHEET DECISION SITS UNDER THE DEFECT IT IS ABOUT. Curtis's E:
+        the symptom is the reason for a referral, so whether it goes to the
+        sheet is asked straight after it — after the count and the pickers that
+        belong to the symptom itself, before the optional notes. It lived below
+        ADVANCED DETAILS, about two and a half screens down on a phone.
+
+        The two rows stay together and in this order: apart, somebody reaches
+        for the wrong one, because they read almost identically and do very
+        different things. DEFERRED and NOT DUPLICATED stay at the bottom. */}
+    <label className="wide downsheet-check downsheet-recommend-check"><input type="checkbox" checked={recommended} onChange={event=>toggleDownSheetRecommendation(event.target.checked)}/><span><b>RECOMMEND FOR DOWN SHEET</b><small>{recommended&&recommendedBy?"Put forward by "+recommendedBy+".":"Put it forward for the sheet. Not added yet."}</small></span></label>
+    <label className="wide downsheet-check"><input type="checkbox" checked={value.onDownSheet} disabled={value.defect.state==="completed"} onChange={event=>toggleOnDownSheet(event.target.checked)}/><span><b>DOWN SHEET</b><small>Add it to the sheet now.</small></span></label>
     {/* BULLET starts a new line with a dot on it, which is the whole feature:
         the breaks somebody types are kept now, so a dot at the start of a line
         IS a bullet and nothing has to parse anything. It appends rather than
@@ -800,13 +811,6 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
       :"Decimal hours: .5 is half an hour. Diagnostic time starts at "+MINIMUM_DIAGNOSTIC_HOURS+" hour and only goes up. Leave blank if no time is being billed."}</small>
     </fieldset>
     </div></details>}
-    {/* Both rows stay below ADVANCED DETAILS, where the Down Sheet control has
-        always lived and where anyone looking for a Down Sheet thing looks. The
-        recommendation goes directly above the escalation rather than up with
-        the work states: apart, somebody reaches for the wrong one, because the
-        two read almost identically and do very different things. */}
-    <label className="wide downsheet-check downsheet-recommend-check"><input type="checkbox" checked={recommended} onChange={event=>toggleDownSheetRecommendation(event.target.checked)}/><span><b>RECOMMEND FOR DOWN SHEET</b><small>{recommended&&recommendedBy?"Put forward by "+recommendedBy+".":"Put it forward for the sheet. Not added yet."}</small></span></label>
-    <label className="wide downsheet-check"><input type="checkbox" checked={value.onDownSheet} disabled={value.defect.state==="completed"} onChange={event=>toggleOnDownSheet(event.target.checked)}/><span><b>DOWN SHEET</b><small>Add it to the sheet now.</small></span></label>
     {/* Disabled while the repair is on the sheet, because the Down Sheet has
         a "Deferred" workflow of its own that writes this same state. Left
         enabled, the two boxes both read as ticked and the form claims a
@@ -1528,7 +1532,10 @@ export default function DefectLog(){
    and matchesSearch can answer honestly: type "brake", log a brake defect on
    any bus at all, and the search still describes it and stays. */
  const clearSearchIfBusIsOutside=(busId:string)=>{
-  if(!search.trim()||busSearch.kind!=="numbers")return;
+  /* No bus is not another bus. Typing over a chosen bus lets it go with an
+     empty id, and that cleared a bus-number search it does not contradict
+     (CodeRabbit on PR 54). */
+  if(!busId||!search.trim()||busSearch.kind!=="numbers")return;
   if(!busSearchIds.has(busId))setSearch("");
  };
  const clearSearchIfItHides=(busId:string,defect:StructuredDefect)=>{
