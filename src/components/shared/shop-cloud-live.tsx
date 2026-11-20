@@ -63,6 +63,13 @@ export default function ShopCloudLive(){
     until the next notification or a trip away from the app. Owed, the next
     sweep pulls whatever the channel says. */
  const pullOwed=useRef(false);
+ /* Pull requests that arrived while a sync was running. A cold read found the
+    gap the flag alone left: a pull already under way set the flag itself,
+    a notification landing mid-pull set the same flag again, and the pull -
+    whose tables were read before that other device's write - then cleared
+    it. Counted, a pull pays off only what was asked before it began, and
+    anything asked during it runs again as soon as it ends. */
+ const askedMidSync=useRef(0);
 
  useEffect(()=>{
   let stopped=false;
@@ -75,9 +82,10 @@ export default function ShopCloudLive(){
   const sync=async(pullToo:boolean)=>{
    const config=readCloudConfig(localStorage);
    if(cloudConfigProblem(config)||stopped)return;
-   if(running.current){if(pullToo)pullOwed.current=true;return}
+   if(running.current){if(pullToo){pullOwed.current=true;askedMidSync.current++}return}
    const wantPull=pullToo||pullOwed.current;
    if(wantPull)pullOwed.current=true;
+   const askedBefore=askedMidSync.current;
    running.current=true;
    try{
     const fleet=readFleetStorage<Record<string,unknown>>(localStorage);
@@ -111,11 +119,18 @@ export default function ShopCloudLive(){
      return;
     }
     const applied=applyCloudPull(localStorage,{map:got.map,defects:got.defects,sheet:got.sheet,deleted:got.deleted,removedEntries:got.removedEntries});
-    if(applied.ok)pullOwed.current=false;
+    /* Paid only if nobody asked again while it ran. A board that cannot take
+       the pull at all - unreadable, or a phone too full to write - is not
+       owed another every 45 seconds: the error is on screen, and the next
+       notification or return to the app asks again (cold read). */
+    if(askedMidSync.current===askedBefore)pullOwed.current=false;
     writeCloudState(localStorage,applied.ok
      ?{phase:"idle",lastSyncedAt:new Date().toISOString(),lastError:"",pending:0}
      :{...readCloudState(localStorage),phase:"error",lastError:applied.error});
-   }finally{running.current=false}
+   }finally{
+    running.current=false;
+    if(!stopped&&askedMidSync.current!==askedBefore)window.setTimeout(()=>sync(true),0);
+   }
   };
 
   /* One device pressing SEND MY CHANGES produces a burst — a hundred rows across

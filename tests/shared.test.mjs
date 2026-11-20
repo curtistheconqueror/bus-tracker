@@ -300,9 +300,16 @@ test("the shop cloud runs on every page, not only while Settings is open",async(
     is push-only, so a pull cut short by window.stop(), failed on dead wifi or
     asked for while another sync ran was never asked for again. */
  assert.match(live,/const pullOwed=useRef\(false\);/);
- assert.match(live,/if\(running\.current\)\{if\(pullToo\)pullOwed\.current=true;return\}/,"a pull asked for mid-sync is owed, not dropped");
+ assert.match(live,/if\(running\.current\)\{if\(pullToo\)\{pullOwed\.current=true;askedMidSync\.current\+\+\}return\}/,"a pull asked for mid-sync is owed and counted, not dropped");
+ /* Cold read: a pull under way cleared the flag a mid-pull notification had
+    set again, though its tables were read before that write. It pays off
+    only what was asked before it began, and a request during it runs next. */
+ assert.match(live,/const askedBefore=askedMidSync\.current;/);
+ assert.match(live,/if\(askedMidSync\.current===askedBefore\)pullOwed\.current=false;/);
+ assert.match(live,/if\(!stopped&&askedMidSync\.current!==askedBefore\)window\.setTimeout\(\(\)=>sync\(true\),0\);/);
+ assert.doesNotMatch(live,/if\(applied\.ok\)pullOwed\.current=false;/,"an apply that cannot succeed must not be retried every sweep");
  assert.match(live,/const wantPull=pullToo\|\|pullOwed\.current;\s*if\(wantPull\)pullOwed\.current=true;/,"owed until it lands, whatever the sweep was asking");
- assert.match(live,/if\(applied\.ok\)pullOwed\.current=false;/,"and only a pull that landed pays it");
+ assert.match(live,/const applied=applyCloudPull\([^;]*\);\s*\/\*[\s\S]*?\*\/\s*if\(askedMidSync\.current===askedBefore\)pullOwed\.current=false;/,"a pull that came back pays it, applied or refused");
  /* The listeners added are the ones removed. */
  assert.match(live,/document\.addEventListener\("visibilitychange",resume\);[\s\S]*document\.removeEventListener\("visibilitychange",resume\);/);
  assert.match(live,/window\.addEventListener\("online",resume\);[\s\S]*window\.removeEventListener\("online",resume\);/);
