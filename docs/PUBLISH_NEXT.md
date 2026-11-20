@@ -125,7 +125,7 @@ On a phone with the app on its home screen. Open the app once after the update, 
 4. Tap **Map**. It should go to the Facility Map and stay there.
 5. Close the app fully from the map and open it. It should open on the map.
 6. Go to the **Defect Log** and leave the phone alone until it has closed the app by itself — an hour, or overnight. Open it. It should open on the Defect Log. **This is still the test that cannot be run anywhere but on the phone.**
-7. If step 2 opens on the map: say so, and whether the map appeared at once or after a couple of seconds of blank screen. At once means the phone does not start the app the way the design assumes. After a pause means the map took more than 2.5 seconds to draw, and the limit needs to be longer.
+7. If step 2 opens on the map: say so, and whether the map appeared at once or after a couple of seconds of blank screen. At once means the phone does not start the app the way the design assumes. After a pause has more than one cause. The app gives up at 2.5 seconds if any of three things is late: the map drawing, the network check answering, or the page itself loading. So a pause alone does not show the limit is too short. Note how good the signal was. Before lengthening anything, time the network check and the map's drawing separately.
 
 ### Open questions for Curtis
 

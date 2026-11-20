@@ -2343,8 +2343,17 @@ test("a fresh start from the home screen reopens the page the app was left on",a
  assert.equal(kept(win).path,"/down-sheet");
  stopFixture();
  assert.equal(win.listening,0);
- /* The whole of what /map.js sends parses, and draws through watchPage. */
- new Function("document","setTimeout","window",fixture.mapScript(1500));
+ /* THE WHOLE OF WHAT /map.js SENDS RUNS: arrived is not drawn, and drawn is
+    ready. It was only parsed, so a fixture that raised the signal the moment
+    its script arrived - X3, exactly - left this file green (SDET review,
+    BT51-F1). Run against the same stand-in as the app's own code. */
+ {const drawLater=[];
+  win=resumeWindow({local:left("/defect-log"),ready:false});run(win);win.answer.ok();await settle();
+  new Function("document","setTimeout","window",fixture.mapScript(1500))({getElementById:()=>({textContent:"",onclick:null})},(fn,ms)=>drawLater.push([fn,ms]),win);
+  assert.equal(win[RESUME_CONFIG.ready],false,"the map's script has arrived, not drawn");
+  assert.deepEqual(drawLater.map(([,ms])=>ms),[1500],"drawing waits for the hydrate delay it was given");
+  drawLater[0][0]();
+  assert.equal(win[RESUME_CONFIG.ready],true,"drawn is ready");}
  assert.match(fixture.mapScript(1500),/watchPage\(window\);\n\},1500\);$/);
  assert.doesNotMatch(fixtureSource.replace(/^\/\/.*$/gm,""),/RESUME_CONFIG\.ready|__pacePageReady|dispatchEvent/,"it does not raise the signal itself");
  assert.match(fixtureSource,/if\(process\.argv\[1\]&&fileURLToPath\(import\.meta\.url\)===process\.argv\[1\]\)/,"it listens only when run, so importing it here opens no port");
