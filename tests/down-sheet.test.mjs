@@ -3905,14 +3905,21 @@ test("ADD TO THAT ENTRY opens the entry it names, not a heading over the blank d
     ADD TO THAT ENTRY changed the heading to the bus and SAVE UPDATE while the
     form kept the blank draft, and the save was refused as a second entry for
     the bus — measured on main. */
- assert.match(page,/\{editing&&<DownSheetEditor key=\{editing\.id\} carriedInitials=\{carriedInitials\} onOpenExisting=\{/);
+ assert.match(page,/\{editing&&<DownSheetEditor key=\{editing\.id\} carriedInitials=\{carriedInitials\} reopened=\{reopened\} onOpenExisting=\{/);
+ /* BT55-F1: the remount dropped keyboard focus to the page, and Tab then
+    Enter closed the form. Reopened, focus goes to the blank card - with a
+    fine pointer only, so a phone raises no keyboard. Forgotten with the editor. */
+ assert.match(page,/if\(found\)setReopened\(true\);/);
+ assert.match(page,/useEffect\(\(\)=>\{if\(!editing\)\{setCarriedInitials\(""\);setReopened\(false\)\}\},\[editing\]\);/);
+ assert.match(editor,/if\(!reopened\|\|typeof matchMedia!=="function"\|\|!matchMedia\("\(pointer: fine\)"\)\.matches\)return;/);
+ assert.match(editor,/last\?\.querySelector<HTMLElement>\("input,select,textarea"\)\?\.focus\(\{preventScroll:true\}\);/);
  /* The new editor is seeded from the entry, so the initials somebody already
     typed would be replaced — on a device with no default, by whoever last
     updated that entry. A cold read found it. They come across instead, and
     are forgotten when the editor shuts. */
  assert.match(editor,/useState\(carriedInitials\|\|defaultInitials\|\|entry\.updatedBy\)/);
  assert.match(page,/if\(found\)setCarriedInitials\(typedInitials\);/);
- assert.match(page,/useEffect\(\(\)=>\{if\(!editing\)setCarriedInitials\(""\)\},\[editing\]\);/);
+ assert.match(page,/if\(!editing\)\{setCarriedInitials\(""\);/);
  /* And what it is handed is the existing entry plus one blank card to add to. */
  assert.match(page,/if\(found\)setEditing\(\{\.\.\.found,repairItems:\[\.\.\.normalizeRepairItems\(found\.repairItems[^)]*\),blankRepairItem\(\)\]\}\)/);
 });

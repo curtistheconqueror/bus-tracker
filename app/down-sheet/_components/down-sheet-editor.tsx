@@ -4,7 +4,7 @@ import {BROWSE_ALL,CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} fr
 import ComboField from "@/src/components/shared/combo-field";
 import BusSelector from "@/src/components/shared/bus-selector";
 import HoursField from "@/src/components/shared/hours-field";
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {defectCountField,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,repairCategoryLabel} from "@/src/lib/defects/repair-catalog";
 import {findingMatchKey,readFindingsMemory,recallFindings} from "@/src/lib/defects/findings-memory";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
@@ -55,13 +55,27 @@ const ESTIMATE_FIELDS:{key:Exclude<keyof RepairTimeEstimate,"notes">;label:strin
 
 function hoursValue(minutes:number){return Number((minutes/60).toFixed(2))}
 
-export default function DownSheetEditor({entry,fleet,entries,defaultInitials,carriedInitials="",onClose,onSave,onOpenExisting}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void;carriedInitials?:string;onOpenExisting?:(entryId:string,typedInitials:string)=>void}){
+export default function DownSheetEditor({entry,fleet,entries,defaultInitials,carriedInitials="",reopened=false,onClose,onSave,onOpenExisting}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void;carriedInitials?:string;reopened?:boolean;onOpenExisting?:(entryId:string,typedInitials:string)=>void}){
   const [draft,setDraft]=useState(()=>({...entry,repairItems:normalizeRepairItems(entry.repairItems,{category:entry.category,repair:entry.repair,details:entry.customReason,timeEstimate:entry.timeEstimate})}));
   /* Initials typed before ADD TO THAT ENTRY come across with it. That button
      opens a fresh editor on the existing entry, and seeding from that entry
      would put whoever last updated it in the box — a foreman who had already
      typed his own and did not look again saves under somebody else's name. */
   const [initials,setInitials]=useState(carriedInitials||defaultInitials||entry.updatedBy);
+  /* THE KEYBOARD PICKS UP WHERE IT WAS. ADD TO THAT ENTRY opens a new editor
+     on the existing entry, and the button that had focus goes with the old
+     one, so focus fell to the page and the next Tab landed on the header's X:
+     Tab then Enter closed the form and the new blank card with it (SDET
+     review, BT55-F1). Reopened that way, focus goes to the blank card the new
+     work is typed into. Only with a mouse-and-keyboard pointer: on a phone a
+     focused field raises the keyboard, which is why nothing here autofocuses. */
+  const formRef=useRef<HTMLFormElement|null>(null);
+  useEffect(()=>{
+    if(!reopened||typeof matchMedia!=="function"||!matchMedia("(pointer: fine)").matches)return;
+    const cards=formRef.current?.querySelectorAll(".repair-item-card");
+    const last=cards?.[cards.length-1];
+    last?.querySelector<HTMLElement>("input,select,textarea")?.focus({preventScroll:true});
+  },[reopened]);
   /* Named so the "leave it" option can say where that actually is. A foreman
      deciding whether to move a bus needs to know where it is sitting now. */
   const currentArea=sectionForLocation(fleet.find(bus=>bus.id===draft.busId)?.l||"");
@@ -144,7 +158,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
   useEffect(()=>lockPageScroll("down-editor-open"),[]);
 
   return <div className="down-shade" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}>
-    <form className="repair-editor" onSubmit={submit}>
+    <form className="repair-editor" onSubmit={submit} ref={formRef}>
       <div className="repair-editor-head"><span>DOWN SHEET ENTRY<h2>{isNew?"Add Down Bus":"Bus "+draft.busNumber}</h2></span><button type="button" onClick={onClose}>X</button></div>
       <div className="repair-form">
         {/* THE SAME PICKER THE DEFECT LOG USES, not a second one.
