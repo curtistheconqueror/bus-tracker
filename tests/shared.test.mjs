@@ -1127,6 +1127,13 @@ test("on the Defect Log a picker opens its list without the keyboard, and typing
     already lifted on the element. iOS raises the keyboard only for a focus
     made inside the tap, and only onto an input that is not read-only then. */
  assert.match(code,/input\.readOnly=!on;/,"the flag is written onto the element, not left for the next render");
+ /* AND THE KEYBOARD HINT GOES WITH IT. Swapped, inputmode="none" would stay
+    on while typing and an iPhone would raise no keyboard at all - a mutant
+    the first version of this test let through (SDET review, BT53-F3). */
+ assert.match(code,/if\(on\)input\.removeAttribute\("inputmode"\);else input\.setAttribute\("inputmode","none"\);/,"typing drops inputmode=none, or iOS shows no keyboard");
+ /* A mouse on the arrow types, as a mouse on the box does (BT53-F1). */
+ assert.match(code,/else if\(pressedWith\.current==="mouse"&&pressedJustNow\(\)\)\{setTypingMode\(true\);inputRef\.current\?\.focus\(\);\}/);
+ assert.equal((code.match(/onPointerDown=\{event=>\{pressedAt\.current=Date\.now\(\);pressedWith\.current=event\.pointerType\}\}/g)||[]).length,2,"the box and the arrow both record what pressed them");
  assert.match(code,/const startTyping=\(\)=>\{\s*if\(disabled\)return;\s*setTypingMode\(true\);\s*openBrowse\(\);\s*inputRef\.current\?\.focus\(\);/);
  /* First tap opens, second tap types — for a finger. A tap never focuses the
     input while it is browsing; the click decides. */

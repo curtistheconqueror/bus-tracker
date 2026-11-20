@@ -190,6 +190,13 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
  const pickBus=useCallback((busId:string)=>{onBusPicked(busId);setValue(current=>({...current,busId}))},[onBusPicked]);
  const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined||draft.defect.finding));
  useEffect(()=>lockPageScroll("defect-editor-open"),[]);
+ /* THE FORM TAKES FOCUS, NOT A FIELD. Nothing in it is focused when it opens,
+    so a phone raises no keyboard - and on the shop computer the cursor stayed
+    on the LOG DEFECT button behind it, where the first Tab went to the board's search
+    box under the editor (SDET review, BT53-F2). Focusing the form itself
+    raises no keyboard anywhere, and the next Tab is the first field. */
+ const editorRef=useRef<HTMLFormElement|null>(null);
+ useEffect(()=>{editorRef.current?.focus({preventScroll:true})},[]);
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
  const repairs=REPAIR_OPTIONS[value.defect.category]||[];
  /* A record can hold wording the picker no longer offers: a merged category kept
@@ -503,7 +510,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
    initial={value.defect.partNumber||""}
    close={()=>setPartPrompt(false)}
    confirm={number=>{setPartPrompt(false);/* ALWAYS `partsUsed:true`, WHICH IS WHAT ENTER LATER PROMISES. The prompt says in as many words that the repair "is marked MISSING PART # on the Fixed Repairs page until the number is added", and ENTER LATER arrives here with an empty number - which the assembler read as "no parts were used", so the repair saved completed with no flag at all and the promise on screen was false. The third argument is the checkbox's answer and ENTER LATER is somebody saying a part WAS used. THROUGH THE ASSEMBLER. This patched `{partsUsed:true,partNumber}` straight onto the record, so on a repair that already held a `parts` array the mirrored pair said one thing and the array another - and the number typed here was never learned, because the save reads the array. It becomes the FIRST row now, which is the one the memory takes. */const rows=normalizeDefectParts(value.defect.parts,value.defect);const first=rows[0];/* ENTER LATER MUST NOT ERASE A NUMBER ALREADY TYPED. It arrives here with an EMPTY number, and writing that over the first row wiped a part the mechanic had entered on the form a moment earlier - the prompt even opens prefilled with it. "I will enter it later" is a statement about a number that is NOT there; with one on the record it is a press of the wrong button, and losing the number is the expensive reading. Only a number given here replaces the row. */const next=number?[{id:first?first.id:"part-0",partNumber:number,...(first?.partName?{partName:first.partName}:{})},...rows.slice(1)]:rows;validateAndSave(true,{},{rows:next,used:true});}}/>}
-  <form className="log-editor" onSubmit={submit}>
+  <form className="log-editor" onSubmit={submit} ref={editorRef} tabIndex={-1}>
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    {coach&&<FormCoachBar step={coach} hide={()=>setCoachHidden(true)}/>}
    <div className="log-form">
