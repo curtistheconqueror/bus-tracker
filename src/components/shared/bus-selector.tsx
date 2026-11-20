@@ -63,7 +63,12 @@ function generationLabel(value:string){return value==="OTHER"?"OTHER":value+"s"}
    that fieldset rather than the generation chips above it, because the number
    is the thing the step is asking for and the chips only narrow the list.
    Absent on the Down Sheet, which does not draw the helper. */
-function BusSelector({fleet,busId,select,listId="bus-number-options",autoFocus=true,coach}:{fleet:PickerBus[];busId:string;select:(busId:string)=>void;listId?:string;autoFocus?:boolean;coach?:string}){
+/* `typeAhead` is the <datalist> under TYPE BUS #. On an iPhone that list is
+   drawn as a grey card offering back the number already in the box — Curtis
+   saw it after every pick from the bus list. Typing a number finds the bus
+   without it (`typeNumber` matches the whole number), so the Defect Log and
+   the Down Sheet's editor both turn it off. On by default for anything else. */
+function BusSelector({fleet,busId,select,listId="bus-number-options",autoFocus=true,coach,typeAhead=true}:{fleet:PickerBus[];busId:string;select:(busId:string)=>void;listId?:string;autoFocus?:boolean;coach?:string;typeAhead?:boolean}){
  const selected=fleet.find(bus=>bus.id===busId);
  /* THE FLEET DECIDES THESE, AND THE FLEET IS NOT WHAT CHANGES WHILE SOMEBODY
     TYPES. Every list below was rebuilt on every keystroke — see the measurement
@@ -113,7 +118,7 @@ function BusSelector({fleet,busId,select,listId="bus-number-options",autoFocus=t
     {/* The typed number is the way in that gets used, so it is the biggest
         thing in the form and it reads in the page's own text colour rather
         than the muted grey every other field uses. */}
-    <label className="type-bus-number">TYPE BUS #<input autoFocus={autoFocus} inputMode="numeric" value={number} onChange={event=>typeNumber(event.target.value)} list={listId} placeholder="Enter full bus number"/><datalist id={listId}>{numberOptions}</datalist></label>
+    <label className="type-bus-number">TYPE BUS #<input autoFocus={autoFocus} inputMode="numeric" value={number} onChange={event=>typeNumber(event.target.value)} list={typeAhead?listId:undefined} placeholder="Enter full bus number"/>{typeAhead&&<datalist id={listId}>{numberOptions}</datalist>}</label>
    </div>
    {/* The list is disabled until a generation is picked, and that control now
        lives in the box above, so the reason has to be said here or it reads as

@@ -159,7 +159,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
 
            autoFocus off, because this editor opens with the section and the
            workflow above it and stealing focus moves the page under a thumb. */}
-          <BusSelector fleet={fleet} busId={draft.busId} listId="down-sheet-bus-numbers" autoFocus={false}
+          <BusSelector fleet={fleet} busId={draft.busId} listId="down-sheet-bus-numbers" autoFocus={false} typeAhead={false}
            select={busId=>{const bus=fleet.find(item=>item.id===busId);setDraft(current=>({...current,busId,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}/>
           {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={()=>onOpenExisting(existingEntry.id)}>ADD TO THAT ENTRY</button>}</p>}
         <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
@@ -186,19 +186,25 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
                     stored "Group - Item" identity — a flat wall of prefixed
                     strings with no optgroup and no display label. The stored
                     identity is untouched; only what is drawn changes. */}
-                <ComboField label="CATEGORY" className="wide"
+                <ComboField label="CATEGORY" className="wide" browseFirst
                  value={item.category}
                  display={item.category?repairCategoryLabel(item.category):""}
-                 placeholder="Type or tap to choose a category"
+                 placeholder="Tap to choose"
                  emptyText="No category matches that"
                  search={query=>searchCategories(query).map(row=>({value:row.value,label:row.label}))}
                  onPick={category=>updateItem(item.id,current=>({...current,category,repair:"",quantity:undefined,estimateEnabled:Boolean(category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}/>
-                <ComboField label="SPECIFIC REPAIR" className="wide"
+                {/* THE SAME PICKERS AS THE DEFECT LOG'S, asked for by name: Curtis,
+                    "make downsheet operate similarly". The list opens without
+                    the keyboard; tap the box again, or TYPE, to type. */}
+                <ComboField label="SPECIFIC REPAIR" className="wide" browseFirst
                  value={item.repair}
                  display={item.repair?(CATALOG_OPTIONS.find(row=>row.value===item.repair&&(!item.category||row.category===item.category))?.label||CATALOG_OPTIONS.find(row=>row.value===item.repair)?.label||item.repair):""}
-                 placeholder={item.category?"Type or tap - or leave it and save the category alone":"Type what is wrong, or tap to browse"}
+                 /* SHORTER THAN THE DEFECT LOG'S, because this box sits inside a
+                    repair card: 240px wide at 360, 122px of it left for text once
+                    TYPE and the arrow have their room. Measured. */
+                 placeholder={item.category?"Tap or type":"Tap to browse"}
                  emptyText="Nothing in the catalog matches that"
-                 footnote={item.category?undefined:"Searching every category. Picking one sets the category for you."}
+                 footnote={item.category?"Optional. You can save the category alone.":"Searching every category. Picking one sets the category for you."}
                  search={query=>{
                   const {inCategory,elsewhere}=searchCatalogForCategory(query,item.category,query.trim()?40:BROWSE_ALL);
                   /* Headings while browsing, the group on each row while

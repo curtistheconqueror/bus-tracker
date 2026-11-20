@@ -930,8 +930,12 @@ test("the picker opens on group titles, and typing still searches everything",as
  assert.match(code,/const browsing=!query\.trim\(\)/,"browsing is the empty query, nothing else");
  assert.match(code,/if\(!browsing\)return options\.map\(option=>\(\{kind:"option",option\}\)\)/,
   "a query still produces the flat ranked list it always did");
- assert.match(code,/if\(browseGroup\)return options\.filter\(option=>option\.section===browseGroup\)/,
+ assert.match(code,/if\(openGroup\)return options\.filter\(option=>option\.section===openGroup\)/,
   "inside a group the rows are that group's defects and nothing else");
+ /* ONE TITLE IS NOT A CHOICE — but only where the Defect Log has asked for the
+    browse-first picker, and only when nothing ungrouped would be hidden. */
+ assert.match(code,/const onlyGroup=browseFirst&&browsing&&!browseGroup&&groupCounts\.size===1&&options\.every\(option=>option\.section\)/);
+ assert.match(code,/const openGroup=browseGroup\|\|onlyGroup;/);
  /* THE WAY BACK IS A HEADER, NOT A WALKABLE ROW, and the keyboard is what
     proved it has to be. As a row it sat at index 0 of the group, so entering
     with Enter left the highlight on the way OUT — the next Enter undid the tap
@@ -1045,9 +1049,10 @@ test("a form redrawing around a text field does not drag the picker with it",asy
     step-by-step helper added `coach="bus"`, which is stable and costs the memo
     nothing; a prop built inline — an arrow, an object, an array — is a new
     value every render and would make the memo a comparison that can never
-    pass, so the pattern admits the former and refuses the latter. */
- assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\}(?: [a-zA-Z]+="[^"]*")*\/>/,
-  "and the held callback is the one passed, with nothing but string literals beside it");
+    pass, so the pattern admits the former and refuses the latter. A boolean
+    literal — `autoFocus={false}` — is as stable as a string and is admitted. */
+ assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\}(?: [a-zA-Z]+=(?:"[^"]*"|\{(?:true|false)\}))*\/>/,
+  "and the held callback is the one passed, with nothing but literals beside it");
  assert.doesNotMatch(log,/select=\{busId=>\{onBusPicked/,
   "no inline arrow remains on that prop");
 
@@ -1117,4 +1122,123 @@ test("the cascade resolver the UI gates lean on answers like a browser", () => {
   {tag:"i",classes:["c"],ancestors:[{tag:"div",classes:["a"]},{tag:"div",classes:["b"]}]},1180).color,"red");
  assert.equal(effectiveStyle(".a>.b>.c{color:red}",
   {tag:"i",classes:["c"],ancestors:[{tag:"div",classes:["b"]},{tag:"div",classes:["a"]}]},1180).color,undefined);
+});
+
+test("on the Defect Log a picker opens its list without the keyboard, and typing is asked for",async()=>{
+ const [combo,css,logCss,log,sheet,picker]=await Promise.all([
+  readFile(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/combo-field.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8"),
+ ]);
+ const code=combo.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+
+ /* Curtis, on the iPhone: pickers should not raise the keyboard "unless I tap
+    to type". Asked how typing is reached, he chose both doors — "tap the box
+    again to type" plus the TYPE button — and LIST to get the list back. */
+ assert.match(code,/browseFirst=false\}/,"off unless a page asks, so the Down Sheet is untouched");
+ assert.match(code,/readOnly=\{browseFirst&&!typing\}/,"read-only until typing is asked for: no keyboard on a phone");
+ assert.match(code,/inputMode=\{browseFirst&&!typing\?"none":undefined\}/);
+ /* THE TAP THAT ASKS TO TYPE FOCUSES INSIDE ITS OWN HANDLER, with the flag
+    already lifted on the element. iOS raises the keyboard only for a focus
+    made inside the tap, and only onto an input that is not read-only then. */
+ assert.match(code,/input\.readOnly=!on;/,"the flag is written onto the element, not left for the next render");
+ /* AND THE KEYBOARD HINT GOES WITH IT. Swapped, inputmode="none" would stay
+    on while typing and an iPhone would raise no keyboard at all - a mutant
+    the first version of this test let through (SDET review, BT53-F3). */
+ assert.match(code,/if\(on\)input\.removeAttribute\("inputmode"\);else input\.setAttribute\("inputmode","none"\);/,"typing drops inputmode=none, or iOS shows no keyboard");
+ /* A mouse on the arrow types, as a mouse on the box does (BT53-F1). */
+ assert.match(code,/else if\(pressedWith\.current==="mouse"&&pressedJustNow\(\)\)\{setTypingMode\(true\);inputRef\.current\?\.focus\(\);\}/);
+ assert.equal((code.match(/onPointerDown=\{event=>\{pressedAt\.current=Date\.now\(\);pressedWith\.current=event\.pointerType\}\}/g)||[]).length,2,"the box and the arrow both record what pressed them");
+ assert.match(code,/const startTyping=\(\)=>\{\s*if\(disabled\)return;\s*setTypingMode\(true\);\s*openBrowse\(\);\s*inputRef\.current\?\.focus\(\);/);
+ /* First tap opens, second tap types — for a finger. A tap never focuses the
+    input while it is browsing; the click decides. */
+ assert.match(code,/onMouseDown=\{event=>\{if\(browseFirst&&!typingRef\.current\)event\.preventDefault\(\);\}\}/);
+ assert.match(code,/if\(!browseFirst\|\|typingRef\.current\|\|disabled\)return;[\s\S]{0,400}?if\(pressedWith\.current==="mouse"&&pressedJustNow\(\)\)\{startTyping\(\);return;\}\s*releaseOtherField\(\);\s*if\(!open\)openBrowse\(\);else startTyping\(\);/,
+  "a mouse types on one click; a finger opens the list, and the second tap types");
+ /* THE SHOP COMPUTER IS NOT ASKED FOR TWO CLICKS. The first build opened the
+    list on a mouse click with the cursor nowhere, so what was typed went to
+    the page — measured by a cold read, activeElement BODY after click+keys. */
+ assert.match(code,/onPointerDown=\{event=>\{pressedAt\.current=Date\.now\(\);pressedWith\.current=event\.pointerType\}\}/);
+ /* A focus with no press just before it is a keyboard arriving (Tab), and goes
+    straight to typing. A time, not a flag, so a press that never became a
+    click cannot swallow the next Tab. */
+ assert.match(code,/const pressedJustNow=\(\)=>Date\.now\(\)-pressedAt\.current<1000;/);
+ assert.match(code,/if\(browseFirst&&!typingRef\.current\)\{if\(pressedJustNow\(\)\)return;setTypingMode\(true\);\}/);
+ /* A KEYBOARD ALREADY UP FROM ANOTHER FIELD GOES DOWN when a picker opens:
+    typed bus number, then a tap on DEFECT CATEGORY. Both the box and the
+    arrow release it. */
+ assert.match(code,/current!==inputRef\.current&&current\.matches\("input,textarea,select,\[contenteditable='true'\]"\)\)current\.blur\(\);/);
+ assert.match(code,/if\(browseFirst\)releaseOtherField\(\);\s*setOpen\(true\)/);
+ assert.match(code,/event\.key\.length===1&&!event\.ctrlKey&&!event\.metaKey&&!event\.altKey\)\{\s*setTypingMode\(true\);/,
+  "a printable key types straight in rather than being swallowed by the read-only flag");
+ /* TYPE, and LIST while typing. LIST puts the keyboard away and brings the
+    whole list back. Spoken names start with the words on the button. */
+ assert.match(code,/className="combo-mode"/);
+ assert.match(code,/aria-label=\{typing\?"LIST "\+label\+" choices":"TYPE "\+label\}/);
+ assert.match(code,/\{typing\?"LIST":"TYPE"\}/);
+ assert.match(code,/const stopTyping=\(\)=>\{\s*setTypingMode\(false\);\s*openBrowse\(\);\s*inputRef\.current\?\.blur\(\);/);
+ /* The arrow never raises the keyboard here, and a shut list ends typing. */
+ assert.match(code,/if\(!browseFirst\)inputRef\.current\?\.focus\(\);/);
+ assert.match(code,/if\(browseFirst&&open\)inputRef\.current\?\.blur\(\);/);
+ assert.match(code,/useEffect\(\(\)=>\{if\(!open&&typingRef\.current\)\{typingRef\.current=false;setTyping\(false\)\}\},\[open\]\)/);
+ /* ONLY THE INPUT TAKES A TAP. Anything else inside the label — the words,
+    the hint, the list's border, the "nothing matches" line — would be handed
+    to the input as a tap of its own, and with the list open that means TYPE.
+    And tapping bare form shuts the list AND the keyboard, which iOS would
+    otherwise leave up. */
+ assert.match(code,/onClick=\{event=>\{if\(browseFirst&&event\.target!==inputRef\.current\)event\.preventDefault\(\);\}\}/);
+ assert.match(code,/setOpen\(false\);setQuery\(""\);\s*if\(browseFirst\)inputRef\.current\?\.blur\(\);/);
+
+ /* BOTH FORMS ASK FOR IT ON BOTH PICKERS. The Down Sheet's editor followed on
+    Curtis's word — "make downsheet operate similarly" — so a defect is picked
+    the same way wherever it is logged. */
+ assert.match(log,/<ComboField label="DEFECT CATEGORY" className="wide" coach="category" browseFirst\n/);
+ assert.match(log,/<ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide" coach="issue" browseFirst\n/);
+ assert.match(sheet,/<ComboField label="CATEGORY" className="wide" browseFirst\n/);
+ assert.match(sheet,/<ComboField label="SPECIFIC REPAIR" className="wide" browseFirst\n/);
+ assert.equal((sheet.match(/<ComboField /g)||[]).length,(sheet.match(/<ComboField [^>\n]*browseFirst/g)||[]).length,
+  "no picker on the Down Sheet left keyboard-first");
+
+ /* NO KEYBOARD AS THE FORM OPENS, AND NO GREY CARD. The grey card is iOS's
+    drawing of a <datalist> suggestion offering back the number in the box. */
+ assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\} coach="bus" autoFocus=\{false\} typeAhead=\{false\}\/>/);
+ assert.match(picker,/list=\{typeAhead\?listId:undefined\}/);
+ assert.match(picker,/\{typeAhead&&<datalist id=\{listId\}>\{numberOptions\}<\/datalist>\}/);
+ assert.match(picker,/typeAhead=true\}/,"on by default, for any page that has not asked");
+ assert.match(sheet,/<BusSelector fleet=\{fleet\} busId=\{draft\.busId\} listId="down-sheet-bus-numbers" autoFocus=\{false\} typeAhead=\{false\}/,
+  "and the Down Sheet has no grey card either");
+
+ /* THE WORDS IN THE BOX FIT. The old symptom placeholder needed 403px in a
+    276px box at 390 wide; the box is narrower still with TYPE in it. */
+ const placeholders=[...log.matchAll(/placeholder=\{value\.defect\.category\?"([^"]*)":"([^"]*)"\}/g)].flatMap(m=>[m[1],m[2]]);
+ assert.deepEqual(placeholders,["Tap to choose, or type","Tap to browse, or type"]);
+ assert.match(log,/placeholder="Tap to choose a category"/);
+ /* The Down Sheet's box sits inside a repair card: 122px for text at 360. */
+ assert.match(sheet,/placeholder=\{item\.category\?"Tap or type":"Tap to browse"\}/);
+ assert.match(sheet,/placeholder="Tap to choose"\n/);
+ assert.match(log,/footnote=\{value\.defect\.category\?"Optional\. You can save the category alone\.":/,
+  "the half about saving the category alone moved to the line under the box");
+
+ /* TYPE and × take turns at the right-hand end — × only on a shut field with
+    an answer, TYPE everywhere else — so the answer is read at full width.
+    With TYPE showing, the arrow moves in by its width and the text stops
+    before both. Written as the arithmetic. */
+ assert.match(code,/const showMode=browseFirst&&\(open\|\|!value\);/);
+ assert.match(code,/\{value&&!open&&!disabled&&<button type="button" className="combo-clear"/,"× only on a shut field with an answer");
+ const tail=css.slice(css.indexOf("Browse first: the TYPE / LIST button"));
+ const [wide,phone]=tail.split("@media(max-width:760px){");
+ const num=(text,re,what)=>{const m=text.match(re);assert.ok(m,"missing "+what);return parseInt(m[1],10);};
+ const caretWidth={wide:num(css,/\.combo-caret\{[^}]*width:(\d+)px/,"caret width"),phone:44};
+ for(const [name,text] of [["wide",wide],["phone",phone]]){
+  const mode=num(text,/\.combo-mode\{[^}]*width:(\d+)px/,name+" mode width");
+  const caretRight=num(text,/\.combo-box\.with-mode \.combo-caret\{right:(\d+)px/,name+" caret right");
+  const padding=num(text,/\.combo-box\.with-mode \.combo-input\{padding-right:(\d+)px/,name+" padding");
+  assert.ok(caretRight>=mode+1,name+": the arrow sits beside TYPE, not under it");
+  assert.ok(padding>=caretRight+caretWidth[name],name+": the text runs under the buttons");
+ }
+ assert.ok(num(phone,/\.combo-mode\{[^}]*width:(\d+)px/,"phone TYPE width")>=44,"a gloved thumb");
+ assert.match(logCss,/\.log-form \.combo-mode\{[^}]*color:var\(--log-accent/,"TYPE takes the page's accent, so the themes keep it");
 });
