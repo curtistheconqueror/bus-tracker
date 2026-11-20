@@ -10187,3 +10187,17 @@ test("DEFECTS LOGGED lists what somebody logged, not what a scanned sheet brough
  assert.deepEqual(defectLogRecords([sheetBus],[]).map(record=>record.defect.id),["t1"],
   "the Defect Log's own list never carries a scanned row in the first place");
 });
+
+test("the defect form starts the keyboard inside itself, and the symptom hint keeps its height",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* BT53-F2: with nothing focused, the shop computer's first Tab went to the
+    board's search box under the editor. The form itself takes focus: no
+    keyboard on a phone, and the next Tab is the first field. */
+ assert.match(page,/<form className="log-editor" onSubmit=\{submit\} ref=\{editorRef\} tabIndex=\{-1\}>/);
+ assert.match(page,/useEffect\(\(\)=>\{editorRef\.current\?\.focus\(\{preventScroll:true\}\)\},\[\]\);/);
+ assert.match(css,/\.log-editor:focus\{outline:none\}/);
+ /* BT53-LS-F1: at 360 the hint under the symptom box went from two lines to
+    one when a category was picked, moving every field below by 14.3px. */
+ assert.match(css,/@media\(max-width:380px\)\{\.log-form \.combo-field\.wide \.combo-footnote\{display:block;min-height:28\.6px\}\}/);
+});

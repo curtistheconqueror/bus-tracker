@@ -479,6 +479,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
    <button
     type="button"
     className="combo-caret"
+    onPointerDown={event=>{pressedAt.current=Date.now();pressedWith.current=event.pointerType}}
     aria-label={(open?"Hide ":"Show ")+label+" choices"}
     aria-expanded={open}
     aria-controls={id+"-list"}
@@ -499,6 +500,10 @@ export default function ComboField({label,value,display,search,onPick,placeholde
      if(browseFirst)releaseOtherField();
      setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
      if(!browseFirst)inputRef.current?.focus();
+     /* A MOUSE ON THE ARROW TYPES TOO, the rule the box itself follows: on the
+        shop computer the list opened with the cursor nowhere, so typing went
+        to the page. Found by the SDET review (BT53-F1). */
+     else if(pressedWith.current==="mouse"&&pressedJustNow()){setTypingMode(true);inputRef.current?.focus();}
     }}>▾</button>
    {/* TYPE, and LIST while typing: the one control that always says how to get
        the other way. Out of the tab order like the arrow — a keyboard reaches

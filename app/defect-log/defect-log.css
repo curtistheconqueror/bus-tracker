@@ -1655,3 +1655,11 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    tint. Both sit above the share buttons, which is the last place somebody
    looks before sending the list on. */
 .quick-filter-source-note{background:color-mix(in srgb,var(--log-accent,#0b64bd) 10%,var(--log-surface,#fff));color:var(--log-muted,#60728c)}
+/* THE LINE UNDER THE SYMPTOM BOX KEEPS ITS HEIGHT. With no category it reads
+   "Searching every category. Picking one sets the category for you.", two
+   lines at 360; with one it reads "Optional. You can save the category
+   alone.", one line. Picking a category moved every field below up 14.3px
+   (SDET review, BT53-LS-F1). Both fit in two lines at every phone width. */
+@media(max-width:380px){.log-form .combo-field.wide .combo-footnote{display:block;min-height:28.6px}}
+/* Focused so the keyboard starts inside it, not drawn as a control. */
+.log-editor:focus{outline:none}
