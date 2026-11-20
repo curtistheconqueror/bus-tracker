@@ -377,7 +377,12 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   row?.scrollIntoView({block:"nearest"});
  },[active,open]);
 
+ /* A fast Enter after an automatic exact bus pick confirms that pick; it
+    must not fall through to the form and save a placeholder repair. A later
+    deliberate Enter still submits normally, as does the explicit Save. */
+ const pickedAt=useRef(0);
  const pick=(option:ComboOption,exact=false)=>{
+  pickedAt.current=Date.now();
   onPick(option.value,option);
   setOpen(false);
   setQuery("");
@@ -387,7 +392,8 @@ export default function ComboField({label,value,display,search,onPick,placeholde
      their newly opened symptom field own the next keystroke. */
   /* A person can take seconds to type a number after tapping TYPE. Pointer
      intent lasts through that entry; it must not expire into desktop focus. */
-  const touch=pressedWith.current!=="mouse"&&pressedWith.current!=="";
+  const coarseKeyboard=pressedWith.current===""&&typeof matchMedia==="function"&&matchMedia("(pointer: coarse)").matches;
+  const touch=(pressedWith.current!=="mouse"&&pressedWith.current!=="")||coarseKeyboard;
   if(!(retainExactFocus&&exact&&!touch))inputRef.current?.blur();
  };
 
@@ -430,6 +436,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
       form, and a mechanic who has already chosen should be able to submit. */
    if(open&&rows[active]){event.preventDefault();choose(rows[active]);}
    else if(open&&exactPick&&query.trim())event.preventDefault();
+   else if(browseFirst&&!open&&Date.now()-pickedAt.current<2000)event.preventDefault();
    return;
   }
   /* ESCAPE STEPS BACK OUT OF A GROUP BEFORE IT CLOSES THE LIST, which is what

@@ -275,3 +275,53 @@ test('refused inline MARK FIXED never announces a successful save',async()=>{
 
  }finally{await context.close();}
 });
+
+for(const route of ['/defect-log','/down-sheet'])test(route+': exact bus Enter confirms without saving; later Enter still works',async()=>{
+ const {page,context,form}=await open(route);
+ try{
+  if(route==='/defect-log'){
+   const c=field(form,'DEFECT CATEGORY');await c.click();await c.fill('engine');await c.press('Enter');
+   const symptom=field(form,'SPECIFIC DEFECT');await page.keyboard.type('misfire');await symptom.press('Enter');
+  }else await form.getByLabel('UPDATED BY - INITIALS',{exact:false}).fill('ZZ');
+  const before=await page.evaluate(()=>[localStorage.getItem('pace-board-v1'),localStorage.getItem('pace-down-sheet-v1')]);
+  const b=await bus(form,'18505');await b.press('Enter');
+  assert.equal(await form.isVisible(),true);
+  assert.deepEqual(await page.evaluate(()=>[localStorage.getItem('pace-board-v1'),localStorage.getItem('pace-down-sheet-v1')]),before);
+  /* The guard does not disable the form's normal deliberate submission. */
+  await page.waitForTimeout(2100);await b.press('Enter');
+  await form.waitFor({state:'hidden'});
+  const saved=await page.evaluate(()=>({buses:JSON.parse(localStorage.getItem('pace-board-v1')).buses,entries:JSON.parse(localStorage.getItem('pace-down-sheet-v1')).entries}));
+  if(route==='/down-sheet')assert.equal(saved.entries.length,1);
+  else assert.ok(saved.buses.find(bus=>bus.n==='18505').defects.some(d=>/misfire/i.test(d.issue)));
+ }finally{await context.close()}
+});
+for(const route of ['/defect-log','/down-sheet'])test(route+': no-pointer coarse exact pick dismisses and mouse-to-touch row pick blurs',async()=>{
+ const {page,context,form}=await open(route,{touch:true});
+ try{
+  assert.equal(await page.evaluate(()=>matchMedia('(pointer: coarse)').matches),true);
+  const b=field(form,'BUS');await b.focus();await b.fill('18505');
+  assert.match(await b.inputValue(),/18505/);
+  assert.equal(await b.evaluate(el=>el===document.activeElement),false);
+  await b.click();await b.fill('185');
+  assert.equal(await b.evaluate(el=>el===document.activeElement),true);
+  await form.locator('.bus-combo .combo-option').filter({hasText:'18505'}).tap();
+  assert.equal(await b.evaluate(el=>el===document.activeElement),false);
+ }finally{await context.close()}
+});
+
+
+for(const route of ['/defect-log','/down-sheet'])test(route+': explicit Save remains available immediately after an exact bus pick',async()=>{
+ const {page,context,form}=await open(route);
+ try{
+  if(route==='/defect-log'){
+   const c=field(form,'DEFECT CATEGORY');await c.click();await c.fill('engine');await c.press('Enter');
+   const symptom=field(form,'SPECIFIC DEFECT');await page.keyboard.type('misfire');await symptom.press('Enter');
+  }else await form.getByLabel('UPDATED BY - INITIALS',{exact:false}).fill('ZZ');
+  await bus(form,'18505');
+  await (route==='/defect-log'?page.locator('.save-log'):form.getByRole('button',{name:'SAVE UPDATE',exact:true})).click();
+  await form.waitFor({state:'hidden'});
+  const saved=await page.evaluate(()=>({buses:JSON.parse(localStorage.getItem('pace-board-v1')).buses,entries:JSON.parse(localStorage.getItem('pace-down-sheet-v1')).entries}));
+  if(route==='/down-sheet')assert.equal(saved.entries.length,1);
+  else assert.ok(saved.buses.find(bus=>bus.n==='18505').defects.some(d=>/misfire/i.test(d.issue)));
+ }finally{await context.close()}
+});
