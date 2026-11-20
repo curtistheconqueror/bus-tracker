@@ -245,3 +245,77 @@ If step 1 opens on the map, say whether the map appeared at once or after a coup
 ## Rollback
 
 Sites 194 / application release 197 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
+
+---
+
+## PR39 (MCP read surface) — NOT MERGED, and not part of any release above
+
+**Nothing in this section is pending publication.** PR39 is an open, unmerged
+pull request, held by Curtis's own release gates; the STATUS line at the top of
+this file is about release 198 and says nothing about this. It is kept here so
+that the gates travel with the branch, and it becomes a release section only if
+and when PR39 is merged — at which point its STATUS, its source SHA and its
+rollback are all written fresh against whatever is live then.
+
+
+PR #39 adds five read-only MCP tools at `/api/mcp`. Last code-bearing source:
+`0e6d9aa99a31ebc83bb458f884d0a937cb225701`; freeze and reverify the actual
+merged release SHA before packaging. Never publish the older `347672f` build.
+CI [39532393605](https://github.com/curtistheconqueror/bus-tracker/actions/runs/39532393605)
+passed lint, build and 399 tests on merge candidate
+`86e84e51bae874e9c55c079ff2b1c891f065ce37` (code head above into `a7e1aa3`).
+Any newer code requires reconciliation and current-head checks.
+
+**THAT CI RUN AND ITS 399 TESTS DESCRIBE AN OLDER CANDIDATE, not this head.**
+`main` was merged into this branch on 2026-11-18 at `19f0e90`, and again on
+2026-11-20 at `eaf1c32` — 30 further commits carrying the five PRs queued as
+release 198 — because the branch is published and is not rebased. One file conflicted,
+`tests/helpers/modules.mjs`, where this branch and `main` had each appended
+export lines at the same end: resolved as the union of both, with every module
+path checked to exist. Measured on the merged tree, in a container rather than
+in CI: the production build succeeds, **520 of 520 tests pass** and ESLint is
+clean. CI must re-run on the actual merge SHA before anything is packaged, and
+the test count above moves with every change that adds one.
+
+Nothing about the gates below changed. This merge is maintenance so the branch
+can land when Curtis clears them; it is not a claim that any gate is met.
+
+Curtis authorized publication of the verified ready scope on 2026-10-21 and
+temporarily accepted the unresolved Major URL-token risk for his initial
+single-user read-only connection. Keep the
+[OPEN risk record](MCP_SECURITY_FOLLOWUP.md) in subsequent release handoffs;
+do not describe it as fixed or CodeRabbit-approved.
+
+Before merge/publication, confirm the coordinating Supabase work has verified
+effective reader isolation and dedicated reader authorization, then configure
+the five runtime variables through the approved secure path. This record does
+not assert provisioning, authorization checks or runtime configuration are done.
+Do not duplicate identity creation, bundle future writes, or disclose a real
+token or token-bearing URL. No application migration is executed by this
+documentation change; separately coordinated Supabase changes need their own
+verification record.
+
+After publishing to the existing site, verify the frozen source and application
+and Sites versions; smoke the existing UI routes, unauthenticated rejection,
+authenticated MCP initialization/discovery, and actual authorized cloud tool
+reads without exposing credentials or private records. Record outcomes and
+remaining client/device checks. A handshake alone is insufficient.
+
+**ROLLBACK IS THE LIVE BASELINE AT PUBLISH TIME, AND IT IS RE-PINNED WHENEVER
+`main` IS MERGED IN.** It read application 191 / Sites 187,
+`b33775685b61acafdf4325807c82e92281c9fc2c` (`sites-v187`) — written on 2026-11-02
+and carried through the merge of 2026-11-18 without being re-read. By then it was
+162 commits behind, so rolling this release back as written would have reverted
+application releases 192 through 197 as well, including 197's page-resume and
+hydration-readiness fix, when the only intent is to take `/api/mcp` away.
+Measured: `git rev-list --count b337756..origin/main` = 162.
+
+**Rollback for this section is the live baseline AT ITS OWN PUBLISH TIME, and
+198 is queued ahead of it.** Live today is Sites 194 / application 197,
+`12822f60c7e5d76d3702108b33711cc116ca4f61`. If 198 publishes first — and it is
+the pending release above — then THAT is this section's rollback, not 194.
+Re-read this against what is live when this section is frozen; a rollback that
+undoes unrelated releases is a defect rather than a stale note, which is what it
+was before the merge of 2026-11-18 (162 commits out of date, and it would have
+reverted releases 192 through 197).
+Do not mark live until deployment and these checks complete.

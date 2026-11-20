@@ -56,6 +56,11 @@ export {DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay} from "../../src/l
 export {DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay} from "../../src/lib/defects/defect-log-display-settings.ts";
 export {quickFilterShareText} from "../../src/lib/defects/quick-filter-share.ts";
 export {DOWN_SHEET_STORAGE_KEY, DOWN_SHEET_STORAGE_VERSION, FLEET_BACKUP_REMINDER_STORAGE_KEY, FLEET_RECOVERY_STORAGE_KEY, FLEET_STORAGE_KEY, FLEET_STORAGE_VERSION, FLEET_BACKUP_INTERVAL, FLEET_BACKUP_INTERVAL_CHOICES, normalizeFleetBackupInterval, fleetBackupDue, fleetDefectCount, fleetDefectLogCount, markFleetBackupExported, readDownSheetPayload, readFleetPayload, readFleetRecoverySnapshot, serializeDownSheetPayload, serializeFleetPayload, writeDownSheetStorage, writeFleetStorage} from "../../src/lib/storage/storage.ts";
+export {boardFromRows, busDefects, discrepancies, downSheetView, findBus, fleetCounts, locateBus, newestStamp} from "../../src/lib/mcp/fleet-reads.ts";
+export {FALLBACK_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, SERVER_INFO, TOOLS, TOOL_NAMES, handleRpc, isReadOnlyToolSurface, textResult} from "../../src/lib/mcp/mcp-protocol.ts";
+export {BOARD_TABLES, PAGE, readBoardRows, readLiveRows} from "../../src/lib/mcp/cloud-read.ts";
+export {createSessionCache, sessionCacheKey} from "../../src/lib/mcp/session-cache.ts";
+export {offeredToken, sameSecret} from "../../src/lib/mcp/agent-token.ts";
 export {CARE_LEVELS, INCIDENTS_STORAGE_KEY, INCIDENT_KINDS, createIncident, editIncident, incidentId, incidentsSince, normalizeIncident, readIncidents, serializeIncidents, sortIncidents, writeIncidents} from "../../src/lib/incidents/incidents.ts";
 export {SHOP_TALK_KINDS, SHOP_TALK_STORAGE_KEY, createShopTalkNote, handleShopTalkNote, isHandled, normalizeShopTalkNote, openHazardCount, readShopTalk, reopenShopTalkNote, serializeShopTalk, shopTalkId, sortShopTalk, writeShopTalk} from "../../src/lib/shop-talk/shop-talk.ts";
 export {DEFAULT_SHIFT_SETTINGS, SHIFT_SETTINGS_KEY, normalizeShiftSettings, readShiftSettings, shiftAt} from "../../src/lib/settings/shift-clock.ts";
