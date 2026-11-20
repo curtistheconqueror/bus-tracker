@@ -12,9 +12,9 @@
 
    So there are two halves, and they run at different moments on purpose:
 
-   - REMEMBERING is `pageMemory`, driven by app/_components/last-page-live.tsx
-     from an effect - so only once a page has actually come up. A page that
-     never draws is never remembered.
+   - REMEMBERING is `pageMemory`, driven by `watchPage`, which
+     app/_components/last-page-live.tsx starts from an effect - so only once a
+     page has actually come up. A page that never draws is never remembered.
    - REOPENING is `RESUME_SOURCE`, a script the root layout writes at the top
      of every page, which runs before the page is drawn. On a fresh start at
      the map it goes to the remembered page instead.
@@ -52,13 +52,33 @@
    - if the mark cannot be written, nothing moves.
 
    BEFORE REPLACEMENT, BOTH THE HOME DOCUMENT AND THE HYDRATED PAGE MUST BE
-   READY. LastPageLive signals after its settling timer, and document.complete
-   means the document and scripts finished loading. An early navigation aborts
-   that loading; stopping it later cannot reconstruct an interrupted map. If
-   readiness misses the same wait budget, reveal the map without navigating or
-   stopping its loading. This costs about two seconds on a normal fresh start,
-   and slow devices may stay on the map for that run. The deadline starts only
-   when this script runs, not before initial document delivery.
+   READY. `watchPage` signals as soon as the map has been drawn, and
+   document.complete means the document and scripts finished loading. An early
+   navigation aborts that loading; stopping it later cannot reconstruct an
+   interrupted map. If readiness misses the same wait budget, reveal the map
+   without navigating or stopping its loading: a device slow enough to miss it
+   stays on the map for that run, with the page still remembered for the next.
+   The deadline starts only when this script runs, not before initial document
+   delivery.
+
+   THE SIGNAL IS SENT WHEN THE MAP IS DRAWN, NOT WHEN IT HAS SETTLED. For one
+   release, 197, it was sent from the two-second probation timer, inside this
+   2.5-second wait. That left under half a second for the map's code to arrive
+   and draw, and a review measured it reopening nothing at all at eight times
+   CPU slowdown or with scripts half a second late - which is the first launch
+   after every release, on garage wifi. Probation asks whether the page that
+   was gone TO has stayed up. Readiness asks whether the map being LEFT is
+   whole. They are two questions, and the timer only ever answered the first.
+
+   WHOLE MEANS THE DOCUMENT HAS LOADED AND THE MAP HAS BEEN DRAWN ONCE, and no
+   more than that. The two seconds had been covering something else by
+   accident: whatever the map starts in its own first effects. Those run just
+   after this signal, so a move can now begin while the map's first pull from
+   the Shop Cloud is in flight, and a move that stalls is stopped about two and
+   a half seconds after the map was drawn where it used to be four and a half.
+   `window.stop()` ends that pull with the move. The board is drawn from this
+   device's own records and is not affected; the pull is retried by the cloud's
+   own sweep. Read, not measured - the same caveat `stop()` already carries.
 
    AND THE NETWORK IS ASKED FIRST. Pages here load network-first, and wifi that
    is joined but dead does not fail a request, it hangs it. Going straight to
@@ -124,6 +144,9 @@ export const RESUME_CONFIG:ResumeConfig={
  /* Raised on the window by the script when it tries to turn a start round,
     and read by the remembering half of the same page. */
  flag:"__paceResumeTried",
+ /* Raised on the window, and sent as an event of the same name, by
+    `watchPage` when a page has been drawn. The script will not leave a map
+    that has not said this. */
  ready:"__pacePageReady",
 };
 /* How long a page has to stay up before it counts as having come up. Its
@@ -193,6 +216,64 @@ export function pageMemory(storage:Pick<Storage,"getItem"|"setItem">,pathname:()
    wasUsed=true;
    return fellBack()?write(false):false;
   },
+ };
+}
+
+/* The page has been drawn: say so, to a script that may be waiting to leave
+   it. The flag is for a script that asks after this ran; the event is for one
+   that was already waiting. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a window, or a test's stand-in for one
+export function signalPageReady(win:any){
+ win[RESUME_CONFIG.ready]=true;
+ try{win.dispatchEvent(new Event(RESUME_CONFIG.ready))}catch{}
+}
+/* The page has gone down again - the route moved, or the crash boundary took
+   the tree. A script still waiting on the network or the document then finds
+   no ready map and stays. It does not undo a move already started: the signal
+   is sent before the page's own first effects run, so a map that throws in
+   those can already have been left - for the page that was remembered, which
+   is where the person was going. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- as above
+export function clearPageReady(win:any){
+ win[RESUME_CONFIG.ready]=false;
+}
+
+/* EVERYTHING THE PAGE DOES ABOUT BEING REMEMBERED, wired to a window. Called
+   once a page has been drawn; what it returns undoes it.
+
+   It was the body of an effect in last-page-live.tsx. It is here so that it
+   can be RUN by a test: the signal below is the only thing that lets a start
+   be turned round, and while it lived in a component the suite could only
+   read its text.
+
+   In order: the page is remembered (`up`), the script is told the page is up
+   (`signalPageReady`), and the probation timer is started. The signal does not
+   wait for the timer - see the header. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- as above
+export function watchPage(win:any):()=>void{
+ let memory:ReturnType<typeof pageMemory>;
+ let doc:Document;
+ try{
+  doc=win.document;
+  memory=pageMemory(win.localStorage,()=>win.location.pathname,win[RESUME_CONFIG.flag]===true);
+ }catch{return()=>{}}
+ const left=()=>{if(doc.visibilityState==="hidden")memory.left()};
+ const back=(event:{persisted?:boolean})=>{if(event&&event.persisted)memory.left()};
+ const used=()=>{memory.used()};
+ memory.up();
+ signalPageReady(win);
+ const timer=win.setTimeout(()=>{memory.settled()},PAGE_SETTLE_MS);
+ doc.addEventListener("visibilitychange",left);
+ win.addEventListener("pageshow",back);
+ win.addEventListener("pointerdown",used,true);
+ win.addEventListener("keydown",used,true);
+ return()=>{
+  clearPageReady(win);
+  win.clearTimeout(timer);
+  doc.removeEventListener("visibilitychange",left);
+  win.removeEventListener("pageshow",back);
+  win.removeEventListener("pointerdown",used,true);
+  win.removeEventListener("keydown",used,true);
  };
 }
 
