@@ -53,7 +53,7 @@ SSR stays on the production loopback server. This is not a live-host test.
 
 ## Remaining mandatory gates
 
-- Final WebKit result must be recorded separately; WebKit is not physical Safari.
+- WebKit loopback: 11/11 scenarios passed. This does not satisfy physical Safari acceptance.
 - Exact integration-head GitHub CI and fresh CodeRabbit findings must be verified.
   Existing PR54/55 reviews do not cover the integration fixes. Do not buy reviews
   or change service settings if the existing integration cannot review it.
@@ -75,3 +75,4 @@ retain saved Sites 194. Historical pre-197 fallback: Sites 191 at
 `a9f610d42123cd6cfaaf32b61d8c78048d585c82`.
 No service-worker, hosting, Supabase, credentials, audience or unrelated audio
 changes are included. No application/Sites version is assigned to this candidate.
+
