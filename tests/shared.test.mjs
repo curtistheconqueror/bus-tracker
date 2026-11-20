@@ -1273,7 +1273,12 @@ test("the bus box cannot leave a repair on a bus nobody chose",async()=>{
  /* SDET BT54-F2: after a typed number picked the bus, the blur threw the
     shop computer's cursor out of the form and Tab went back into the box.
     A finger still lets go - that is what takes a phone keyboard down. */
- assert.match(code,/if\(!browseFirst\|\|\(pressedWith\.current!=="mouse"&&pressedWith\.current!==""\)\)inputRef\.current\?\.blur\(\);/);
+ assert.match(code,/const keepFocus=browseFirst&&\(pressedWith\.current==="mouse"\|\|\(pressedWith\.current===""&&!\(typeof matchMedia==="function"&&matchMedia\("\(pointer: coarse\)"\)\.matches\)\)\);\s*if\(!keepFocus\)inputRef\.current\?\.blur\(\);/,
+  "a mouse or a hardware keyboard keeps focus; a finger, a pen, or a phone's own keyboard arrows let go");
+ /* Cold read: with focus kept, an Enter out of habit right after typing a
+    full bus number submitted the Down Sheet form with no repair on it. */
+ assert.match(code,/else if\(browseFirst&&Date\.now\(\)-pickedAt\.current<2000\)event\.preventDefault\(\);/);
+ assert.match(code,/pickedAt\.current=Date\.now\(\);/);
  /* CodeRabbit on PR 54: the list opening itself must not wipe a query
     somebody is typing in that box. */
  assert.match(code,/if\(!browseFirst\|\|disabled\|\|!openWhen\|\|openWhen===before\|\|value\|\|typingRef\.current\)return;/);

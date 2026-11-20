@@ -364,6 +364,12 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   row?.scrollIntoView({block:"nearest"});
  },[active,open]);
 
+ /* When an answer was last picked. Focus now stays in the box after a mouse
+    or keyboard pick, so an Enter pressed out of habit straight after typing a
+    full bus number reached the form: on the Down Sheet that saved an entry
+    with no repair on it (cold read). An Enter this soon after a pick, on a
+    shut browse-first box, is that habit and goes nowhere. */
+ const pickedAt=useRef(0);
  const pick=(option:ComboOption)=>{
   onPick(option.value,option);
   setOpen(false);
@@ -375,7 +381,12 @@ export default function ComboField({label,value,display,search,onPick,placeholde
      of on to the next - the step that let letters typed there pick the wrong
      bus (SDET review, BT54-F2). Browsing, the field is read-only again once
      the list shuts, so keeping focus raises nothing. */
-  if(!browseFirst||(pressedWith.current!=="mouse"&&pressedWith.current!==""))inputRef.current?.blur();
+  pickedAt.current=Date.now();
+  /* No press at all is a keyboard - Tab on the shop computer - except on a
+     touch screen, where it is the arrows above the phone's own keyboard, and
+     that keyboard has to go down too (cold read). */
+  const keepFocus=browseFirst&&(pressedWith.current==="mouse"||(pressedWith.current===""&&!(typeof matchMedia==="function"&&matchMedia("(pointer: coarse)").matches)));
+  if(!keepFocus)inputRef.current?.blur();
  };
 
  /* WHAT PRESSING A ROW DOES, in one place, because three things can be pressed
@@ -410,6 +421,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
    /* Only swallow Enter when it is doing something. Otherwise it belongs to the
       form, and a mechanic who has already chosen should be able to submit. */
    if(open&&rows[active]){event.preventDefault();choose(rows[active]);}
+   else if(browseFirst&&Date.now()-pickedAt.current<2000)event.preventDefault();
    return;
   }
   /* ESCAPE STEPS BACK OUT OF A GROUP BEFORE IT CLOSES THE LIST, which is what
