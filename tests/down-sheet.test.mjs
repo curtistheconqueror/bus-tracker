@@ -2435,13 +2435,13 @@ test("the Down Sheet uses the Defect Log's bus picker, and adds to a bus already
  assert.match(editorCode,/\{existingEntry&&<p className="repair-existing-entry">/,
   "the notice renders when the bus is already on the sheet");
  assert.match(editorCode,/is already on the sheet\./);
- assert.match(editorCode,/\{onOpenExisting&&<button type="button" onClick=\{\(\)=>onOpenExisting\(existingEntry\.id\)\}>ADD TO THAT ENTRY<\/button>\}/,
+ assert.match(editorCode,/\{onOpenExisting&&<button type="button" onClick=\{\(\)=>onOpenExisting\(existingEntry\.id,initials\.trim\(\)\)\}>ADD TO THAT ENTRY<\/button>\}/,
   "and the way through is wired to that entry");
 
  /* And "add to it" means exactly that: the existing entry opens with a fresh
     blank repair card on the end, so the new work is typed into the row that is
     already there rather than refused. */
- assert.match(page,/onOpenExisting=\{entryId=>/);
+ assert.match(page,/onOpenExisting=\{\(entryId,typedInitials\)=>/);
  assert.match(page,/\.\.\.normalizeRepairItems\(found\.repairItems[^)]*\),blankRepairItem\(\)\]/);
 
  /* NOTHING STEALS FOCUS when this editor opens — it opens with the section
@@ -3895,4 +3895,41 @@ test("moving a bus never writes its Down Sheet membership",async()=>{
     honest rather than removed - but "the badge disappeared after I moved it"
     was reachable, and Curtis's rule is about what a foreman sees, not only
     about what is stored. It is gone; the test above holds that. */
+});
+
+test("ADD TO THAT ENTRY opens the entry it names, not a heading over the blank draft",async()=>{
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ const editor=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
+ /* The editor seeds its draft ONCE, from the entry it mounted with. */
+ assert.match(editor,/const \[draft,setDraft\]=useState\(\(\)=>\(\{\.\.\.entry,/,
+  "if the draft ever follows the prop instead, this test's reason is gone and it should be rewritten");
+ /* So the page must hand a different entry to a NEW editor. Without the key,
+    ADD TO THAT ENTRY changed the heading to the bus and SAVE UPDATE while the
+    form kept the blank draft, and the save was refused as a second entry for
+    the bus — measured on main. */
+ assert.match(page,/\{editing&&<DownSheetEditor key=\{editing\.id\} carriedInitials=\{carriedInitials\} reopened=\{reopened\} onOpenExisting=\{/);
+ /* BT55-F1: the remount dropped keyboard focus to the page, and Tab then
+    Enter closed the form. Reopened, focus goes to the blank card - with a
+    fine pointer only, so a phone raises no keyboard. Forgotten with the editor. */
+ assert.match(page,/if\(found\)setReopened\(true\);/);
+ assert.match(page,/useEffect\(\(\)=>\{if\(!editing\)\{setCarriedInitials\(""\);setReopened\(false\)\}\},\[editing\]\);/);
+ /* The box around the blank card's fields, not a field: no keyboard on any
+    device, and the next Tab is CATEGORY, not the MARK FINISHED tick. */
+ assert.match(editor,/if\(!reopened\)return;/);
+ assert.match(editor,/last\?\.querySelector<HTMLElement>\("\.repair-item-fields"\)\?\.focus\(\{preventScroll:true\}\);/);
+ /* The NEW card - the last - not the entry's first (SDET BT55-F3), and on
+    screen when the entry already has several (CodeRabbit on PR 55). */
+ assert.match(editor,/const last=cards\?\.\[cards\.length-1\];/);
+ assert.match(editor,/last\?\.scrollIntoView\(\{block:"nearest"\}\);/);
+ assert.match(editor,/<div className="repair-item-fields" tabIndex=\{-1\}>/);
+ assert.doesNotMatch(editor,/pointer: fine/);
+ /* The new editor is seeded from the entry, so the initials somebody already
+    typed would be replaced — on a device with no default, by whoever last
+    updated that entry. A cold read found it. They come across instead, and
+    are forgotten when the editor shuts. */
+ assert.match(editor,/useState\(carriedInitials\|\|defaultInitials\|\|entry\.updatedBy\)/);
+ assert.match(page,/if\(found\)setCarriedInitials\(typedInitials\);/);
+ assert.match(page,/if\(!editing\)\{setCarriedInitials\(""\);/);
+ /* And what it is handed is the existing entry plus one blank card to add to. */
+ assert.match(page,/if\(found\)setEditing\(\{\.\.\.found,repairItems:\[\.\.\.normalizeRepairItems\(found\.repairItems[^)]*\),blankRepairItem\(\)\]\}\)/);
 });

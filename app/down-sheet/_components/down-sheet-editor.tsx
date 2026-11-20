@@ -4,7 +4,7 @@ import {BROWSE_ALL,CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} fr
 import ComboField from "@/src/components/shared/combo-field";
 import BusSelector from "@/src/components/shared/bus-selector";
 import HoursField from "@/src/components/shared/hours-field";
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {defectCountField,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,repairCategoryLabel} from "@/src/lib/defects/repair-catalog";
 import {findingMatchKey,readFindingsMemory,recallFindings} from "@/src/lib/defects/findings-memory";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
@@ -55,9 +55,35 @@ const ESTIMATE_FIELDS:{key:Exclude<keyof RepairTimeEstimate,"notes">;label:strin
 
 function hoursValue(minutes:number){return Number((minutes/60).toFixed(2))}
 
-export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onClose,onSave,onOpenExisting}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void;onOpenExisting?:(entryId:string)=>void}){
+export default function DownSheetEditor({entry,fleet,entries,defaultInitials,carriedInitials="",reopened=false,onClose,onSave,onOpenExisting}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void;carriedInitials?:string;reopened?:boolean;onOpenExisting?:(entryId:string,typedInitials:string)=>void}){
   const [draft,setDraft]=useState(()=>({...entry,repairItems:normalizeRepairItems(entry.repairItems,{category:entry.category,repair:entry.repair,details:entry.customReason,timeEstimate:entry.timeEstimate})}));
-  const [initials,setInitials]=useState(defaultInitials||entry.updatedBy);
+  /* Initials typed before ADD TO THAT ENTRY come across with it. That button
+     opens a fresh editor on the existing entry, and seeding from that entry
+     would put whoever last updated it in the box — a foreman who had already
+     typed his own and did not look again saves under somebody else's name. */
+  const [initials,setInitials]=useState(carriedInitials||defaultInitials||entry.updatedBy);
+  /* THE KEYBOARD PICKS UP WHERE IT WAS. ADD TO THAT ENTRY opens a new editor
+     on the existing entry, and the button that had focus goes with the old
+     one, so focus fell to the page and the next Tab landed on the header's X:
+     Tab then Enter closed the form and the new blank card with it (SDET
+     review, BT55-F1). Reopened that way, focus goes to the FIELDS of the blank
+     card the new work is typed into - the box around them, not a field in it.
+     A box raises no keyboard on any device, so this needs no guess about
+     which screens have one (a cold read caught a pointer test here that an
+     iPad with a trackpad would fail), and the next Tab is the card's CATEGORY
+     rather than its MARK FINISHED tick, which a field search found first. */
+  const formRef=useRef<HTMLFormElement|null>(null);
+  useEffect(()=>{
+    if(!reopened)return;
+    const cards=formRef.current?.querySelectorAll(".repair-item-card");
+    const last=cards?.[cards.length-1];
+    last?.querySelector<HTMLElement>(".repair-item-fields")?.focus({preventScroll:true});
+    /* And brought into view: with several repairs on the entry the new card
+       sits below the form's visible part, and focus nobody can see is not
+       much of a place to start (CodeRabbit on PR 55). Nearest, so a card
+       already on screen does not move. */
+    last?.scrollIntoView({block:"nearest"});
+  },[reopened]);
   /* Named so the "leave it" option can say where that actually is. A foreman
      deciding whether to move a bus needs to know where it is sitting now. */
   const currentArea=sectionForLocation(fleet.find(bus=>bus.id===draft.busId)?.l||"");
@@ -140,7 +166,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
   useEffect(()=>lockPageScroll("down-editor-open"),[]);
 
   return <div className="down-shade" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}>
-    <form className="repair-editor" onSubmit={submit}>
+    <form className="repair-editor" onSubmit={submit} ref={formRef}>
       <div className="repair-editor-head"><span>DOWN SHEET ENTRY<h2>{isNew?"Add Down Bus":"Bus "+draft.busNumber}</h2></span><button type="button" onClick={onClose}>X</button></div>
       <div className="repair-form">
         {/* THE SAME PICKER THE DEFECT LOG USES, not a second one.
@@ -159,7 +185,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
            it opens: the bus box opens its list on a tap, without the keyboard. */}
           <BusSelector fleet={fleet} busId={draft.busId}
            select={busId=>{const bus=fleet.find(item=>item.id===busId);setDraft(current=>({...current,busId,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}/>
-          {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={()=>onOpenExisting(existingEntry.id)}>ADD TO THAT ENTRY</button>}</p>}
+          {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={()=>onOpenExisting(existingEntry.id,initials.trim())}>ADD TO THAT ENTRY</button>}</p>}
         <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
 
         <fieldset className="repair-items wide">
@@ -170,7 +196,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
             return <section className="repair-item-card" key={item.id}>
               <header><b>DEFECT {index+1}</b><span>{item.estimateEnabled?formatRepairTime(itemTotal):"No estimate"}</span>{draft.repairItems.length>1&&<button type="button" onClick={()=>setDraft(current=>({...current,repairItems:current.repairItems.filter(candidate=>candidate.id!==item.id)}))}>REMOVE</button>}</header>
               <label className="repair-item-done"><input type="checkbox" checked={item.done===true} onChange={event=>setRepairDone(item.id,event.target.checked)}/><span>{item.done?"FINISHED":"MARK THIS REPAIR FINISHED"}</span></label>
-              <div className="repair-item-fields">
+              <div className="repair-item-fields" tabIndex={-1}>
                 {/* TYPE OR TAP, and the repair box is NOT locked behind the
                     category. These were two plain <select>s, and the second
                     carried disabled={!item.category} — so you had to know a
