@@ -25,10 +25,10 @@
    property runs, plus any other prefix actually in the fleet, so one 16xxx bus
    adds a 16s row rather than vanishing. */
 
-import {memo,useMemo} from "react";
+import {memo,useMemo,useRef} from "react";
 
-import {locationLabel} from "@/src/lib/fleet/location-label";
-import {busGeneration,busPickerDisplay,exactBus,generationLabel,searchBuses,type SearchableBus} from "@/src/lib/fleet/bus-search";
+import {busPickerDisplay,locationLabel} from "@/src/lib/fleet/location-label";
+import {busGeneration,exactBus,generationLabel,searchBuses,type SearchableBus} from "@/src/lib/fleet/bus-search";
 import ComboField,{type ComboOption} from "./combo-field";
 import "./bus-selector.css";
 
@@ -49,6 +49,8 @@ export type PickerBus=SearchableBus;
 /* `coach` names this box for the step-by-step helper to ring. */
 function BusSelector({fleet,busId,select,coach}:{fleet:PickerBus[];busId:string;select:(busId:string)=>void;coach?:string}){
  const selected=fleet.find(bus=>bus.id===busId);
+ const beforeTyping=useRef("");
+ const editingNumber=useRef(false);
  /* THE FLEET DECIDES THESE, AND THE FLEET IS NOT WHAT CHANGES WHILE SOMEBODY
     TYPES. Sorted once per fleet; the picker only asks for rows while its list
     is open. */
@@ -56,7 +58,7 @@ function BusSelector({fleet,busId,select,coach}:{fleet:PickerBus[];busId:string;
     1750 before 15502, and the 17s row would come up above the 15s. */
  const sorted=useMemo(()=>[...fleet].sort((a,b)=>COLLATOR.compare(busGeneration(a.n),busGeneration(b.n))||COLLATOR.compare(a.n,b.n)),[fleet]);
  const toOption=(bus:PickerBus,section?:string):ComboOption=>({value:bus.id,label:"Bus "+bus.n,hint:bus.l?locationLabel(bus.l):undefined,section});
- return <ComboField label="BUS" className="wide bus-combo" coach={coach} browseFirst typeAs="numeric"
+ return <ComboField label="BUS" className="wide bus-combo" coach={coach} browseFirst typeAs="numeric" retainExactFocus
   value={busId}
   display={selected?busPickerDisplay(selected):""}
   placeholder="Tap to pick a bus"
@@ -70,9 +72,19 @@ function BusSelector({fleet,busId,select,coach}:{fleet:PickerBus[];busId:string;
      not a bus leaves no bus chosen, and the save says so, rather than keeping
      the old one under the new number (CodeRabbit on PR 54). Opening the list
      or backing out of it keeps the bus. */
-  onType={()=>{if(busId)select("")}}
+  onType={()=>{
+   if(!editingNumber.current){beforeTyping.current=busId;editingNumber.current=true;}
+   if(busId)select("");
+  }}
+  /* Only an explicit cancellation restores the prior identity. A click on
+     SAVE while raw text is unresolved must leave no bus selected. */
+  onCancel={()=>{
+   const prior=beforeTyping.current;
+   if(editingNumber.current&&prior&&fleet.some(bus=>bus.id===prior))select(prior);
+   editingNumber.current=false;beforeTyping.current="";
+  }}
   exactPick={query=>{const bus=exactBus(fleet,query);return bus?toOption(bus):null}}
-  onPick={id=>select(id)}/>;
+  onPick={id=>{editingNumber.current=false;beforeTyping.current="";select(id)}}/>;
 }
 
 export default memo(BusSelector);

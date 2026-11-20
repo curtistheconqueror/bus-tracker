@@ -725,7 +725,7 @@ test("a search ends when somebody ends it, and never says so silently", async ()
     search can be judged; testing a TEXT search there cleared "brake" the moment
     a bus was picked, before the brake defect it would have matched existed.
     Measured in a browser, not reasoned about. */
- assert.match(page, /const clearSearchIfBusIsOutside=\(busId:string\)=>\{\s*if\(!search\.trim\(\)\|\|busSearch\.kind!=="numbers"\)return;/,
+ assert.match(page, /const clearSearchIfBusIsOutside=\(busId:string\)=>\{\s*if\(!busId\|\|!search\.trim\(\)\|\|busSearch\.kind!=="numbers"\)return;/,
   "the pick-time check judges bus-number searches only");
  assert.match(page, /const clearSearchIfItHides=\(busId:string,defect:StructuredDefect\)=>/,
   "the save-time check takes the whole record, so a text search it still matches survives");

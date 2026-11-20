@@ -84,7 +84,7 @@ export type ComboOption={
    pages that draw this today ask for it: the Defect Log, and the Down Sheet's
    editor on Curtis's word, "make downsheet operate similarly". Without the
    flag every line below behaves exactly as it did. */
-export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen="",typeAs,exactPick,onType}:{
+export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen="",typeAs,exactPick,onType,onCancel,retainExactFocus=false}:{
  label:string;
  value:string;
  /* What the closed field shows. Passed in rather than looked up here, because
@@ -128,6 +128,9 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     and keeping the old answer under it is how a repair lands on the wrong bus
     (CodeRabbit on PR 54). */
  onType?:(query:string)=>void;
+ onCancel?:()=>void;
+ /* Only an automatically resolved bus number keeps desktop typing focus. */
+ retainExactFocus?:boolean;
 }){
  const [open,setOpen]=useState(false);
  /* Only ever true with `browseFirst`. Mirrored in a ref because the focus and
@@ -140,6 +143,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  const [browseGroup,setBrowseGroup]=useState("");
  const [active,setActive]=useState(0);
  const inputRef=useRef<HTMLInputElement|null>(null);
+ const browsingFocus=useRef(false);
  const listRef=useRef<HTMLUListElement|null>(null);
  const boxRef=useRef<HTMLDivElement|null>(null);
  const id=useId();
@@ -307,6 +311,15 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   if(!browseFirst||disabled||!openWhen||openWhen===before||value||typingRef.current)return;
   openedItselfAt.current=Date.now();
   setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
+  /* Move to the list just opened, without opening a software keyboard. The
+     next hardware key must search this field, not replace its category. */
+  const input=inputRef.current;
+  if(input){
+   input.readOnly=true;input.setAttribute("inputmode","none");
+   browsingFocus.current=true;
+   input.focus({preventScroll:true});
+   browsingFocus.current=false;
+  }
  },[openWhen,value,browseFirst,disabled]);
  /* A KEYBOARD ALREADY UP FROM ANOTHER FIELD GOES DOWN. Type the bus number,
     then tap DEFECT CATEGORY: the tap is kept from focusing this field, so on
@@ -364,18 +377,18 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   row?.scrollIntoView({block:"nearest"});
  },[active,open]);
 
- const pick=(option:ComboOption)=>{
+ const pick=(option:ComboOption,exact=false)=>{
   onPick(option.value,option);
   setOpen(false);
   setQuery("");
   setBrowseGroup("");
-  /* A FINGER LETS GO, A KEYBOARD KEEPS ITS PLACE. On a phone the blur is what
-     takes the keyboard down once the answer is in. On the shop computer it
-     threw the cursor out of the form, so Tab went back into this box instead
-     of on to the next - the step that let letters typed there pick the wrong
-     bus (SDET review, BT54-F2). Browsing, the field is read-only again once
-     the list shuts, so keeping focus raises nothing. */
-  if(!browseFirst||(pressedWith.current!=="mouse"&&pressedWith.current!==""))inputRef.current?.blur();
+  /* Selection dismisses the old field. Only an exact typed bus number keeps
+     desktop focus so Tab continues from BUS; ordinary categories must let
+     their newly opened symptom field own the next keystroke. */
+  /* A person can take seconds to type a number after tapping TYPE. Pointer
+     intent lasts through that entry; it must not expire into desktop focus. */
+  const touch=pressedWith.current!=="mouse"&&pressedWith.current!=="";
+  if(!(retainExactFocus&&exact&&!touch))inputRef.current?.blur();
  };
 
  /* WHAT PRESSING A ROW DOES, in one place, because three things can be pressed
@@ -390,6 +403,11 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  const leaveGroup=()=>{setBrowseGroup("");setActive(0)};
 
  const keys=(event:React.KeyboardEvent<HTMLInputElement>)=>{
+  /* Deliberate clear, including an optional symptom. Enter on a normal Tab
+     stop never clears. The shortcut is exposed on the combobox itself. */
+  if(browseFirst&&!disabled&&(event.ctrlKey||event.metaKey)&&event.key==="Backspace"){
+   event.preventDefault();onPick("",null);setQuery("");setOpen(false);setTypingMode(false);return;
+  }
   /* A hardware keyboard types straight in: the first printable key lifts the
      read-only flag before the browser inserts it, so nothing is swallowed. */
   if(browseFirst&&!typingRef.current&&!disabled&&event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey){
@@ -400,8 +418,9 @@ export default function ComboField({label,value,display,search,onPick,placeholde
    event.preventDefault();
    if(!open){setOpen(true);setActive(0);return;}
    setActive(current=>{
-    const next=event.key==="ArrowDown"?current+1:current-1;
     if(!rows.length)return 0;
+    if(current<0)return event.key==="ArrowDown"?0:rows.length-1;
+    const next=event.key==="ArrowDown"?current+1:current-1;
     return (next+rows.length)%rows.length;
    });
    return;
@@ -410,6 +429,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
    /* Only swallow Enter when it is doing something. Otherwise it belongs to the
       form, and a mechanic who has already chosen should be able to submit. */
    if(open&&rows[active]){event.preventDefault();choose(rows[active]);}
+   else if(open&&exactPick&&query.trim())event.preventDefault();
    return;
   }
   /* ESCAPE STEPS BACK OUT OF A GROUP BEFORE IT CLOSES THE LIST, which is what
@@ -417,7 +437,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   if(event.key==="Escape"&&open){
    event.preventDefault();
    if(browseGroup){leaveGroup();return}
-   setOpen(false);setQuery("");
+   onCancel?.();setOpen(false);setQuery("");
   }
  };
 
@@ -441,6 +461,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     aria-expanded={open}
     aria-controls={id+"-list"}
     aria-autocomplete="list"
+    aria-keyshortcuts={browseFirst?"Control+Backspace Meta+Backspace":undefined}
     aria-activedescendant={open&&rows[active]?id+"-option-"+active:undefined}
     autoComplete="off"
     disabled={disabled}
@@ -449,6 +470,8 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     placeholder={placeholder||"Type or tap to choose"}
     onFocus={()=>{
      if(disabled)return;
+     if(browsingFocus.current)return;
+     if(!pressedJustNow())pressedWith.current="";
      /* A tap is decided by the click below. A focus with no tap behind it is a
         keyboard arriving, and a keyboard means typing. */
      if(browseFirst&&!typingRef.current){if(pressedJustNow())return;setTypingMode(true);}
@@ -460,7 +483,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     onMouseDown={event=>{if(browseFirst&&!typingRef.current)event.preventDefault();}}
     onClick={()=>{
      if(!browseFirst||typingRef.current||disabled)return;
-     if(Date.now()-openedItselfAt.current<600)return;
+     if(pressedAt.current<openedItselfAt.current&&Date.now()-openedItselfAt.current<600)return;
      /* A MOUSE IS THE SHOP COMPUTER, where there is no keyboard to keep down:
         one click types, as it always did. Built first as two clicks for every
         pointer, and a cold read caught it — the list opened, the cursor was
@@ -474,8 +497,10 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     onChange={event=>{
      onType?.(event.target.value);
      const exact=exactPick?.(event.target.value);
-     if(exact){pick(exact);return;}
-     setQuery(event.target.value);setActive(0);setBrowseGroup("");if(!open)setOpen(true);
+     if(exact){pick(exact,true);return;}
+     /* A prefix or ambiguous bus number has no implicit first answer. Arrow
+        navigation or a deliberate row press can still choose a listed bus. */
+     setQuery(event.target.value);setActive(exactPick?-1:0);setBrowseGroup("");if(!open)setOpen(true);
     }}
     onKeyDown={keys}/>
    {/* A REAL BUTTON, because it was a span with pointer-events:none and it looked
@@ -510,7 +535,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
      /* Browsing first, the arrow never raises the keyboard: closing takes it
         down, opening leaves it down. */
      if(browseFirst&&open)inputRef.current?.blur();
-     if(open){setOpen(false);setQuery("");return;}
+     if(open){onCancel?.();setOpen(false);setQuery("");return;}
      if(browseFirst)releaseOtherField();
      setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
      if(!browseFirst)inputRef.current?.focus();
