@@ -194,3 +194,22 @@ export function quickFilterShareFilename(label:string,now=new Date()){
  const slug=label.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"filter";
  return "pace-"+slug+"-"+now.toISOString().slice(0,10)+".html";
 }
+
+/* AFTER A PRESS, FOCUS GOES TO THE OTHER BUTTON IN THE SAME ROW - PUT BACK
+   after LEAVE OUT, LEAVE OUT after PUT BACK - because the pressed one is
+   replaced by its row's other state. Found by a data attribute one frame
+   later, since the element is one the next render creates. Takes the window
+   so a test can run it with a stand-in: the SDET review planted a mutant that
+   stopped focus moving and the source-text checks let it through (BT52-F1). */
+export type FocusRowWindow={
+ requestAnimationFrame?:(callback:()=>void)=>unknown;
+ document:{querySelector:(selector:string)=>{focus:()=>void}|null};
+ CSS?:{escape?:(value:string)=>string};
+};
+export function focusShareRow(win:FocusRowWindow,attribute:"data-leave-out"|"data-put-back",busId:string){
+ if(typeof win.requestAnimationFrame!=="function")return;
+ win.requestAnimationFrame(()=>{
+  const escaped=win.CSS?.escape?win.CSS.escape(busId):busId.replace(/["\\]/g,"\\$&");
+  win.document.querySelector(".quick-filter-drawer ["+attribute+'="'+escaped+'"]')?.focus();
+ });
+}

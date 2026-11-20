@@ -1697,7 +1697,12 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    circle that only has a MIN width, so "5 OF 6" filled it edge to edge and the
    rounded ends cut into the letters - measured at 390. It gets side padding
    while it carries the total, and stays a circle for a plain number. */
-.quick-filter-head strong.with-total{padding:0 10px;white-space:nowrap}
+/* THE BADGE KEEPS ONE WIDTH while the list offers LEAVE OUT. It was a 30px
+   circle that grew into a pill on the first LEAVE OUT - 17.7px sideways with
+   six buses, 28.6px with twelve - and shrank back on the last PUT BACK (SDET
+   review, BT52-LS-F2). Reserved for the whole time, in tabular figures so the
+   digits do not wobble it. Holds still up to two-digit totals. */
+.quick-filter-head strong.leave-out-offered{min-width:64px;padding:0 10px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .quick-filter-head strong>small{margin-left:3px;font-size:.55em;font-weight:900;letter-spacing:.4px;opacity:.8}
 @media(max-width:760px){
  .quick-filter-bus-card.can-leave-out>.quick-filter-leave-out{min-width:56px}
