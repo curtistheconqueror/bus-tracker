@@ -84,7 +84,7 @@ export type ComboOption={
    pages that draw this today ask for it: the Defect Log, and the Down Sheet's
    editor on Curtis's word, "make downsheet operate similarly". Without the
    flag every line below behaves exactly as it did. */
-export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen="",typeAs,exactPick}:{
+export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen="",typeAs,exactPick,onType}:{
  label:string;
  value:string;
  /* What the closed field shows. Passed in rather than looked up here, because
@@ -123,6 +123,11 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     returns is picked at once. For the bus box: a full fleet number IS the bus,
     and the number pad a phone raises for it has no Enter key to confirm with. */
  exactPick?:(query:string)=>ComboOption|null;
+ /* Told of every character typed, before exactPick. The bus box uses it to
+    let go of the bus it held: a number typed over it is a different question,
+    and keeping the old answer under it is how a repair lands on the wrong bus
+    (CodeRabbit on PR 54). */
+ onType?:(query:string)=>void;
 }){
  const [open,setOpen]=useState(false);
  /* Only ever true with `browseFirst`. Mirrored in a ref because the focus and
@@ -297,7 +302,9 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  useEffect(()=>{
   const before=lastOpenWhen.current;
   lastOpenWhen.current=openWhen;
-  if(!browseFirst||disabled||!openWhen||openWhen===before||value)return;
+  /* Not while somebody is typing in this box: the category picked by keyboard
+     elsewhere must not throw away what they typed here (CodeRabbit on PR 54). */
+  if(!browseFirst||disabled||!openWhen||openWhen===before||value||typingRef.current)return;
   openedItselfAt.current=Date.now();
   setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
  },[openWhen,value,browseFirst,disabled]);
@@ -362,7 +369,13 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   setOpen(false);
   setQuery("");
   setBrowseGroup("");
-  inputRef.current?.blur();
+  /* A FINGER LETS GO, A KEYBOARD KEEPS ITS PLACE. On a phone the blur is what
+     takes the keyboard down once the answer is in. On the shop computer it
+     threw the cursor out of the form, so Tab went back into this box instead
+     of on to the next - the step that let letters typed there pick the wrong
+     bus (SDET review, BT54-F2). Browsing, the field is read-only again once
+     the list shuts, so keeping focus raises nothing. */
+  if(!browseFirst||(pressedWith.current!=="mouse"&&pressedWith.current!==""))inputRef.current?.blur();
  };
 
  /* WHAT PRESSING A ROW DOES, in one place, because three things can be pressed
@@ -459,6 +472,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     /* TYPING LEAVES THE GROUP. A query searches every wording in the catalog,
        so staying inside one group would quietly hide most of what matched. */
     onChange={event=>{
+     onType?.(event.target.value);
      const exact=exactPick?.(event.target.value);
      if(exact){pick(exact);return;}
      setQuery(event.target.value);setActive(0);setBrowseGroup("");if(!open)setOpen(true);
@@ -511,6 +525,11 @@ export default function ComboField({label,value,display,search,onPick,placeholde
    {showMode&&<button
     type="button"
     className="combo-mode"
+    /* Recorded like the box and the arrow: whether a finger or a mouse asked
+       to type decides whether picking lets go of the field afterwards, which
+       is what takes a phone keyboard down. Unrecorded, a TYPE tap on a phone
+       read as a keyboard and the keyboard stayed up after the bus was picked. */
+    onPointerDown={event=>{pressedAt.current=Date.now();pressedWith.current=event.pointerType}}
     aria-label={typing?"LIST "+label+" choices":"TYPE "+label}
     tabIndex={-1}
     disabled={disabled}
@@ -521,7 +540,10 @@ export default function ComboField({label,value,display,search,onPick,placeholde
      :<><rect x="1" y="1" width="16" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="M4 5h1M7 5h1M10 5h1M13 5h1M5 9h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></>}</svg>
     {typing?"LIST":"TYPE"}
    </button>}
-   {value&&!open&&!disabled&&<button type="button" className="combo-clear" aria-label={"Clear "+label}
+   {/* Out of the Tab order on a browse-first field, like the arrow and TYPE:
+       the next Tab after picking a bus landed here, and Enter cleared the bus
+       somebody had just typed. Typing over an answer replaces it anyway. */}
+   {value&&!open&&!disabled&&<button type="button" className="combo-clear" aria-label={"Clear "+label} tabIndex={browseFirst?-1:undefined}
     onClick={event=>{event.preventDefault();onPick("",null);}}>×</button>}
    {open&&<ul className={grouped?"combo-list grouped":"combo-list"} id={id+"-list"} role="listbox" ref={listRef}>
     {/* THE WAY BACK IS A HEADER, NOT A ROW THE KEYBOARD WALKS, and that was

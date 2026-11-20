@@ -55,7 +55,7 @@ function BusSelector({fleet,busId,select,coach}:{fleet:PickerBus[];busId:string;
  /* By generation first, then number: a numeric sort alone puts a four-digit
     1750 before 15502, and the 17s row would come up above the 15s. */
  const sorted=useMemo(()=>[...fleet].sort((a,b)=>COLLATOR.compare(busGeneration(a.n),busGeneration(b.n))||COLLATOR.compare(a.n,b.n)),[fleet]);
- const toOption=(bus:PickerBus,section?:string):ComboOption=>({value:bus.id,label:"Bus "+bus.n,hint:locationLabel(bus.l)||undefined,section});
+ const toOption=(bus:PickerBus,section?:string):ComboOption=>({value:bus.id,label:"Bus "+bus.n,hint:bus.l?locationLabel(bus.l):undefined,section});
  return <ComboField label="BUS" className="wide bus-combo" coach={coach} browseFirst typeAs="numeric"
   value={busId}
   display={selected?busPickerDisplay(selected):""}
@@ -66,6 +66,11 @@ function BusSelector({fleet,busId,select,coach}:{fleet:PickerBus[];busId:string;
   search={query=>query.trim()
    ?searchBuses(sorted,query).map(bus=>toOption(bus))
    :sorted.map(bus=>toOption(bus,generationLabel(busGeneration(bus.n))))}
+  /* TYPING OVER A BUS LETS IT GO, as TYPE BUS # always did: a number that is
+     not a bus leaves no bus chosen, and the save says so, rather than keeping
+     the old one under the new number (CodeRabbit on PR 54). Opening the list
+     or backing out of it keeps the bus. */
+  onType={()=>{if(busId)select("")}}
   exactPick={query=>{const bus=exactBus(fleet,query);return bus?toOption(bus):null}}
   onPick={id=>select(id)}/>;
 }

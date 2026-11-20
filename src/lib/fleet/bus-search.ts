@@ -17,14 +17,17 @@ export function generationLabel(value:string){return value==="OTHER"?"OTHER":val
 /* "Bus 17507 · Main Garage": what the box reads once a bus is chosen. The
    location goes through locationLabel, never a prefix, so TROUBLE BAY 11 is
    not "Main Garage". */
-export function busPickerDisplay(bus:SearchableBus){const where=locationLabel(bus.l);return "Bus "+bus.n+(where?" · "+where:"")}
+export function busPickerDisplay(bus:SearchableBus){const where=bus.l?locationLabel(bus.l):"";return "Bus "+bus.n+(where?" · "+where:"")}
 
 /* WHAT TYPING FINDS. Digits match the fleet number — the start of it first,
    then anywhere in it — and anything typed that is not a digit is ignored, so
-   "bus 175" finds what "175" finds. Nothing typed returns the list as given. */
+   "bus 175" finds what "175" finds. Nothing typed returns the list as given;
+   something typed with no digit in it finds NO bus. It used to return the
+   whole fleet, so "brakes" typed into the bus box and Enter picked the first
+   bus in the list - a repair on the wrong bus (SDET review, BT54-F1). */
 export function searchBuses<T extends SearchableBus>(sorted:T[],query:string):T[]{
  const digits=String(query||"").replace(/\D/g,"");
- if(!digits)return sorted;
+ if(!digits)return String(query||"").trim()?[]:sorted;
  const starts=sorted.filter(bus=>bus.n.startsWith(digits));
  const inside=sorted.filter(bus=>!bus.n.startsWith(digits)&&bus.n.includes(digits));
  return [...starts,...inside];

@@ -242,6 +242,14 @@ test("the defect form asks for the bus the way a mechanic reaches for it",async(
  assert.deepEqual(searchBuses(fleet,"175").map(bus=>bus.n),["17507","17509","1750","21750"],"the start of the number first, then anywhere in it");
  assert.deepEqual(searchBuses(fleet,"bus 1550").map(bus=>bus.n),["15502"],"words are ignored, digits are searched");
  assert.equal(searchBuses(fleet,"").length,5,"nothing typed is the whole list");
+ /* BT54-F1: letters typed with no digit find no bus. They found the whole
+    fleet, and Enter picked the first bus - a repair on the wrong bus. */
+ assert.deepEqual(searchBuses(fleet,"abc"),[]);
+ assert.deepEqual(searchBuses(fleet,"brakes"),[]);
+ assert.deepEqual(searchBuses(fleet,"   ").map(bus=>bus.n).length,5,"spaces alone are nothing typed");
+ /* A bus with no location is just its number, not "Location not set". */
+ const {busPickerDisplay}=await import("../src/lib/fleet/bus-search.ts");
+ assert.equal(busPickerDisplay({id:"x",n:"15502",l:""}),"Bus 15502");
  assert.equal(exactBus(fleet,"17509")?.id,"c","a full number picks its bus");
  assert.equal(exactBus(fleet,"1750"),null,"not while 17507 and 17509 still start with it");
  assert.equal(exactBus(fleet,"1751"),null,"a number that is no bus picks nothing");
@@ -1133,10 +1141,10 @@ test("on the Defect Log a picker opens its list without the keyboard, and typing
  /* AND THE KEYBOARD HINT GOES WITH IT. Swapped, inputmode="none" would stay
     on while typing and an iPhone would raise no keyboard at all - a mutant
     the first version of this test let through (SDET review, BT53-F3). */
- assert.match(code,/if\(on\)input\.removeAttribute\("inputmode"\);else input\.setAttribute\("inputmode","none"\);/,"typing drops inputmode=none, or iOS shows no keyboard");
+ assert.match(code,/if\(!on\)input\.setAttribute\("inputmode","none"\);else if\(typeAs\)input\.setAttribute\("inputmode",typeAs\);else input\.removeAttribute\("inputmode"\);/,"typing drops inputmode=none, or iOS shows no keyboard");
  /* A mouse on the arrow types, as a mouse on the box does (BT53-F1). */
  assert.match(code,/else if\(pressedWith\.current==="mouse"&&pressedJustNow\(\)\)\{setTypingMode\(true\);inputRef\.current\?\.focus\(\);\}/);
- assert.equal((code.match(/onPointerDown=\{event=>\{pressedAt\.current=Date\.now\(\);pressedWith\.current=event\.pointerType\}\}/g)||[]).length,2,"the box and the arrow both record what pressed them");
+ assert.equal((code.match(/onPointerDown=\{event=>\{pressedAt\.current=Date\.now\(\);pressedWith\.current=event\.pointerType\}\}/g)||[]).length,3,"the box, the arrow and TYPE all record what pressed them");
  assert.match(code,/const startTyping=\(\)=>\{\s*if\(disabled\)return;\s*setTypingMode\(true\);\s*openBrowse\(\);\s*inputRef\.current\?\.focus\(\);/);
  /* First tap opens, second tap types — for a finger. A tap never focuses the
     input while it is browsing; the click decides. */
@@ -1242,8 +1250,31 @@ test("picking a category opens the symptom list by itself, without the keyboard"
     answer, never for a disabled field, and only on a browse-first field —
     browsing, so no keyboard comes with it. */
  assert.match(code,/const lastOpenWhen=useRef\(openWhen\);/);
- assert.match(code,/if\(!browseFirst\|\|disabled\|\|!openWhen\|\|openWhen===before\|\|value\)return;\s*openedItselfAt\.current=Date\.now\(\);\s*setOpen\(true\);setQuery\(""\);setBrowseGroup\(""\);setActive\(0\);/);
+ assert.match(code,/if\(!browseFirst\|\|disabled\|\|!openWhen\|\|openWhen===before\|\|value\|\|typingRef\.current\)return;\s*openedItselfAt\.current=Date\.now\(\);\s*setOpen\(true\);setQuery\(""\);setBrowseGroup\(""\);setActive\(0\);/);
  assert.doesNotMatch(code.slice(code.indexOf("const lastOpenWhen"),code.indexOf("const releaseOtherField")),/focus\(\)|setTypingMode\(true\)/,"it never starts typing");
  assert.match(log,/coach="issue" browseFirst\n\s*openWhen=\{value\.defect\.category\}/);
  assert.match(sheet,/<ComboField label="SPECIFIC REPAIR" className="wide" browseFirst\n\s*openWhen=\{item\.category\}/);
+});
+
+test("the bus box cannot leave a repair on a bus nobody chose",async()=>{
+ const [combo,picker]=await Promise.all([
+  readFile(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8"),
+ ]);
+ const code=combo.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ /* CodeRabbit on PR 54: a number typed over a chosen bus kept the old bus
+    under it, and the Down Sheet could save the repair there. Typing lets the
+    bus go, as TYPE BUS # did; opening or backing out of the list keeps it. */
+ assert.match(code,/onType\?\.\(event\.target\.value\);\s*const exact=exactPick\?\.\(event\.target\.value\);/,"told of each character before any pick");
+ assert.match(picker,/onType=\{\(\)=>\{if\(busId\)select\(""\)\}\}/);
+ /* And the × is not the next Tab stop after a pick: Enter there cleared the
+    bus just typed. Measured at 1180 before the fix. */
+ assert.match(code,/className="combo-clear" aria-label=\{"Clear "\+label\} tabIndex=\{browseFirst\?-1:undefined\}/);
+ /* SDET BT54-F2: after a typed number picked the bus, the blur threw the
+    shop computer's cursor out of the form and Tab went back into the box.
+    A finger still lets go - that is what takes a phone keyboard down. */
+ assert.match(code,/if\(!browseFirst\|\|\(pressedWith\.current!=="mouse"&&pressedWith\.current!==""\)\)inputRef\.current\?\.blur\(\);/);
+ /* CodeRabbit on PR 54: the list opening itself must not wipe a query
+    somebody is typing in that box. */
+ assert.match(code,/if\(!browseFirst\|\|disabled\|\|!openWhen\|\|openWhen===before\|\|value\|\|typingRef\.current\)return;/);
 });
