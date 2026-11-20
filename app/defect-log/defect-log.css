@@ -1701,8 +1701,8 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    circle that grew into a pill on the first LEAVE OUT - 17.7px sideways with
    six buses, 28.6px with twelve - and shrank back on the last PUT BACK (SDET
    review, BT52-LS-F2). Reserved for the whole time, in tabular figures so the
-   digits do not wobble it. Holds still up to two-digit totals. */
-.quick-filter-head strong.leave-out-offered{min-width:64px;padding:0 10px;white-space:nowrap;font-variant-numeric:tabular-nums}
+   digits do not wobble it. 76px holds still up to three-digit totals - "104 OF 105" measured 74.5px - which an ALL window can reach (SDET re-gate, BT52-LS-F4). */
+.quick-filter-head strong.leave-out-offered{min-width:76px;padding:0 10px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .quick-filter-head strong>small{margin-left:3px;font-size:.55em;font-weight:900;letter-spacing:.4px;opacity:.8}
 @media(max-width:760px){
  .quick-filter-bus-card.can-leave-out>.quick-filter-leave-out{min-width:56px}

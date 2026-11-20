@@ -10376,7 +10376,7 @@ test("a bus can be left out of a shared Defects Logged list, and put back",async
  assert.match(css,/\.quick-filter-share-actions>small\.quick-filter-leave-live\{position:absolute;/);
  /* The count badge keeps one width while LEAVE OUT is offered, so its
     first LEAVE OUT and last PUT BACK move nothing in the header (BT52-LS-F2). */
- assert.match(css,/\.quick-filter-head strong\.leave-out-offered\{min-width:64px;padding:0 10px;white-space:nowrap;font-variant-numeric:tabular-nums\}/);
+ assert.match(css,/\.quick-filter-head strong\.leave-out-offered\{min-width:76px;padding:0 10px;white-space:nowrap;font-variant-numeric:tabular-nums\}/);
  assert.doesNotMatch(css,/with-total/);
  /* A LEFT OUT row keeps the height its card had, open detail and all, so
     nothing below it moves (BT52-LS-F1). Recorded by every LEAVE OUT. */
