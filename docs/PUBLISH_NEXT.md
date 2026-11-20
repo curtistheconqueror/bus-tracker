@@ -1,52 +1,99 @@
 # Publish next
 
-**STATUS: ONE RELEASE PROPOSED, ON A BRANCH — application release 198: the fix for last-page reopening in 197. NOT ON `main`, NOT MERGED, NOT PUBLISHED.** It is on `claude/resume-ready-on-mount`. Curtis decides whether it merges; nothing here is to be published until it is on `main` and he has pointed Codex at this file. Until then `main` has nothing pending.
+**STATUS: ONE RELEASE PENDING ON `main` — application release 198, from `2ee1bb5`. NOT PUBLISHED.** Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
 
-**What is live:** Sites Version 194 / application release 197, deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Rollback for 197: Sites 191 at `a9f610d42123cd6cfaaf32b61d8c78048d585c82`. Rollback for 198, if it is published: Sites 194 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
+**What is live:** Sites Version 194 / application release 197, deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Rollback for 198: Sites 194 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
 
-**Why 198 exists.** A re-gate of the published head (PR50 review 5950415977, verdict FAIL, posted after publication) found that **197 reopens the page a person left only when the map's code arrives and draws within about half a second.** On a slow phone, or on the first launch after any release, it opens on the Facility Map — the thing Curtis asked to stop. The live record's "readiness taking more than the 2.5-second script budget falls back to map" is true and understates it: 2 of those 2.5 seconds were being spent on a timer.
-
-PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`, with a correction at its head.
+1 release is pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
 
 | Release | What it is | State |
 | --- | --- | --- |
-| 198 | The map says it is ready when it is drawn, so the app reopens the page it was left on at the speeds real phones run at | On a branch, awaiting Curtis |
+| 198 | Reopening the last page at real phone speeds; the log-a-defect pickers without the keyboard; one BUS box; the symptom list opening itself; the Down Sheet ticks moved up; leaving a bus out of a shared Defects Logged list; ADD TO THAT ENTRY fixed; a Shop Cloud pull that did not finish is asked for again | On `main`, pending publication |
 
-## 198 — the map says it is ready when it is drawn
+## 198 — five merged PRs
 
 ### Source
 
-Release source: `520fa20`, on `claude/resume-ready-on-mount`. Previous: `19f0e90`, the head of `main`, which recorded the 197 release.
+Release source: `2ee1bb5`, the head of `main` below the commit that updates this file. Previous: `19f0e90`, which recorded the 197 release.
 
-The three blocks below were run at `520fa20`, the commit below the one this file is updated in.
+The four blocks below were run at `2ee1bb5`.
 
 ```
-$ git log --oneline 19f0e90..520fa20
+$ git log --oneline 19f0e90..2ee1bb5
+2ee1bb5 Merge claude/down-sheet-add-to-entry (PR 55) on Curtis's go
+4cb3173 Merge claude/log-defect-flow (PR 54) on Curtis's go
+f2afe36 Merge claude/log-defect-pickers (PR 53) on Curtis's go
+15dcbb1 Merge claude/logged-share-leave-out (PR 52) on Curtis's go
+fce33e3 Merge claude/resume-ready-on-mount (PR 51) on Curtis's go
+d8f0115 Leave out: the count badge holds still at three-digit totals too
+d235554 Down Sheet: the new card is scrolled into view after ADD TO THAT ENTRY
+4acf963 Pickers: answers to the SDET re-gate of PR 54 and CodeRabbit
+79adfbc Leave out: a share answers for the list it was started on, whatever changed it
+f589c5c Down Sheet: focus goes to the new card's fields, on every device
+5b9e4d6 Shop Cloud: a pull asked for mid-pull runs next; a refused apply is not retried every sweep
+32e10de Bus box: an Enter out of habit after a typed number saves nothing
+f1e4d65 Down Sheet: the keyboard lands on the new card after ADD TO THAT ENTRY
+32df6bd Resume: answers to the CodeRabbit and SDET reviews of PR 51
+ac3f412 Leave out: answers to the SDET and CodeRabbit reviews of PR 52
+2de3fd2 Bus box: answers to the SDET and CodeRabbit reviews of PR 54
+21e5a07 Merge branch 'claude/log-defect-pickers' into claude/log-defect-flow
+188b6d8 Pickers: answers to the SDET review of PR 53
+70aa56d Down Sheet: initials typed before ADD TO THAT ENTRY come across with it
+0f8be6a Down Sheet: ADD TO THAT ENTRY opens the entry instead of a dead end
+635101d B and C: answers to the cold read of both
+475cf7b B: one BUS box, picked like the category, typed on the number pad
+8d98c36 E: RECOMMEND FOR DOWN SHEET and DOWN SHEET move up under the defect
+5956d56 C: pick a category and the symptom list opens by itself
+b6f2e53 Pickers: one click types on the shop computer; the Down Sheet follows
+94e1c5e Defect Log pickers: the list opens without the keyboard, typing is asked for
+e81e25d Leave a bus out of a shared Defects Logged list, with PUT BACK
+a445487 Propose 198 in the handoff: the fix for reopening in 197
 520fa20 BT197-F2: the map says it is ready when it is drawn, not two seconds later
 ```
 
 ```
-$ git diff --name-only 19f0e90..520fa20 -- app src tests
+$ git diff --name-only 19f0e90..2ee1bb5 -- app src tests
 app/_components/last-page-live.tsx
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/down-sheet/_components/down-sheet-editor.tsx
+app/down-sheet/down-sheet.css
+app/down-sheet/page.tsx
+src/components/shared/bus-selector.css
+src/components/shared/bus-selector.tsx
+src/components/shared/combo-field.css
+src/components/shared/combo-field.tsx
+src/components/shared/shop-cloud-live.tsx
+src/lib/defects/form-coach.ts
+src/lib/defects/quick-filter-share.ts
+src/lib/fleet/bus-search.ts
 src/lib/settings/last-page.ts
+tests/app-shell.test.mjs
+tests/defects.test.mjs
+tests/down-sheet.test.mjs
 tests/fixtures/resume-navigation-server.mjs
 tests/settings.test.mjs
+tests/shared.test.mjs
 ```
 
 ```
-$ git diff --shortstat 19f0e90..520fa20
- 6 files changed, 427 insertions(+), 95 deletions(-)
+$ git diff --shortstat 19f0e90..2ee1bb5
+ 24 files changed, 1985 insertions(+), 428 deletions(-)
 ```
 
 Proof of no infrastructure change. This returned nothing:
 
 ```
-$ git diff --name-only 19f0e90..520fa20 -- supabase package.json package-lock.json .github public worker
+$ git diff --name-only 19f0e90..2ee1bb5 -- supabase package.json package-lock.json .github public worker
 ```
+
+The one merge conflict was at PR 53 (`f2afe36`): PR 52 and PR 53 each appended to the end of `app/defect-log/defect-log.css` and `tests/defects.test.mjs`. Both sides are kept, PR 52's first.
 
 ### Migrations
 
-None. No storage key is added, renamed or read differently. `public/sw.js` and the manifest are untouched. **The inline script at the top of every page is byte for byte the one 197 serves**; what changed is in the page's own code, which sends the signal that script waits for.
+None. **No storage key is added, renamed or read differently** — the added lines of `app` and `src` name no `pace-…-v…` key. Everything new here is page state held in memory. `public/sw.js` and the manifest are untouched. The inline script at the top of every page is the one 197 serves.
+
+## Part 1 (PR 51) — the map says it is ready when it is drawn
 
 ### What was wrong
 
@@ -96,44 +143,105 @@ Three other things in this commit, none of which a person will see:
 
 ### One thing this trades, written down
 
-The two-second timer had also been covering something by accident: whatever the map starts in its own first moments. A move can now begin while the map's first pull from the Shop Cloud is in flight, and a move that stalls is stopped about 2.5 seconds after the map was drawn, where it was 4.5. Stopping ends that pull with the move. The board is drawn from the device's own records and is not affected, and the pull is retried by the cloud's own sweep. **This was read in the code, not measured.**
+The two-second timer had also been covering something by accident: whatever the map starts in its own first moments. A move can now begin while the map's first pull from the Shop Cloud is in flight, and a move that stalls is stopped about 2.5 seconds after the map was drawn, where it was 4.5. Stopping ends that pull with the move. The board is drawn from the device's own records and is not affected, and since Part 2 a pull that was cut off is owed and made by the next sync. **This was read in the code, not measured.**
 
-### Verified
+### Part 1 measurements
 
-- `npm test` on Windows — **470 pass, 0 fail**.
+- **The table above**: production build, served locally, Chromium at 390 wide, the real inline script in the real app, through a proxy that held each script file back. One run per row; the proxy forbade caching after two early runs were found to be served from the browser's cache.
+- **49 bugs planted** one at a time in the module and the component; the tests caught all 49.
+- A planted fixture fault (the ready signal raised on arrival) fails `tests/settings.test.mjs`, which now runs what `/map.js` sends rather than only parsing it.
+
+## Part 2 (PR 51) — a Shop Cloud pull that did not finish is asked for again
+
+**What was wrong.** While the live connection to the Shop Cloud is up, the 45-second sweep only sends; it does not fetch. So a fetch that did not finish was never asked for again: the first fetch of a page that reopening cut short, one that failed on dead wifi, or one requested while another sync was running, which was simply dropped. The board sat on what it had until the next change notification or a trip away from the app.
+
+**What changed.** A fetch is owed until one comes back, and the next sync makes it. A request that arrives mid-sync is counted, and a fetch runs again as soon as that sync ends. A fetch that came back but could not be saved (a phone too full, say) is not retried every 45 seconds: the error shows as before. A fetch still never runs unless sending succeeded first. Separately, the page now removes the listeners it added when it unloads.
+
+**Not measured:** this needs a live Shop Cloud connection to drive, and the development machine has none. It was read and reviewed.
+
+## Part 3 (PRs 53 and 54) — logging a defect on a phone
+
+**What was wrong**, on Curtis's iPhone:
+- The keyboard came up when LOG DEFECT opened and again on every pick, covering the list it had just opened.
+- Picking a bus left a grey card repeating the number.
+- Engine opened on one "Engine 23" row that had to be tapped first.
+- The symptom box's text was cut off.
+- The bus took three controls and a third of the screen.
+- RECOMMEND FOR DOWN SHEET sat about two and a half screens down.
+
+**What changed** — on the Defect Log's LOG DEFECT form, and the Down Sheet's editor where it says so:
+- **No keyboard when the form opens.**
+- **Tapping a list box opens its list with no keyboard.** Tapping the box again, or the **TYPE** button at its right end, starts typing; while typing the button reads **LIST** and brings the whole list back. The ▾ arrow opens and closes the list. On the shop computer, one mouse click types as it always did. (Both forms.)
+- **One BUS box** in place of the generation chips, the bus list and TYPE BUS #. Tap it: 15s, 17s, 18s, 20s with counts, then the buses. TYPE brings up the number pad, and a full fleet number picks the bus by itself. Picked, it reads "Bus 17507 · Main Garage". No grey card. Letters typed there find no bus. Typing over a chosen bus lets it go; backing out gives it back. (Both forms.)
+- **Pick a category and the symptom list opens by itself**, with no keyboard. (Both forms.)
+- **A category with one group opens straight into its choices** — Engine shows its 23 defects. (Both forms.)
+- **The text in the boxes fits.** "Optional. You can save the category alone." sits under the symptom box. The Down Sheet uses shorter wording because its boxes sit inside repair cards.
+- **RECOMMEND FOR DOWN SHEET and DOWN SHEET moved up**, right under the symptom and before ADDITIONAL DETAILS. DEFERRED and NOT DUPLICATED stay at the bottom. (Defect Log.)
+- **Taps on a label or hint line no longer jump into the field.**
+- **Backspace with nothing typed empties an answer**; the × does too.
+- **An Enter pressed within two seconds of a typed bus number does nothing**, so it cannot save an empty Down Sheet entry.
+
+## Part 4 (PR 52) — leave a bus out of a shared Defects Logged list
+
+**What was wrong.** On the Defects Logged quick filter, there was no way to drop a bus from the list before COPY LIST, SHARE or SHARE PAGE.
+
+**What changed.** Each bus row has **LEAVE OUT**. The bus stays in its place as a dashed LEFT OUT row with **PUT BACK**, the same height it had, so nothing below moves. The count reads "5 OF 6" in a badge that holds one width. Leave everything out and the three share buttons go dead. Nothing about a bus or a defect is written; the next list opened starts whole. Defects Logged only — offering it on other lists is Curtis's call.
+
+## Part 5 (PR 55) — ADD TO THAT ENTRY on the Down Sheet
+
+**What was wrong**, measured on 197. ADD DOWN BUS, type a bus already on the sheet, press **ADD TO THAT ENTRY**: the heading changed to that bus, the form stayed blank, and SAVE was refused — *"That bus already has an active down-sheet entry."* The only way out lost what was typed.
+
+**What changed.** It opens the bus's existing entry with its repairs and a blank card for the new one, scrolled into view; saving adds to that entry. Initials typed before pressing it come across with it.
+
+## Verified
+
+- `npm test` on Windows at `2ee1bb5` — **477 pass, 0 fail**.
 - `npm run lint` — no error; one warning, in a tool file that is not part of the app.
-- **49 bugs planted** one at a time in the module and the component; the tests caught all 49. They include both of the review's F4 mutants, its X2 mutant, and the original fault put back with the source left reading in the right order. Each of those fails a test that *runs* the code, not one that reads it.
-- **The table above**: production build, served locally, Chromium at 390 wide, the real inline script in the real app. This is the first time the whole feature has been run end to end in a real page; everything before it used a stand-in window. One run per row.
-- **A cold read of the diff** by one subagent that had not seen the reasoning: no blocker, the fix confirmed right. Two should-fix and seven notes, each answered in the commit message of the release source.
+- Type-check — 240 errors, against 239 on `main`. The one more is `src/lib/fleet/bus-search.ts` importing with a `.ts` ending, the convention every `src/lib` module follows so the Node test runner can load it.
+- **Every PR** passed an SD-QG gate and a CodeRabbit review, and each finding was fixed in a named commit or declined with the reason in its commit message. Each PR was also read cold by a subagent before it was pushed, and the review fixes were read cold again. The merge resolution only kept both sides of two appended blocks.
+- **Measured in Chromium** on the dev server, with real clicks and keys at 1180 and touch-pointer events at 360 and 390, on pages no service worker served. The numbers are in each commit message. Examples: picking a category at 360 moves the fields below by 0 px; leaving out a bus with its detail open moves the rows below by 0 px; the count badge moves 0 px from "105" to "104 OF 105"; on the shop computer the review's wrong-bus path (17507, Tab, "brakes", Enter) keeps Bus 17507 and picks Brakes.
+- **Part 1's measurements** are in its own section above.
 
 **Not verified:**
+- **A real iPhone or iPad, or WebKit.** Keyboard down on the first tap and up on the second, the number pad on TYPE, the grey card being gone, and the reopening of an installed copy are all reasoned from how iOS behaves, not measured.
+- **The Shop Cloud change (Part 2)** against a live connection.
+- **Rotating a phone, or opening another bus's detail, between LEAVE OUT and PUT BACK** can still move rows on PUT BACK (SDET BT52-LS-F3, CodeRabbit). Left on purpose.
+- **Four test-only suggestions** from the reviews ask for tests that render screens; this repository has no tool for that. Behaviour was measured in the browser instead.
 
-- **A phone, an iPad, or a real installed copy.** The proxy makes a desktop browser report that it is installed. That a home-screen app the phone has closed starts with no memory of its last run and nothing having sent it there is still what the whole feature rests on, and still read, not measured.
-- **A slow processor.** These measurements slow the network. The review's eight-times slowdown was not repeated here.
-- **WebKit.** Everything was Chromium.
-- **What stopping a stalled move costs** a map whose first pull is in flight. See above.
-- **The changes made after the cold read** were not read cold again. They are comments, tests and docs; the code that was measured is unchanged.
-- **Two early runs of the measurement were wrong** and are not in the table: the browser was serving the script files from its own cache, so the delay applied to nothing and 197 appeared to pass. The proxy now forbids caching, and 197 then failed as the review said.
+## What to check once it is live
 
-### What to check once it is live
+On a phone with the app on its home screen. Open the app once after the update so it has the new version.
 
-On a phone with the app on its home screen. Open the app once after the update, so it has the new version, before starting.
+**Reopening**
+1. Tap **Defects**, wait a few seconds, swipe the app away, tap the icon. It should open on the Defect Log without the map first. Do it three times.
+2. Tap **Map**, close the app from there, open it. It should open on the map.
+3. Go to the Defect Log and leave the phone until it has closed the app itself — an hour or overnight. It should open on the Defect Log.
 
-1. Open the app and tap **Defects**. Wait a few seconds.
-2. Swipe the app away to close it fully. Tap the icon. **It should open on the Defect Log**, after a short blank moment, without the map appearing first. On 197 this is the step that showed the map.
-3. Do step 2 three more times. It should be the Defect Log each time.
-4. Tap **Map**. It should go to the Facility Map and stay there.
-5. Close the app fully from the map and open it. It should open on the map.
-6. Go to the **Defect Log** and leave the phone alone until it has closed the app by itself — an hour, or overnight. Open it. It should open on the Defect Log. **This is still the test that cannot be run anywhere but on the phone.**
-7. If step 2 opens on the map: say so, and whether the map appeared at once or after a couple of seconds of blank screen. At once means the phone does not start the app the way the design assumes. After a pause has more than one cause. The app gives up at 2.5 seconds if any of three things is late: the map drawing, the network check answering, or the page itself loading. So a pause alone does not show the limit is too short. Note how good the signal was. Before lengthening anything, time the network check and the map's drawing separately.
+**Logging a defect**
+4. Tap **+ LOG DEFECT**. No keyboard should come up.
+5. Tap **BUS**. The generations should show with no keyboard. Tap 17s, then a bus. No grey card should appear.
+6. Tap BUS again, then **TYPE**. The number pad should come up. Type a full bus number: it should be picked and the keyboard should go down.
+7. Tap **DEFECT CATEGORY**: the list, no keyboard. Tap the box again: the keyboard. Tap **LIST**: the keyboard goes, the list stays.
+8. Pick **Engine**. The symptom list should open by itself straight on its choices, with no "Engine 23" row.
+9. RECOMMEND FOR DOWN SHEET and DOWN SHEET should be right under the symptom.
+10. On the Down Sheet's ADD DOWN BUS, do steps 5 to 8 there.
 
-### Open questions for Curtis
+**Sharing**
+11. Open **Defects Logged**, press **LEAVE OUT** on a bus, then COPY LIST. That bus should not be in what is pasted. PUT BACK should bring it back.
 
-- **Does a device restart reopen the last page, or go to the map?** As built, it reopens the page: the app cannot tell a restart from the phone closing it, and the remembered page is still stored. Curtis named a restart as a time the map would be acceptable; whether he wants the map there is his to say, and it is not decided here.
-- **The 2.5-second limit** has never been tuned on a real phone. Longer reopens on slower phones and keeps a blank screen up longer when the wifi is dead.
-- **BT197-O1, not in this release.** On a phone the Defect Log's SPECIFIC DEFECT list opens inside the form and moves SAVE DEFECT down by 229 px. It does that on purpose — `src/components/shared/combo-field.css` records why: a floating list clips inside the scrolling form, and in the form the results stay above the phone's keyboard. Making it float, or reserving its space, reverses a recorded decision about the form.
-- **A switch in Settings** to turn reopening off on a device. Not built.
+**ADD TO THAT ENTRY**
+12. On the Down Sheet, ADD DOWN BUS, type a bus already on the sheet, press **ADD TO THAT ENTRY**. Its repairs should show with a blank card; add one and save.
 
-### Rollback
+If step 1 opens on the map, say whether the map appeared at once or after a couple of seconds of blank screen, and how good the signal was.
+
+## Open questions for Curtis
+
+- **Does a device restart reopen the last page, or go to the map?** As built it reopens the page.
+- **The 2.5-second reopening limit** has never been tuned on a real phone.
+- **LEAVE OUT on every shared list**, not only Defects Logged: asked for, held for his answer because the other lists carry buttons that change real records.
+- **Down Sheet referrals:** should the shared referral list hold only buses not yet on the sheet, and does a direct DOWN SHEET tick count as a referral?
+- **Not yet built, approved in the mockups:** the light-blue symptom box, dimming the form until the bus and category are picked, removing the duplicate save buttons mid-form, and the SAVE strip above the keyboard.
+
+## Rollback
 
 Sites 194 / application release 197 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
