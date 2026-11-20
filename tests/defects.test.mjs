@@ -581,14 +581,21 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
      with no way to type a number at all, and copying this across would have
      made two of them. Asserted where it lives. */
   const picker=await readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8");
-  assert.match(picker,/className="bus-generations"/);
-  assert.match(picker,/input autoFocus=\{autoFocus\} inputMode="numeric"/);
-  assert.match(picker,/Choose generation first/);
+  /* ONE BUS BOX (Curtis's B): the shared picker's own control, numbers typed
+     on the number pad, and nothing focused when the form opens. */
+  assert.match(picker,/<ComboField label="BUS" className="wide bus-combo" coach=\{coach\} browseFirst typeAs="numeric"/);
+  assert.doesNotMatch(picker,/autoFocus/);
   assert.match(page,/<BusSelector /,"and the Defect Log uses it rather than its own copy");
   assert.match(page,/className="save-log-middle" disabled=\{Boolean\(recentDuplicate\)\}>\{saveLabel\}/);
   assert.match(page,/className="close-log-middle" onClick=\{close\}>CLOSE/);
   assert.doesNotMatch(page,/className="log-header-save/);
-  assert.ok(page.indexOf('className="save-log-middle-actions"')<page.indexOf('className="wide downsheet-check"'));
+  /* Curtis's E: the Down Sheet decision is asked under the defect it is about,
+     after the symptom and before the optional notes — not below ADVANCED
+     DETAILS. DEFERRED stays at the bottom. */
+  assert.ok(page.indexOf('label="SPECIFIC DEFECT OR SYMPTOM"')<page.indexOf('className="wide downsheet-check downsheet-recommend-check"'));
+  assert.ok(page.indexOf('className="wide downsheet-check downsheet-recommend-check"')<page.indexOf('className="wide downsheet-check"'),"RECOMMEND first, then DOWN SHEET, together");
+  assert.ok(page.indexOf('className="wide downsheet-check"')<page.indexOf('className="wide description-label"'));
+  assert.ok(page.indexOf('className="save-log-middle-actions"')<page.indexOf('className="wide downsheet-check deferred-check"'));
   assert.match(page,/lockPageScroll\("defect-editor-open"\)/);
   assert.match(page,/const closeEditor=\(\)=>\{const left=window\.scrollX,top=window\.scrollY/);
   assert.match(page,/window\.requestAnimationFrame\(\(\)=>\{restore\(\);window\.requestAnimationFrame\(restore\)\}\)/);
@@ -718,7 +725,7 @@ test("a search ends when somebody ends it, and never says so silently", async ()
     search can be judged; testing a TEXT search there cleared "brake" the moment
     a bus was picked, before the brake defect it would have matched existed.
     Measured in a browser, not reasoned about. */
- assert.match(page, /const clearSearchIfBusIsOutside=\(busId:string\)=>\{\s*if\(!search\.trim\(\)\|\|busSearch\.kind!=="numbers"\)return;/,
+ assert.match(page, /const clearSearchIfBusIsOutside=\(busId:string\)=>\{\s*if\(!busId\|\|!search\.trim\(\)\|\|busSearch\.kind!=="numbers"\)return;/,
   "the pick-time check judges bus-number searches only");
  assert.match(page, /const clearSearchIfItHides=\(busId:string,defect:StructuredDefect\)=>/,
   "the save-time check takes the whole record, so a text search it still matches survives");
@@ -9924,8 +9931,10 @@ test("every field the step-by-step helper names is drawn, and the ring's own att
     looks for is emitted in combo-field.tsx and bus-selector.tsx. Deleting
     `data-coach={coach}` from either left the whole suite green. A cold read
     found that, and it is the exact failure this test exists to stop. */
- for(const [name,code] of [["ComboField",combo],["BusSelector",picker]])
-  assert.match(code,/data-coach=\{coach\}/,name+" emits the attribute the ring is put on, not just the prop");
+ assert.match(combo,/data-coach=\{coach\}/,"ComboField emits the attribute the ring is put on, not just the prop");
+ /* The bus box IS a ComboField now, so it lands the attribute by handing its
+    own `coach` straight through — and nothing else may stand in its way. */
+ assert.match(picker,/<ComboField [^>]*coach=\{coach\}/,"BusSelector passes its coach to the ComboField that emits it");
 
  const drawn=new Set();
  for(const code of [page,combo,picker])for(const match of code.matchAll(/data-coach="([a-z]+)"/g))drawn.add(match[1]);
@@ -10177,4 +10186,18 @@ test("DEFECTS LOGGED lists what somebody logged, not what a scanned sheet brough
  const sheetBus={id:"b2",n:"18506",pendingRepair:"",defects:[typed,scanned]};
  assert.deepEqual(defectLogRecords([sheetBus],[]).map(record=>record.defect.id),["t1"],
   "the Defect Log's own list never carries a scanned row in the first place");
+});
+
+test("the defect form starts the keyboard inside itself, and the symptom hint keeps its height",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* BT53-F2: with nothing focused, the shop computer's first Tab went to the
+    board's search box under the editor. The form itself takes focus: no
+    keyboard on a phone, and the next Tab is the first field. */
+ assert.match(page,/<form className="log-editor" onSubmit=\{submit\} ref=\{editorRef\} tabIndex=\{-1\}>/);
+ assert.match(page,/useEffect\(\(\)=>\{editorRef\.current\?\.focus\(\{preventScroll:true\}\)\},\[\]\);/);
+ assert.match(css,/\.log-editor:focus\{outline:none\}/);
+ /* BT53-LS-F1: at 360 the hint under the symptom box went from two lines to
+    one when a category was picked, moving every field below by 14.3px. */
+ assert.match(css,/@media\(max-width:380px\)\{\.log-form \.combo-field\.wide \.combo-footnote\{display:block;min-height:28\.6px\}\}/);
 });
