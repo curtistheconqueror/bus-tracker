@@ -84,7 +84,7 @@ export type ComboOption={
    pages that draw this today ask for it: the Defect Log, and the Down Sheet's
    editor on Curtis's word, "make downsheet operate similarly". Without the
    flag every line below behaves exactly as it did. */
-export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen="",typeAs,exactPick,onType}:{
+export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen="",typeAs,exactPick,onType,onCancel}:{
  label:string;
  value:string;
  /* What the closed field shows. Passed in rather than looked up here, because
@@ -128,12 +128,21 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     and keeping the old answer under it is how a repair lands on the wrong bus
     (CodeRabbit on PR 54). */
  onType?:(query:string)=>void;
+ /* Told when the list shuts, or typing stops, without anything picked. The
+    bus box uses it to give back the bus that typing let go of: an accidental
+    digit, then Escape, no longer leaves an old defect with no bus (SDET
+    review, BT54-F7). */
+ onCancel?:()=>void;
 }){
  const [open,setOpen]=useState(false);
  /* Only ever true with `browseFirst`. Mirrored in a ref because the focus and
     key handlers run inside the same event that changed it, before any render. */
  const [typing,setTyping]=useState(false);
  const typingRef=useRef(false);
+ /* The latest onCancel, for the outside-tap listener, which is added once per
+    opening and would otherwise call the one from when the list opened. */
+ const cancelRef=useRef(onCancel);
+ useEffect(()=>{cancelRef.current=onCancel});
  const [query,setQuery]=useState("");
  /* WHICH GROUP IS OPEN, while browsing. Empty means the list is showing its
     group titles and nothing else — see the row builder below. */
@@ -246,6 +255,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     /* A tap on bare form does not blur an input on iOS, so the keyboard would
        stay up over a list that has gone. */
     if(browseFirst)inputRef.current?.blur();
+    cancelRef.current?.();
    }
   };
   /* CAPTURE, AND THE REASON IS A RACE THIS CHANGE CREATED.
@@ -329,6 +339,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   setTypingMode(false);
   openBrowse();
   inputRef.current?.blur();
+  onCancel?.();
  };
 
  /* OPENING SCROLLS THE WHOLE CONTROL INTO VIEW, not just the input. The list is
@@ -370,22 +381,23 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     with no repair on it (cold read). An Enter this soon after a pick, on a
     shut browse-first box, is that habit and goes nowhere. */
  const pickedAt=useRef(0);
- const pick=(option:ComboOption)=>{
+ const pick=(option:ComboOption,typedExact=false)=>{
   onPick(option.value,option);
   setOpen(false);
   setQuery("");
   setBrowseGroup("");
-  /* A FINGER LETS GO, A KEYBOARD KEEPS ITS PLACE. On a phone the blur is what
-     takes the keyboard down once the answer is in. On the shop computer it
-     threw the cursor out of the form, so Tab went back into this box instead
-     of on to the next - the step that let letters typed there pick the wrong
-     bus (SDET review, BT54-F2). Browsing, the field is read-only again once
-     the list shuts, so keeping focus raises nothing. */
+  /* ONLY A TYPED ANSWER KEEPS ITS PLACE, and only off a touch screen. After
+     a full bus number typed on the shop computer, the blur threw the cursor
+     out of the form, so Tab went back into this box (SDET review, BT54-F2).
+     Keeping focus after EVERY pick was the first fix, and it was wrong: pick
+     a category and the symptom list opens below it while the cursor stays
+     in the category, so typing to narrow the symptoms changed the category
+     (BT54-F4). A pick from the list lets go, as it always did. */
   pickedAt.current=Date.now();
   /* No press at all is a keyboard - Tab on the shop computer - except on a
      touch screen, where it is the arrows above the phone's own keyboard, and
      that keyboard has to go down too (cold read). */
-  const keepFocus=browseFirst&&(pressedWith.current==="mouse"||(pressedWith.current===""&&!(typeof matchMedia==="function"&&matchMedia("(pointer: coarse)").matches)));
+  const keepFocus=browseFirst&&typedExact&&(pressedWith.current==="mouse"||(pressedWith.current===""&&!(typeof matchMedia==="function"&&matchMedia("(pointer: coarse)").matches)));
   if(!keepFocus)inputRef.current?.blur();
  };
 
@@ -401,6 +413,12 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  const leaveGroup=()=>{setBrowseGroup("");setActive(0)};
 
  const keys=(event:React.KeyboardEvent<HTMLInputElement>)=>{
+  /* A KEYBOARD CAN EMPTY AN ANSWER. With the x out of the Tab order there was
+     no key that cleared one, and the optional symptom could not be emptied
+     without a pointer (SDET review BT54-F5, CodeRabbit). Backspace or Delete
+     with nothing typed clears the answer, which is what those keys already
+     mean, and nothing reaches them by Tab and Enter. */
+  if(browseFirst&&!disabled&&(event.key==="Backspace"||event.key==="Delete")&&!query&&value){event.preventDefault();onPick("",null);return;}
   /* A hardware keyboard types straight in: the first printable key lifts the
      read-only flag before the browser inserts it, so nothing is swallowed. */
   if(browseFirst&&!typingRef.current&&!disabled&&event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey){
@@ -429,7 +447,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   if(event.key==="Escape"&&open){
    event.preventDefault();
    if(browseGroup){leaveGroup();return}
-   setOpen(false);setQuery("");
+   setOpen(false);setQuery("");onCancel?.();
   }
  };
 
@@ -486,7 +504,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     onChange={event=>{
      onType?.(event.target.value);
      const exact=exactPick?.(event.target.value);
-     if(exact){pick(exact);return;}
+     if(exact){pick(exact,true);return;}
      setQuery(event.target.value);setActive(0);setBrowseGroup("");if(!open)setOpen(true);
     }}
     onKeyDown={keys}/>
@@ -522,7 +540,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
      /* Browsing first, the arrow never raises the keyboard: closing takes it
         down, opening leaves it down. */
      if(browseFirst&&open)inputRef.current?.blur();
-     if(open){setOpen(false);setQuery("");return;}
+     if(open){setOpen(false);setQuery("");onCancel?.();return;}
      if(browseFirst)releaseOtherField();
      setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
      if(!browseFirst)inputRef.current?.focus();

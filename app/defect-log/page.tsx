@@ -1490,7 +1490,10 @@ export default function DefectLog(){
    and matchesSearch can answer honestly: type "brake", log a brake defect on
    any bus at all, and the search still describes it and stays. */
  const clearSearchIfBusIsOutside=(busId:string)=>{
-  if(!search.trim()||busSearch.kind!=="numbers")return;
+  /* No bus is not another bus. Typing over a chosen bus lets it go with an
+     empty id, and that cleared a bus-number search it does not contradict
+     (CodeRabbit on PR 54). */
+  if(!busId||!search.trim()||busSearch.kind!=="numbers")return;
   if(!busSearchIds.has(busId))setSearch("");
  };
  const clearSearchIfItHides=(busId:string,defect:StructuredDefect)=>{

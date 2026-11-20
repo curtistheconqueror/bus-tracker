@@ -774,7 +774,7 @@ test("the picker's drop-down arrow is a real control, and the component carries 
  assert.doesNotMatch(combo,/<span className="combo-caret"/);
  assert.doesNotMatch(css,/\.combo-caret\{[^}]*pointer-events:\s*none/);
  /* Toggles, so the arrow that asks for the list also puts it away. */
- assert.match(combo,/if\(open\)\{setOpen\(false\);setQuery\(""\);return;\}/);
+ assert.match(combo,/if\(open\)\{setOpen\(false\);setQuery\(""\);onCancel\?\.\(\);return;\}/);
  /* Out of the tab order on purpose: the input owns the keyboard, where
     ArrowDown already opens the list. This adds a touch target, not a tab stop. */
  assert.match(combo,/className="combo-caret"[\s\S]*?tabIndex=\{-1\}/);
@@ -895,7 +895,7 @@ test("the bus picker does not rebuild the fleet on every character",async()=>{
     number search a chosen bus would hide. The bus is CHOSEN now, by a tap or
     by a full number: nothing is reported until then, and the page still hears
     the bus that was picked — which is the only one that search can hide. */
- assert.match(code,/onPick=\{id=>select\(id\)\}/,"the picked bus is what the page hears");
+ assert.match(code,/onPick=\{id=>\{letGo\.current="";select\(id\)\}\}/,"the picked bus is what the page hears");
  assert.match(code,/exactPick=\{query=>\{const bus=exactBus\(fleet,query\);return bus\?toOption\(bus\):null\}\}/,
   "a full fleet number picks its bus without a tap");
 });
@@ -1029,7 +1029,7 @@ test("a form redrawing around a text field does not drag the picker with it",asy
     option lists; its props do not move while somebody types a sentence. */
  assert.match(pickerCode,/^function BusSelector\(/m,"declared, so it can be wrapped");
  assert.match(pickerCode,/^export default memo\(BusSelector\);$/m);
- assert.match(pickerCode,/import \{memo,useMemo\} from "react"/);
+ assert.match(pickerCode,/import \{memo,useMemo,useRef\} from "react"/);
  /* A memo over an inline arrow is a comparison that can never pass. */
  assert.match(log,/const pickBus=useCallback\(\(busId:string\)=>\{onBusPicked\(busId\);setValue\(current=>\(\{\.\.\.current,busId\}\)\)\},\[onBusPicked\]\)/,
   "the callback is held still, or the memo does nothing but cost a comparison");
@@ -1133,7 +1133,7 @@ test("on the Defect Log a picker opens its list without the keyboard, and typing
     the bus box. Written onto the element too, with the read-only flag. */
  assert.match(code,/if\(!on\)input\.setAttribute\("inputmode","none"\);else if\(typeAs\)input\.setAttribute\("inputmode",typeAs\);else input\.removeAttribute\("inputmode"\);/);
  /* A full answer picks itself: exactPick runs on every character typed. */
- assert.match(code,/const exact=exactPick\?\.\(event\.target\.value\);\s*if\(exact\)\{pick\(exact\);return;\}/);
+ assert.match(code,/const exact=exactPick\?\.\(event\.target\.value\);\s*if\(exact\)\{pick\(exact,true\);return;\}/);
  /* THE TAP THAT ASKS TO TYPE FOCUSES INSIDE ITS OWN HANDLER, with the flag
     already lifted on the element. iOS raises the keyboard only for a focus
     made inside the tap, and only onto an input that is not read-only then. */
@@ -1265,15 +1265,27 @@ test("the bus box cannot leave a repair on a bus nobody chose",async()=>{
  /* CodeRabbit on PR 54: a number typed over a chosen bus kept the old bus
     under it, and the Down Sheet could save the repair there. Typing lets the
     bus go, as TYPE BUS # did; opening or backing out of the list keeps it. */
- assert.match(code,/onType\?\.\(event\.target\.value\);\s*const exact=exactPick\?\.\(event\.target\.value\);/,"told of each character before any pick");
- assert.match(picker,/onType=\{\(\)=>\{if\(busId\)select\(""\)\}\}/);
+ assert.match(code,/onType\?\.\(event\.target\.value\);\s*const exact=exactPick\?\.\(event\.target\.value\);\s*if\(exact\)\{pick\(exact,true\);return;\}/,"told of each character before any pick");
+ assert.match(picker,/onType=\{\(\)=>\{if\(busId\)\{letGo\.current=busId;select\(""\)\}\}\}/);
+ /* BT54-F7: an accidental digit then Escape left an old defect with no bus.
+    Backing out without a pick gives back the bus typing let go of - from
+    Escape, LIST, the arrow and a tap away alike. */
+ assert.match(picker,/onCancel=\{\(\)=>\{const back=letGo\.current;letGo\.current="";if\(back&&!busId&&fleet\.some\(bus=>bus\.id===back\)\)select\(back\)\}\}/);
+ assert.match(code,/setOpen\(false\);setQuery\(""\);onCancel\?\.\(\);\s*\}/,"Escape is a cancel");
+ assert.match(code,/const stopTyping=\(\)=>\{[^}]*onCancel\?\.\(\);/,"LIST is a cancel");
+ assert.match(code,/cancelRef\.current\?\.\(\);/,"a tap away is a cancel");
+ /* BT54-F4: keeping focus after every pick let typing meant for the symptom
+    list change the category. Only a typed exact answer keeps it. */
+ assert.match(code,/const keepFocus=browseFirst&&typedExact&&/);
+ /* BT54-F5: with nothing typed, Backspace or Delete empties an answer. */
+ assert.match(code,/if\(browseFirst&&!disabled&&\(event\.key==="Backspace"\|\|event\.key==="Delete"\)&&!query&&value\)\{event\.preventDefault\(\);onPick\("",null\);return;\}/);
  /* And the × is not the next Tab stop after a pick: Enter there cleared the
     bus just typed. Measured at 1180 before the fix. */
  assert.match(code,/className="combo-clear" aria-label=\{"Clear "\+label\} tabIndex=\{browseFirst\?-1:undefined\}/);
  /* SDET BT54-F2: after a typed number picked the bus, the blur threw the
     shop computer's cursor out of the form and Tab went back into the box.
     A finger still lets go - that is what takes a phone keyboard down. */
- assert.match(code,/const keepFocus=browseFirst&&\(pressedWith\.current==="mouse"\|\|\(pressedWith\.current===""&&!\(typeof matchMedia==="function"&&matchMedia\("\(pointer: coarse\)"\)\.matches\)\)\);\s*if\(!keepFocus\)inputRef\.current\?\.blur\(\);/,
+ assert.match(code,/const keepFocus=browseFirst&&typedExact&&\(pressedWith\.current==="mouse"\|\|\(pressedWith\.current===""&&!\(typeof matchMedia==="function"&&matchMedia\("\(pointer: coarse\)"\)\.matches\)\)\);\s*if\(!keepFocus\)inputRef\.current\?\.blur\(\);/,
   "a mouse or a hardware keyboard keeps focus; a finger, a pen, or a phone's own keyboard arrows let go");
  /* Cold read: with focus kept, an Enter out of habit right after typing a
     full bus number submitted the Down Sheet form with no repair on it. */

@@ -25,7 +25,7 @@
    property runs, plus any other prefix actually in the fleet, so one 16xxx bus
    adds a 16s row rather than vanishing. */
 
-import {memo,useMemo} from "react";
+import {memo,useMemo,useRef} from "react";
 
 import {locationLabel} from "@/src/lib/fleet/location-label";
 import {busGeneration,busPickerDisplay,exactBus,generationLabel,searchBuses,type SearchableBus} from "@/src/lib/fleet/bus-search";
@@ -55,6 +55,8 @@ function BusSelector({fleet,busId,select,coach}:{fleet:PickerBus[];busId:string;
  /* By generation first, then number: a numeric sort alone puts a four-digit
     1750 before 15502, and the 17s row would come up above the 15s. */
  const sorted=useMemo(()=>[...fleet].sort((a,b)=>COLLATOR.compare(busGeneration(a.n),busGeneration(b.n))||COLLATOR.compare(a.n,b.n)),[fleet]);
+ /* The bus typing let go of, until a pick replaces it or a cancel gives it back. */
+ const letGo=useRef("");
  const toOption=(bus:PickerBus,section?:string):ComboOption=>({value:bus.id,label:"Bus "+bus.n,hint:bus.l?locationLabel(bus.l):undefined,section});
  return <ComboField label="BUS" className="wide bus-combo" coach={coach} browseFirst typeAs="numeric"
   value={busId}
@@ -70,9 +72,12 @@ function BusSelector({fleet,busId,select,coach}:{fleet:PickerBus[];busId:string;
      not a bus leaves no bus chosen, and the save says so, rather than keeping
      the old one under the new number (CodeRabbit on PR 54). Opening the list
      or backing out of it keeps the bus. */
-  onType={()=>{if(busId)select("")}}
+  onType={()=>{if(busId){letGo.current=busId;select("")}}}
+  /* Backed out without picking - Escape, LIST, the arrow or a tap away - the
+     bus typing let go of comes back (SDET review, BT54-F7). */
+  onCancel={()=>{const back=letGo.current;letGo.current="";if(back&&!busId&&fleet.some(bus=>bus.id===back))select(back)}}
   exactPick={query=>{const bus=exactBus(fleet,query);return bus?toOption(bus):null}}
-  onPick={id=>select(id)}/>;
+  onPick={id=>{letGo.current="";select(id)}}/>;
 }
 
 export default memo(BusSelector);
