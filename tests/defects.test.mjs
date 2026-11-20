@@ -214,9 +214,11 @@ test("the Mystery list renders on the Down Sheet, and the Defect Log packs its c
   assert.match(page,/quickFilterExpandedBusIds/);
   assert.match(page,/aria-expanded=\{expanded\}/);
   /* quickFilterShareLabel, not quickFilterLabel: the recency window is part of
-     what a shared list claims, so it travels in the heading. Still built from
-     quickFilterBuses, which is the narrowed list. */
-  assert.match(page,/quickFilterShareText\(quickFilterShareLabel,quickFilterBuses,quickFilter,quickFilterShareOptions\)/);
+     what a shared list claims, so it travels in the heading. Built from the
+     narrowed list, less any bus left out by hand - `quickFilterScope.buses`,
+     which is made from quickFilterBuses and nothing wider. */
+  assert.match(page,/quickFilterShareText\(quickFilterShareLabel,quickFilterScope\.buses,quickFilter,quickFilterShareOptions\)/);
+  assert.match(page,/const quickFilterScope=quickFilterShareScope\(quickFilterBuses,/);
   assert.match(page,/navigator\.share\(\{title:quickFilterShareLabel\+" bus list",text\}\)/);
   assert.doesNotMatch(page,/navigator\.share\(\{[^}]*url:/);
   assert.match(page,/aria-label="Copy filtered bus list"/);
@@ -581,14 +583,21 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
      with no way to type a number at all, and copying this across would have
      made two of them. Asserted where it lives. */
   const picker=await readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8");
-  assert.match(picker,/className="bus-generations"/);
-  assert.match(picker,/input autoFocus=\{autoFocus\} inputMode="numeric"/);
-  assert.match(picker,/Choose generation first/);
+  /* ONE BUS BOX (Curtis's B): the shared picker's own control, numbers typed
+     on the number pad, and nothing focused when the form opens. */
+  assert.match(picker,/<ComboField label="BUS" className="wide bus-combo" coach=\{coach\} browseFirst typeAs="numeric"/);
+  assert.doesNotMatch(picker,/autoFocus/);
   assert.match(page,/<BusSelector /,"and the Defect Log uses it rather than its own copy");
   assert.match(page,/className="save-log-middle" disabled=\{Boolean\(recentDuplicate\)\}>\{saveLabel\}/);
   assert.match(page,/className="close-log-middle" onClick=\{close\}>CLOSE/);
   assert.doesNotMatch(page,/className="log-header-save/);
-  assert.ok(page.indexOf('className="save-log-middle-actions"')<page.indexOf('className="wide downsheet-check"'));
+  /* Curtis's E: the Down Sheet decision is asked under the defect it is about,
+     after the symptom and before the optional notes — not below ADVANCED
+     DETAILS. DEFERRED stays at the bottom. */
+  assert.ok(page.indexOf('label="SPECIFIC DEFECT OR SYMPTOM"')<page.indexOf('className="wide downsheet-check downsheet-recommend-check"'));
+  assert.ok(page.indexOf('className="wide downsheet-check downsheet-recommend-check"')<page.indexOf('className="wide downsheet-check"'),"RECOMMEND first, then DOWN SHEET, together");
+  assert.ok(page.indexOf('className="wide downsheet-check"')<page.indexOf('className="wide description-label"'));
+  assert.ok(page.indexOf('className="save-log-middle-actions"')<page.indexOf('className="wide downsheet-check deferred-check"'));
   assert.match(page,/lockPageScroll\("defect-editor-open"\)/);
   assert.match(page,/const closeEditor=\(\)=>\{const left=window\.scrollX,top=window\.scrollY/);
   assert.match(page,/window\.requestAnimationFrame\(\(\)=>\{restore\(\);window\.requestAnimationFrame\(restore\)\}\)/);
@@ -718,7 +727,7 @@ test("a search ends when somebody ends it, and never says so silently", async ()
     search can be judged; testing a TEXT search there cleared "brake" the moment
     a bus was picked, before the brake defect it would have matched existed.
     Measured in a browser, not reasoned about. */
- assert.match(page, /const clearSearchIfBusIsOutside=\(busId:string\)=>\{\s*if\(!search\.trim\(\)\|\|busSearch\.kind!=="numbers"\)return;/,
+ assert.match(page, /const clearSearchIfBusIsOutside=\(busId:string\)=>\{\s*\/\*[\s\S]*?\*\/\s*if\(!busId\|\|!search\.trim\(\)\|\|busSearch\.kind!=="numbers"\)return;/,
   "the pick-time check judges bus-number searches only");
  assert.match(page, /const clearSearchIfItHides=\(busId:string,defect:StructuredDefect\)=>/,
   "the save-time check takes the whole record, so a text search it still matches survives");
@@ -7012,10 +7021,11 @@ test("the window narrows the shared list, not just the drawn one",async()=>{
     pastes all twenty is worse than no filter — it lies at the only moment that
     matters. */
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
- /* Every share path builds from quickFilterBuses, which is the narrowed list,
-    and none from quickFilterAllBuses. */
- assert.match(page,/quickFilterShareText\(quickFilterShareLabel,quickFilterBuses,quickFilter,quickFilterShareOptions\)/);
- assert.match(page,/quickFilterShareHtml\(quickFilterShareLabel,quickFilterBuses,quickFilter,stamp,quickFilterShareOptions\)/);
+ /* Every share path builds from the narrowed list - quickFilterBuses, less
+    any bus left out by hand - and none from quickFilterAllBuses. */
+ assert.match(page,/const quickFilterScope=quickFilterShareScope\(quickFilterBuses,/);
+ assert.match(page,/quickFilterShareText\(quickFilterShareLabel,quickFilterScope\.buses,quickFilter,quickFilterShareOptions\)/);
+ assert.match(page,/quickFilterShareHtml\(quickFilterShareLabel,quickFilterScope\.buses,quickFilter,stamp,quickFilterShareOptions\)/);
  assert.equal(/quickFilterShareText\(\w+,quickFilterAllBuses/.test(page),false);
  /* And the heading says which window, so somebody who cannot see the screen it
     came off is not reading six buses as the total. */
@@ -9924,8 +9934,10 @@ test("every field the step-by-step helper names is drawn, and the ring's own att
     looks for is emitted in combo-field.tsx and bus-selector.tsx. Deleting
     `data-coach={coach}` from either left the whole suite green. A cold read
     found that, and it is the exact failure this test exists to stop. */
- for(const [name,code] of [["ComboField",combo],["BusSelector",picker]])
-  assert.match(code,/data-coach=\{coach\}/,name+" emits the attribute the ring is put on, not just the prop");
+ assert.match(combo,/data-coach=\{coach\}/,"ComboField emits the attribute the ring is put on, not just the prop");
+ /* The bus box IS a ComboField now, so it lands the attribute by handing its
+    own `coach` straight through — and nothing else may stand in its way. */
+ assert.match(picker,/<ComboField [^>]*coach=\{coach\}/,"BusSelector passes its coach to the ComboField that emits it");
 
  const drawn=new Set();
  for(const code of [page,combo,picker])for(const match of code.matchAll(/data-coach="([a-z]+)"/g))drawn.add(match[1]);
@@ -10177,4 +10189,262 @@ test("DEFECTS LOGGED lists what somebody logged, not what a scanned sheet brough
  const sheetBus={id:"b2",n:"18506",pendingRepair:"",defects:[typed,scanned]};
  assert.deepEqual(defectLogRecords([sheetBus],[]).map(record=>record.defect.id),["t1"],
   "the Defect Log's own list never carries a scanned row in the first place");
+});
+
+/* LEAVE A BUS OUT OF WHAT GETS SHARED. Curtis, with the last 24 hours of his
+   own reports open - six buses - and one he did not want to send: "there's no
+   way to remove a bus from the list before sharing it ... It should only drop
+   it from what gets shared, not delete the defect report itself. Make it easy
+   to undo, and make sure the count badge updates." */
+test("a bus can be left out of a shared Defects Logged list, and put back",async()=>{
+ const {quickFilterCanLeaveOut,quickFilterShareScope,quickFilterShareIsEmpty,quickFilterShareText,quickFilterShareHtml,restoreLeftOutBus}=
+  await import("../src/lib/defects/quick-filter-share.ts");
+ const {excludeFromFocusShare}=await import("../src/lib/defects/focus-share-scope.ts");
+ const logged=(id,n,issue)=>({id,n,l:"garage-1",defects:[{id:id+"-d",category:"Brakes",issue,details:"",operability:"service",state:"open",source:"defect-log",reportedAt:new Date().toISOString()}]});
+ /* The six he had on screen. */
+ const six=[logged("b1","15502","ABS warning"),logged("b2","17507","Brake noise"),logged("b3","17509","Brake pull"),logged("b4","17526","Low pedal"),logged("b5","17543","Brake drag"),logged("b6","17564","Park brake")];
+
+ /* WHICH LISTS OFFER IT. Defects Logged, and for now no other: two of the
+    others already carry row buttons that change real records. */
+ assert.equal(quickFilterCanLeaveOut("logged"),true);
+ for(const filter of QUICK_FILTERS)
+  assert.equal(quickFilterCanLeaveOut(filter.key),filter.key==="logged",filter.key);
+ for(const nothing of [null,undefined,""])assert.equal(quickFilterCanLeaveOut(nothing),false);
+
+ /* NOTHING LEFT OUT: the share is the list. */
+ let scope=quickFilterShareScope(six,[]);
+ assert.deepEqual(scope,{buses:six,out:[],total:6,leftOut:0});
+ assert.equal(quickFilterShareIsEmpty(scope),false);
+ assert.deepEqual(quickFilterShareScope(six),{buses:six,out:[],total:6,leftOut:0},"and with no list of ids at all");
+
+ /* ONE LEFT OUT. The other five are sent, in the order they were in; the one
+    left out is named, as the very bus object, so the drawer can hold its row. */
+ let leftOut=excludeFromFocusShare([],"b2");
+ scope=quickFilterShareScope(six,leftOut);
+ assert.deepEqual(scope.buses.map(bus=>bus.n),["15502","17509","17526","17543","17564"]);
+ assert.deepEqual(scope.out,[six[1]]);
+ assert.equal(scope.out[0],six[1],"the board's own bus, not a copy");
+ assert.deepEqual([scope.total,scope.leftOut],[6,1]);
+ /* ALL THREE OUTPUTS ARE BUILT FROM THAT LIST, so the count in the heading and
+    the buses under it are the five. */
+ const text=quickFilterShareText("Defects Logged by CJ (Last 24 hours)",scope.buses,"logged");
+ assert.match(text,/^Defects Logged by CJ \(Last 24 hours\) — 5 buses\n/);
+ assert.doesNotMatch(text,/17507/);
+ for(const bus of scope.buses)assert.ok(text.includes("Bus "+bus.n),bus.n);
+ const html=quickFilterShareHtml("Defects Logged by CJ (Last 24 hours)",scope.buses,"logged","now");
+ assert.match(html,/<h1>Defects Logged by CJ \(Last 24 hours\) — 5 buses<\/h1>/);
+ assert.doesNotMatch(html,/17507/);
+ assert.equal((html.match(/<article>/g)||[]).length,5);
+
+ /* IT TOUCHES NO RECORD. The list handed in and every bus on it are exactly
+    as they were, whatever is left out. This is "not delete the defect report
+    itself", as a test. */
+ const before=JSON.stringify(six);
+ quickFilterShareScope(six,["b1","b2","b3","b4","b5","b6"]);
+ assert.equal(JSON.stringify(six),before);
+ assert.equal(scope.buses[0],six[0],"the buses that are sent are the board's own, not copies");
+
+ /* PUTTING ONE BACK puts back THAT bus - the row pressed - not the last one
+    left out. */
+ leftOut=excludeFromFocusShare(excludeFromFocusShare(leftOut,"b5"),"b1");
+ assert.deepEqual(leftOut,["b2","b5","b1"]);
+ assert.equal(excludeFromFocusShare(leftOut,"b5"),leftOut,"leaving out a bus twice is one bus");
+ scope=quickFilterShareScope(six,leftOut);
+ assert.deepEqual([scope.buses.length,scope.leftOut],[3,3]);
+ assert.deepEqual(scope.out.map(bus=>bus.n),["15502","17507","17543"],"named in list order, where their rows are");
+ leftOut=restoreLeftOutBus(leftOut,"b5");
+ assert.deepEqual(leftOut,["b2","b1"],"the middle one, because that is the row pressed");
+ assert.deepEqual(quickFilterShareScope(six,leftOut).buses.map(bus=>bus.id),["b3","b4","b5","b6"]);
+ assert.equal(restoreLeftOutBus(leftOut,"b4"),leftOut,"a bus that is not out: the same array, so a stray press is not a re-render");
+ assert.equal(restoreLeftOutBus(leftOut,""),leftOut);
+ leftOut=restoreLeftOutBus(restoreLeftOutBus(leftOut,"b1"),"b2");
+ assert.deepEqual(quickFilterShareScope(six,leftOut),{buses:six,out:[],total:6,leftOut:0},"and the list is whole again");
+
+ /* THE WINDOW AND THE LIST ARE TWO DIFFERENT THINGS. b2 is left out, then the
+    window is narrowed and b2 is not on the list at all: it is not counted as
+    left out of a list it is not on, and widening the window again finds it
+    still left out. */
+ const narrowed=six.filter(bus=>bus.id!=="b2");
+ scope=quickFilterShareScope(narrowed,["b2","b6"]);
+ assert.deepEqual([scope.total,scope.leftOut,scope.buses.length],[5,1,4]);
+ assert.deepEqual(scope.out.map(bus=>bus.id),["b6"]);
+ assert.deepEqual(quickFilterShareScope(six,["b2"]).out.map(bus=>bus.id),["b2"],"widened again, it is still left out");
+
+ /* EVERY BUS LEFT OUT IS A REFUSAL, NOT A SHARE. Sent, it would read "0 buses"
+    and "No buses currently match this filter." about a shift with six
+    reports. */
+ scope=quickFilterShareScope(six,six.map(bus=>bus.id));
+ assert.deepEqual([scope.buses.length,scope.leftOut,scope.out.length],[0,6,6]);
+ assert.equal(quickFilterShareIsEmpty(scope),true);
+ assert.match(quickFilterShareText("Defects Logged",scope.buses,"logged"),/No buses currently match this filter\./,"which is the sentence the refusal keeps from being sent");
+ /* A list that is empty because nothing MATCHED is not that: the sentence is
+    then true, and it has always been shareable. */
+ assert.equal(quickFilterShareIsEmpty(quickFilterShareScope([],["b1"])),false);
+ /* Ids are compared as text, an id that is not there is ignored, and a bus
+    with no id can never be matched by an empty one. */
+ assert.equal(quickFilterShareScope([{id:7,n:"7"}],["7"]).leftOut,1);
+ assert.equal(quickFilterShareScope(six,new Set(["nobody"])).leftOut,0);
+ assert.equal(quickFilterShareScope([{n:"x"},{id:"",n:"y"}],[""]).leftOut,0);
+ assert.deepEqual(excludeFromFocusShare([],""),[],"and the list never takes an empty id in the first place");
+
+ /* THE RULE HOLDS NOTHING AND WRITES NOTHING. It is handed a list and a set of
+    ids and hands back lists. */
+ const moduleSource=stripCodeComments(await readFile(new URL("../src/lib/defects/quick-filter-share.ts",import.meta.url),"utf8"));
+ assert.doesNotMatch(moduleSource,/localStorage|sessionStorage|setItem|getItem|writeFleet|saveFleet|\.defects\s*=|delete\s+\w+\./);
+
+ /* ── THE PAGE ──────────────────────────────────────────────────────────── */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const code=stripCodeComments(page);
+
+ /* ONE SET OF BUSES TO SEND. What will be sent is the filter's list less what
+    was left out, and the count and the three outputs all read it. */
+ assert.match(code,/const quickFilterScope=quickFilterShareScope\(quickFilterBuses,quickFilterLeaveOutOffered\?quickFilterLeftOut:\[\]\);/);
+ assert.match(code,/const quickFilterLeaveOutOffered=quickFilterCanLeaveOut\(quickFilter\);/);
+ assert.match(code,/const quickFilterShareEmpty=quickFilterShareIsEmpty\(quickFilterScope\);/);
+ const outputs={copyQuickFilterList:/quickFilterShareText\(quickFilterShareLabel,quickFilterScope\.buses,quickFilter,quickFilterShareOptions\)/,
+  shareQuickFilterList:/quickFilterShareText\(quickFilterShareLabel,quickFilterScope\.buses,quickFilter,quickFilterShareOptions\)/,
+  shareQuickFilterPage:/quickFilterShareHtml\(quickFilterShareLabel,quickFilterScope\.buses,quickFilter,stamp,quickFilterShareOptions\)/};
+ for(const [name,reads] of Object.entries(outputs)){
+  const body=bodyOfSource(code,name);
+  assert.match(body,reads,name+" sends what the count says");
+  /* Each refuses an emptied list in its own body: SHARE falls back to COPY,
+     so a guard on one path is a guard on the path somebody happened to take. */
+  assert.match(body,/^\{\s*if\(!quickFilter\|\|quickFilterShareEmpty\)return;/,name+" refuses when every bus is left out");
+ }
+ assert.equal(/quickFilterShare(?:Text|Html)\(\w+,quickFilterBuses\b/.test(code),false,"nothing sends the list from before a bus was left out");
+ assert.equal(/quickFilterShare(?:Text|Html)\(\w+,quickFilterAllBuses\b/.test(code),false);
+ for(const label of ["Copy filtered bus list","Share filtered bus list as text","Share filtered bus list as a page"])
+  assert.match(code,new RegExp('disabled=\\{quickFilterShareEmpty\\} aria-label="'+label+'"'),label+" goes dead with nothing to send");
+
+ /* THE DRAWER LISTS EVERY BUS THE FILTER FOUND, and a bus left out is drawn
+    in its own place as a LEFT OUT row with its own PUT BACK - so nothing below
+    it moves, and the bus is named. */
+ /* `(?:\/\*…\*\/)?` because the comment there survives `stripCodeComments`:
+    an apostrophe in JSX text earlier on the same line ("EVERYONE'S") reads to
+    it as an open string. */
+ assert.match(code,/<div className="quick-filter-results">\{quickFilterBuses\.length\?quickFilterBuses\.map\(bus=>\{(?:\/\*[\s\S]*?\*\/)?if\(quickFilterScope\.out\.includes\(bus\)\)return <article className="quick-filter-bus-card left-out" key=\{bus\.id\} style=\{quickFilterLeftOutHeights\[bus\.id\]\?\{minHeight:quickFilterLeftOutHeights\[bus\.id\]\+"px"\}:undefined\}><span className="quick-filter-left-out-bus"><small>BUS<\/small><b>\{bus\.n\}<\/b><\/span><span className="quick-filter-left-out-note">LEFT OUT OF THIS SHARE<\/span><button type="button" className="quick-filter-put-back" data-put-back=\{bus\.id\} onClick=\{\(\)=>putQuickFilterBusBack\(bus\.id,bus\.n\|\|""\)\} aria-label=\{"Put back bus "\+bus\.n\+" into this share"\}><span aria-hidden="true">&#8629;<\/span> PUT BACK<\/button><\/article>;/);
+ /* The single PUT BACK at the top, for the last one, is gone. */
+ assert.doesNotMatch(code,/quickFilterPutBackRef|quickFilterCopyRef|putBackLastExclusion\(quickFilterLeftOut/);
+
+ /* THE COUNT FOLLOWS WHAT WILL BE SENT - the number, and how many of. */
+ assert.match(code,/<strong className=\{quickFilterLeaveOutOffered\?"leave-out-offered":undefined\} aria-label=\{quickFilterScope\.buses\.length\+" buses"\+\(quickFilterScope\.leftOut\?" to share, "\+quickFilterScope\.leftOut\+" left out":""\)\}>\{quickFilterScope\.buses\.length\}\{quickFilterScope\.leftOut>0&&<small> OF \{quickFilterScope\.total\}<\/small>\}<\/strong>/);
+ /* The window's own count is still the window's: buses it took, not buses a
+    person left out. */
+ assert.match(code,/hidden=\{quickFilterAllBuses\.length-quickFilterBuses\.length\}/);
+
+ /* LEAVING OUT AND PUTTING BACK CHANGE THIS PAGE'S OWN STATE AND NOTHING ELSE.
+    Every setter either handler calls is one of the three below; neither is
+    handed a way to write a bus or a defect. */
+ const allowed=new Set(["setQuickFilterLeftOut","setQuickFilterLeaveNote","setQuickFilterShareStatus","setQuickFilterLeftOutHeights"]);
+ for(const name of ["leaveQuickFilterBusOut","putQuickFilterBusBack"]){
+  const body=bodyOfSource(code,name);
+  const setters=[...body.matchAll(/\bset[A-Z]\w*(?=\()/g)].map(found=>found[0]);
+  assert.ok(setters.length>=3,name+" was read: "+setters.join(","));
+  assert.deepEqual(setters.filter(setter=>!allowed.has(setter)),[],name+" sets nothing but the share's own state");
+  assert.doesNotMatch(body,/localStorage|setItem|write[A-Z]\w*\(|save[A-Z]\w*\(|persist\w*\(|update[A-Z]\w*\(|remove[A-Z]\w*\(|delete\s|\.defects\b|confirm\(/,name+" reaches for no record");
+  /* COPIED! over a list that has just changed is a claim about a clipboard
+     that now holds a different one. */
+  assert.match(body,/setQuickFilterShareStatus\(""\)/,name+" clears a share outcome that is no longer true");
+ }
+ assert.match(bodyOfSource(code,"leaveQuickFilterBusOut"),/setQuickFilterLeftOut\(current=>excludeFromFocusShare\(current,busId\)\)/);
+ assert.match(bodyOfSource(code,"putQuickFilterBusBack"),/setQuickFilterLeftOut\(current=>restoreLeftOutBus\(current,busId\)\)/,"the bus pressed, not the last one");
+ /* Focus goes to the other button in the same row. */
+ assert.match(bodyOfSource(code,"leaveQuickFilterBusOut"),/focusQuickFilterRow\("data-put-back",busId\)/);
+ assert.match(bodyOfSource(code,"putQuickFilterBusBack"),/focusQuickFilterRow\("data-leave-out",busId\)/);
+ assert.match(code,/const focusQuickFilterRow=\(attribute:"data-leave-out"\|"data-put-back",busId:string\)=>focusShareRow\(window as unknown as FocusRowWindow,attribute,busId\);/);
+ /* A bus left out of one list is not left out of the next one opened. */
+ assert.match(code,/useEffect\(\(\)=>\{setQuickFilterLeftOut\(\[\]\);setQuickFilterLeaveNote\(""\)\},\[quickFilter\]\);/);
+ assert.match(code,/const \[quickFilterLeftOut,setQuickFilterLeftOut\]=useState<string\[\]>\(\[\]\);/,"held in memory, as ids");
+
+ /* LEAVE OUT on the row - not HIDE, which on this row closes the detail, and
+    not REMOVE, which on the recommended list takes a bus off it for good - and
+    only where it is offered, on a bus that has an id. Its spoken name starts
+    with the words on it, so voice control can say "Leave out". */
+ assert.match(code,/\{quickFilterLeaveOutOffered&&bus\.id&&<button type="button" className="quick-filter-leave-out" data-leave-out=\{bus\.id\} onClick=\{event=>leaveQuickFilterBusOut\(bus\.id,bus\.n\|\|"",event\.currentTarget\.closest\("article"\)\)\} aria-label=\{"Leave out bus "\+bus\.n\+" from this share"\} title=\{"Leaves bus "\+bus\.n\+" out of what you copy or share\. Its defects stay in the log\."\}><span aria-hidden="true">&times;<\/span><b>LEAVE OUT<\/b><\/button>\}/);
+ assert.match(code,/return <article className=\{"quick-filter-bus-card"\+\(expanded\?" expanded":""\)\+\(quickFilterLeaveOutOffered\?" can-leave-out":""\)\} key=\{bus\.id\}>/,"the two-column card is only where it is offered");
+ /* What a press did is read out, in a region of its own. */
+ assert.match(code,/\{quickFilterLeaveOutOffered&&<small className="quick-filter-leave-live" role="status" aria-live="polite">\{quickFilterLeaveNote\}<\/small>\}/);
+ assert.match(bodyOfSource(code,"leaveQuickFilterBusOut"),/setQuickFilterLeaveNote\("LEFT OUT OF THIS SHARE \\u2014 BUS "\+busNumber\)/);
+ assert.match(bodyOfSource(code,"putQuickFilterBusBack"),/setQuickFilterLeaveNote\("PUT BACK \\u2014 BUS "\+busNumber\)/);
+
+ /* ── THE STYLES ────────────────────────────────────────────────────────── */
+ const css=stripCodeComments(await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"));
+ /* The card is two columns only where the button is offered, and everything a
+    card grows underneath spans both. */
+ assert.match(css,/\.quick-filter-bus-card\.can-leave-out\{display:grid;grid-template-columns:minmax\(0,1fr\) auto\}/);
+ assert.match(css,/\.quick-filter-bus-card\.can-leave-out>\*\{grid-column:1\/-1\}/);
+ assert.match(css,/\.quick-filter-bus-card\.can-leave-out>\.quick-filter-bus\{grid-column:1\}/);
+ assert.match(css,/\.quick-filter-bus-card\.can-leave-out>\.quick-filter-leave-out\{grid-column:2;/);
+ /* The LEFT OUT row is laid out on its own, and adds no height rule of its
+    own: it keeps the card's floor, which is what holds the rows below still. */
+ assert.match(css,/\.quick-filter-bus-card\.left-out\{display:grid;grid-template-columns:52px minmax\(0,1fr\) auto;/);
+ assert.doesNotMatch(css.match(/\.quick-filter-bus-card\.left-out\{[^}]*\}/)[0],/height/);
+ assert.match(css,/\.quick-filter-bus-card\{min-height:62px;/);
+ /* The read-out is out of the grid's flow, or it would be a fifth cell and a
+    new row under the buttons. */
+ assert.match(css,/\.quick-filter-share-actions>small\.quick-filter-leave-live\{position:absolute;/);
+ /* The count badge keeps one width while LEAVE OUT is offered, so its
+    first LEAVE OUT and last PUT BACK move nothing in the header (BT52-LS-F2). */
+ assert.match(css,/\.quick-filter-head strong\.leave-out-offered\{min-width:76px;padding:0 10px;white-space:nowrap;font-variant-numeric:tabular-nums\}/);
+ assert.doesNotMatch(css,/with-total/);
+ /* A LEFT OUT row keeps the height its card had, open detail and all, so
+    nothing below it moves (BT52-LS-F1). Recorded by every LEAVE OUT. */
+ assert.match(bodyOfSource(code,"leaveQuickFilterBusOut"),/const height=card\?card\.getBoundingClientRect\(\)\.height:0;\s*setQuickFilterLeftOutHeights\(current=>\(\{\.\.\.current,\[busId\]:height\}\)\);/);
+ assert.match(code,/<article className="quick-filter-bus-card left-out" key=\{bus\.id\} style=\{quickFilterLeftOutHeights\[bus\.id\]\?\{minHeight:quickFilterLeftOutHeights\[bus\.id\]\+"px"\}:undefined\}>/);
+ /* A share reports only on the list it began with (CodeRabbit on PR 52).
+    The list is named by the filter and the buses it would send, so leaving
+    out, putting back, a new filter and a new time window all change it. */
+ assert.match(code,/const quickFilterShareListKey=\(quickFilter\|\|""\)\+"\|"\+quickFilterScope\.buses\.map\(bus=>bus\.id\)\.join\(","\);/);
+ assert.match(code,/useEffect\(\(\)=>\{quickFilterShareKey\.current=quickFilterShareListKey\},\[quickFilterShareListKey\]\);/);
+ assert.match(code,/const quickFilterShareReport=\(started:string,status:[^)]*\)=>\{if\(started===quickFilterShareKey\.current\)setQuickFilterShareStatus\(status\)\};/);
+ for(const name of ["copyQuickFilterList","shareQuickFilterList"]){
+  const body=bodyOfSource(code,name);
+  assert.match(body,/const started=quickFilterShareListKey;/,name+" notes which list it was started for");
+  assert.doesNotMatch(body,/setQuickFilterShareStatus\(/,name+" reports through the list check only");
+ }
+ /* Thumb-sized targets on a phone. */
+ assert.match(css,/@media\(max-width:760px\)\{\s*\.quick-filter-bus-card\.can-leave-out>\.quick-filter-leave-out\{min-width:56px\}/);
+ assert.match(css,/\.quick-filter-bus-card\.left-out>\.quick-filter-put-back\{min-width:72px;/);
+ /* On a phone a bus row is its 66px button plus 2px of border, and the LEFT
+    OUT row matches it, or every row below moves when one is left out. */
+ assert.match(css,/\.quick-filter-bus\{min-height:66px\}/);
+ assert.match(css,/@media\(max-width:760px\)\{[^@]*\.quick-filter-bus-card\.left-out\{min-height:68px\}/);
+});
+
+
+test("after LEAVE OUT or PUT BACK, focus really lands on the other button in that row",async()=>{
+ /* BT52-F1: a mutant that stopped focus moving survived every source check.
+    This runs the function the page calls, with a stand-in window. */
+ const {focusShareRow}=await import("../src/lib/defects/quick-filter-share.ts");
+ const frames=[];const asked=[];let focused=0;
+ const win={requestAnimationFrame:callback=>{frames.push(callback);return frames.length},document:{querySelector:selector=>{asked.push(selector);return {focus(){focused++}}}},CSS:{escape:value=>value}};
+ focusShareRow(win,"data-put-back","b2");
+ assert.equal(focused,0,"not until the frame after the press, when the row has been redrawn");
+ frames.shift()();
+ assert.deepEqual(asked,['.quick-filter-drawer [data-put-back="b2"]']);
+ assert.equal(focused,1,"the PUT BACK in that row took focus");
+ focusShareRow(win,"data-leave-out","b2");frames.shift()();
+ assert.equal(asked[1],'.quick-filter-drawer [data-leave-out="b2"]',"and back to that row's LEAVE OUT");
+ assert.equal(focused,2);
+ /* Without CSS.escape a quote in an id cannot break out of the selector. */
+ const bare={...win,CSS:undefined};
+ focusShareRow(bare,"data-put-back",'a"b');frames.shift()();
+ assert.equal(asked[2],'.quick-filter-drawer [data-put-back="a\\"b"]');
+ /* No frame to wait for, no throw and no focus. */
+ assert.doesNotThrow(()=>focusShareRow({document:win.document},"data-put-back","b2"));
+ assert.equal(focused,3);
+});
+
+test("the defect form starts the keyboard inside itself, and the symptom hint keeps its height",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* BT53-F2: with nothing focused, the shop computer's first Tab went to the
+    board's search box under the editor. The form itself takes focus: no
+    keyboard on a phone, and the next Tab is the first field. */
+ assert.match(page,/<form className="log-editor" onSubmit=\{submit\} ref=\{editorRef\} tabIndex=\{-1\}>/);
+ assert.match(page,/useEffect\(\(\)=>\{editorRef\.current\?\.focus\(\{preventScroll:true\}\)\},\[\]\);/);
+ assert.match(css,/\.log-editor:focus\{outline:none\}/);
+ /* BT53-LS-F1: at 360 the hint under the symptom box went from two lines to
+    one when a category was picked, moving every field below by 14.3px. */
+ assert.match(css,/@media\(max-width:380px\)\{\.log-form \.combo-field\.wide \.combo-footnote\{display:block;min-height:28\.6px\}\}/);
 });

@@ -955,3 +955,5 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    SCAN SHEET held pages of the batch back. */
 .scan-handed{margin:0;padding:8px 11px;border-left:4px solid #08733f;background:#e6f6ec;color:#0c3b22;font-size:9px;font-weight:900;letter-spacing:.3px;line-height:1.4}
 .scan-handed.held-back{border-left-color:#c98a00;background:#fff3d6;color:#6b4a00}
+/* Focused by ADD TO THAT ENTRY so the keyboard starts in the new card; not a control, so not outlined. */
+.repair-item-fields:focus{outline:none}
