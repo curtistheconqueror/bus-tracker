@@ -1275,7 +1275,7 @@ test("the Down Sheet can move a bus, which is what makes a status change stick",
  // it would re-run on every later save and drag the bus back from wherever
  // somebody had since parked it.
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
- assert.match(page,/next=\{\.\.\.next,location:undefined\}/);
+ assert.match(page,/const savedNext=\{\.\.\.next,location:undefined\}/);
  const editor=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
  assert.match(editor,/MOVE BUS TO/);
  assert.doesNotMatch(editor,/Status only; location stays unchanged/);
@@ -2231,7 +2231,7 @@ test("the Down Sheet writes a removal down wherever one happens, and takes it ba
  /* DELETE, one row at a time — the third door onto the same ledger, and the
     one a foreman uses daily. A row merely dropped from this device stays live
     on the server and comes back on the next pull. */
- assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,1800}?rememberRemovedEntries\(localStorage,\[entry\.id\],now\)/,"a deleted row has to be written to the removal ledger or it will not travel");
+ assert.match(page.slice(page.indexOf("const deleteEntry="),page.indexOf("const markEntryFixed=")),/rememberRemovedEntries\(localStorage,\[entry\.id\],now\)/,"a deleted row has to be written to the removal ledger or it will not travel");
  /* Sliced rather than matched within a character window: this handler routes
     two kinds of undo now, and a window wide enough to clear the routing is wide
     enough to match the wrong function. */
@@ -2240,7 +2240,7 @@ test("the Down Sheet writes a removal down wherever one happens, and takes it ba
  assert.match(undoDelete,/\{\.\.\.entry,updatedAt:restoredAt\}/,"and be restamped, or it loses to its own tombstone on the next pull");
  /* The undo copy is written before the row goes, and the delete gives up if it
     cannot be: a removal with no way back is the door this app does not build. */
- assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,900}?if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,400}?return;/);
+ assert.match(page.slice(page.indexOf("const deleteEntry="),page.indexOf("const markEntryFixed=")),/if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,400}?return;/);
 
  /* MARK FIXED is one press and writes no tombstone: nothing was removed, the
     row only stopped being active. It goes through saveEntry so a quick close-out
@@ -2249,7 +2249,9 @@ test("the Down Sheet writes a removal down wherever one happens, and takes it ba
  assert.match(fix,/workflow:"Completed",completedAt:now/,"a closed-out row is stamped when it was closed");
  assert.match(fix,/saveEntry\(normalizeEntry\(/,"one press must not mean a different kind of save");
  assert.ok(!fix.includes("rememberRemovedEntries"),"marking fixed removes nothing, so it must not write a tombstone");
- assert.match(fix,/if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,600}?return;/,"and the way back is written before the change, because there is no confirm");
+ const savePart=page.slice(page.indexOf("const saveEntry="),page.indexOf("const clearEntireDownSheet="));
+ assert.match(savePart,/if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,600}?return false\b/,"the original undo copy is checked before the journal/data writes");
+ assert.ok(savePart.indexOf("writeSetting(localStorage,ENTRY_UNDO_KEY")<savePart.indexOf("resumePairJournal("));
 
  /* The undo restores the BUS, not just the entry, and this is the whole reason
     it is not simply "save the old entry again".
@@ -2262,9 +2264,9 @@ test("the Down Sheet writes a removal down wherever one happens, and takes it ba
     one fault is the thing this app must never do. */
  const unfix=page.slice(page.indexOf("const undoFixEntry="),page.indexOf("const undoDeleteEntry="));
  assert.match(unfix,/bus\?:\{id:string;s:FleetStatus;defects:StructuredDefect\[\];pendingRepair:string\}/,"the fields the completion changed have to be carried in the copy");
- assert.match(unfix,/fleet\.map\(item=>item\.id===bus\.id\?\{\.\.\.item,s:bus\.s,defects:bus\.defects,pendingRepair:bus\.pendingRepair\}:item\)/,"and put back as they were rather than re-derived from the entry");
+ assert.match(unfix,/currentFleet\.map\(item=>item\.id===bus\.id\?\{\.\.\.item,s:bus\.s,defects:bus\.defects,pendingRepair:bus\.pendingRepair\}:item\)/,"and put back as they were rather than re-derived from the entry");
  assert.ok(!unfix.includes("saveEntry("),"re-saving the entry is exactly what duplicated the defect");
- assert.match(fix,/const bus=fleet\.find\(item=>item\.id===entry\.busId\)/,"the snapshot is taken before the change, not after");
+ assert.match(savePart,/const bus=currentFleet\.find\(item=>item\.id===next\.busId\)/,"the snapshot uses freshly read pre-write data");
 
  /* And the tombstone goes only AFTER a write that succeeded. The other order
     reads the same until the device is full, and then it tells the shop cloud to

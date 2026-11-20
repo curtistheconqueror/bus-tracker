@@ -1,3 +1,4 @@
+import {browserPairRecoveryPending} from "../storage/recovery-gate.mjs";
 /* The part that actually talks to Supabase.
 
    Kept apart from cloud-sync.ts so that everything worth testing can be tested
@@ -264,12 +265,14 @@ export function pushPlan(busChanged:CloudRow[],defectChanged:CloudRow[],entryCha
 export async function executePushPlan(supabase:SupabaseLike,plan:PushStep[]):Promise<{message:string}|null>{
  for(const step of plan){
   for(let at=0;at<step.upserts.length;at+=200){
+   if(browserPairRecoveryPending())return {message:"Finish pending Down Sheet recovery before syncing."};
    const {error}=await supabase.from(step.table).upsert(step.upserts.slice(at,at+200),{onConflict:step.conflict});
    if(error)return error;
   }
   for(const row of step.updates){
    const record=row as Record<string,unknown>;
    const patch=Object.fromEntries(Object.entries(record).filter(([key])=>key!==step.conflict)) as CloudRow;
+   if(browserPairRecoveryPending())return {message:"Finish pending Down Sheet recovery before syncing."};
    const {error}=await supabase.from(step.table).update(patch).eq(step.conflict,String(record[step.conflict]??""));
    if(error)return error;
   }
@@ -281,6 +284,7 @@ export async function executePushPlan(supabase:SupabaseLike,plan:PushStep[]):Pro
    in a basement all morning sends its morning's work and nothing else. */
 export async function cloudPush(input:PushInput):Promise<PushResult>{
  const {buses,entries,config,now,sent}=input;
+ if(browserPairRecoveryPending())return {ok:false,phase:"error",message:"Finish pending Down Sheet recovery before syncing.",sent,pushed:0,pending:0};
  const busRows=buses.map(bus=>busRow(bus,config,now)).filter(Boolean) as CloudRow[];
  const defectRows=buses.flatMap(bus=>{
   const fleetNumber=String(bus?.n??"").trim();
@@ -348,6 +352,7 @@ export type PullResult=CloudOutcome&{
    tombstones themselves, as ids only, so a removal travels. */
 export async function cloudPull(config:CloudConfig,now:string,merged:MergedAwayDefects={},removedEntries:RemovedEntries={}):Promise<PullResult>{
  const empty={map:null,defects:null,sheet:null,deleted:{},removedEntries:{}};
+ if(browserPairRecoveryPending())return {ok:false,phase:"error",message:"Finish pending Down Sheet recovery before syncing.",...empty};
  try{
   const supabase=await cloudClient(config);
   if(!supabase)return {ok:false,phase:"error",message:"The connection details are not usable.",...empty};
@@ -358,6 +363,7 @@ export async function cloudPull(config:CloudConfig,now:string,merged:MergedAwayD
    readTombstones(supabase,"bus_defects","defect_id"),
    readTombstones(supabase,"down_sheet_entries","entry_id"),
   ]);
+  if(browserPairRecoveryPending())return {ok:false,phase:"error",message:"Finish pending Down Sheet recovery before syncing.",...empty};
   const firstError=busRes.error||defectRes.error||entryRes.error||deletedRes.error||removedRes.error;
   if(firstError)return {...failed(new Error(firstError.message)),...empty};
   return {

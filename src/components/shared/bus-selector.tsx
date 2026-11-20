@@ -47,7 +47,7 @@ export type PickerBus=SearchableBus;
    not move while somebody types a sentence into DETAILS. The callback has to be
    stable for this to bite; see the useCallback where it is passed. */
 /* `coach` names this box for the step-by-step helper to ring. */
-function BusSelector({fleet,busId,select,coach}:{fleet:PickerBus[];busId:string;select:(busId:string)=>void;coach?:string}){
+function BusSelector({fleet,busId,select,restore,coach}:{fleet:PickerBus[];busId:string;select:(busId:string)=>void;restore?:(busId:string)=>void;coach?:string}){
  const selected=fleet.find(bus=>bus.id===busId);
  const beforeTyping=useRef("");
  const editingNumber=useRef(false);
@@ -80,7 +80,7 @@ function BusSelector({fleet,busId,select,coach}:{fleet:PickerBus[];busId:string;
      SAVE while raw text is unresolved must leave no bus selected. */
   onCancel={()=>{
    const prior=beforeTyping.current;
-   if(editingNumber.current&&prior&&fleet.some(bus=>bus.id===prior))select(prior);
+   if(editingNumber.current&&prior&&fleet.some(bus=>bus.id===prior))(restore||select)(prior);
    editingNumber.current=false;beforeTyping.current="";
   }}
   exactPick={query=>{const bus=exactBus(fleet,query);return bus?toOption(bus):null}}

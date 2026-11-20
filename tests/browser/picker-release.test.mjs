@@ -223,7 +223,7 @@ test('a refused sheet write keeps the transferred repair draft and initials open
   await page.waitForFunction(()=>document.activeElement?.matches('.repair-item-fields input.combo-input'));
   const before=await page.evaluate(()=>localStorage.getItem('pace-down-sheet-v1'));
   await page.evaluate(()=>{
-   const original=Storage.prototype.setItem;
+   const original=Storage.prototype.setItem;window.fixtureBeforeRefusal=original;
    Storage.prototype.setItem=function(key,value){if(key==='pace-down-sheet-v1')throw new DOMException('Fixture quota refusal','QuotaExceededError');return original.call(this,key,value);};
   });
   let message='';page.once('dialog',async d=>{message=d.message();await d.dismiss();});
@@ -233,6 +233,15 @@ test('a refused sheet write keeps the transferred repair draft and initials open
   assert.equal(await form.getByLabel('UPDATED BY - INITIALS',{exact:false}).inputValue(),'ZZ');
   assert.equal(await form.locator('.repair-item-card').count(),3);
   assert.equal(await page.evaluate(()=>localStorage.getItem('pace-down-sheet-v1')),before);
+  await form.getByLabel('UPDATED BY - INITIALS',{exact:false}).fill('XY');
+  await page.evaluate(()=>{Storage.prototype.setItem=window.fixtureBeforeRefusal});
+  await page.setViewportSize({width:390,height:640});const retry=form.getByRole('button',{name:'RETRY PENDING SAVE',exact:true});await retry.scrollIntoViewIfNeeded();
+  assert.equal(await retry.evaluate(el=>{const r=el.getBoundingClientRect(),p=el.closest('.repair-editor').getBoundingClientRect();return r.top>=p.top&&r.bottom<=p.bottom&&r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth&&el.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))}),true,'retry is visible and uncovered inside the small-screen modal');
+  await retry.click();
+  assert.equal(await form.isVisible(),true);assert.equal(await form.getByLabel('UPDATED BY - INITIALS',{exact:false}).inputValue(),'XY');
+  await form.getByRole('button',{name:'SAVE UPDATE',exact:true}).click();await form.waitFor({state:'hidden'});
+  const saved=await page.evaluate(()=>({entry:JSON.parse(localStorage.getItem('pace-down-sheet-v1')).entries[0],bus:JSON.parse(localStorage.getItem('pace-board-v1')).buses[0]}));
+  assert.equal(saved.entry.updatedBy,'XY');assert.equal(saved.entry.repairItems.length,2);assert.equal(saved.bus.defects.length,2);assert.equal(new Set(saved.bus.defects.map(d=>d.id)).size,2);
  }finally{await context.close();}
 });
 
@@ -268,7 +277,7 @@ test('refused inline MARK FIXED never announces a successful save',async()=>{
   });
   await page.getByRole('button',{name:'RESTORE BEFORE ATTEMPT',exact:true}).click();
   assert.ok(messages.some(message=>/tracker was NOT RESTORED/.test(message)));
-  assert.equal(await page.evaluate(key=>localStorage.getItem(key),recoveryKey),recovery);
+  assert.deepEqual(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),recoveryKey),{...JSON.parse(recovery),restoring:true});
   await page.evaluate(()=>{Storage.prototype.setItem=window.fixtureOriginalSet;});
   await page.getByRole('button',{name:'RESTORE BEFORE ATTEMPT',exact:true}).click();
   assert.equal(await page.evaluate(key=>localStorage.getItem(key),recoveryKey),null);
@@ -441,4 +450,113 @@ for(const route of ['/defect-log','/down-sheet'])test(route+': Tab cannot restor
    await refusedBusSave(draft);
   }finally{await context.close()}
  }
+});
+
+const pairKey='pace-down-sheet-pair-recovery-v1',entryUndoKey='pace-down-sheet-entry-undo-v1';
+async function recoveryDraft(){
+ const {page,context,form}=await open('/down-sheet',{existing:true});
+ await page.evaluate(()=>{
+  const data=JSON.parse(localStorage.getItem('pace-board-v1'));data.buses[0].defects=[{id:'original-defect',category:'Brakes',issue:'Brake chamber leak',details:'Original repair',operability:'down',state:'open',createdAt:'2026-11-20T00:00:00.000Z',updatedAt:'2026-11-20T00:00:00.000Z'}];
+  const value=JSON.stringify(data);localStorage.setItem('pace-board-v1',value);dispatchEvent(new StorageEvent('storage',{key:'pace-board-v1',newValue:value}));
+ });
+ await form.getByRole('button',{name:'CANCEL',exact:true}).click();
+ page.on('dialog',async d=>{if(d.type()==='confirm')await d.accept();else await d.dismiss()});
+ return {page,context};
+}
+async function refuseRecord(page,key){await page.evaluate(key=>{const native=Storage.prototype.setItem;window.qaNativeSet=native;Storage.prototype.setItem=function(k,v){if(k===key)throw new DOMException('QA refusal','QuotaExceededError');return native.call(this,k,v)}},key)}
+async function recoveryValues(page){return page.evaluate(()=>Object.fromEntries(Object.keys(localStorage).map(k=>[k,localStorage.getItem(k)])))}
+async function reloadRecovery(page,context){const saved=await recoveryValues(page);await context.addInitScript(values=>{for(const[k,v]of Object.entries(values))localStorage.setItem(k,v)},saved);await page.reload({waitUntil:'domcontentloaded'});await page.getByRole('button',{name:'RETRY PENDING SAVE',exact:true}).waitFor();return saved}
+for(const cancel of ['Escape','Tab','Shift+Tab','caret'])test('cancel '+cancel+' retains an edited Down Sheet status while a genuine pick uses defaults',async()=>{
+ const {context,form}=await open('/down-sheet');try{
+  await bus(form,'18505');const status=form.getByLabel('BUS STATUS ON TRACKER',{exact:false});await status.selectOption('out');
+  const b=field(form,'BUS');await b.click();await b.fill('99999');
+  if(cancel==='caret')await form.getByRole('button',{name:'Hide BUS choices',exact:true}).click();else await b.press(cancel);
+  assert.match(await b.inputValue(),/18505/);assert.equal(await status.inputValue(),'out');
+  await b.click();await b.fill('20500');assert.equal(await status.inputValue(),'service');
+ }finally{await context.close()}
+});
+test('completion-only transferred card is kept and explicitly refused until identified',async()=>{
+ const {page,context,form}=await open('/down-sheet',{existing:true});try{
+  page.on('dialog',async d=>{if(d.type()==='confirm')await d.accept();else await d.dismiss()});
+  await bus(form,'17507');await form.getByLabel('UPDATED BY - INITIALS',{exact:false}).fill('ZZ');
+  await form.getByLabel('MARK THIS REPAIR FINISHED',{exact:false}).check();await form.getByLabel('FIX / STEPS TAKEN',{exact:false}).fill('Replaced fan');await form.getByLabel('Repair hours',{exact:true}).fill('2');
+  await form.getByRole('button',{name:'ADD TO THAT ENTRY'}).click();await page.waitForFunction(()=>document.querySelectorAll('.repair-item-card').length===3);
+  const before=await page.evaluate(()=>localStorage.getItem('pace-down-sheet-v1'));await form.getByRole('button',{name:'SAVE UPDATE',exact:true}).click();
+  assert.equal(await form.isVisible(),true);assert.equal(await page.evaluate(()=>localStorage.getItem('pace-down-sheet-v1')),before);assert.equal(await form.getByLabel('FIX / STEPS TAKEN',{exact:false}).inputValue(),'Replaced fan');
+  const card=form.locator('.repair-item-card').nth(1),category=field(card,'CATEGORY');await category.click();await category.fill('engine');await category.press('Enter');
+  const symptom=field(card,'SPECIFIC REPAIR');await page.keyboard.type('misfire');await symptom.press('Enter');await form.getByRole('button',{name:'SAVE UPDATE',exact:true}).click();await form.waitFor({state:'hidden'});
+  const items=await page.evaluate(()=>JSON.parse(localStorage.getItem('pace-down-sheet-v1')).entries[0].repairItems);const added=items.find(item=>item.actionTaken==='Replaced fan');assert.ok(added);assert.equal(added.repairHours,2);assert.equal(items.length,2);
+ }finally{await context.close()}
+});
+for(const failed of ['pace-board-v1','pace-down-sheet-v1'])test('Mark Fixed '+failed+' refusal survives reload and retry without duplicate adopted identity',async()=>{
+ const {page,context}=await recoveryDraft();try{
+  await refuseRecord(page,failed);await page.getByRole('button',{name:'Mark fixed: bus 17507',exact:true}).click();
+  const first=await page.evaluate(key=>localStorage.getItem(key),entryUndoKey);assert.ok(first);await page.getByRole('button',{name:'Mark fixed: bus 17507',exact:true}).click();assert.equal(await page.evaluate(key=>localStorage.getItem(key),entryUndoKey),first);
+  await page.getByRole('button',{name:'Delete bus 17507 from the Down Sheet',exact:true}).click();assert.equal(await page.evaluate(key=>localStorage.getItem(key),entryUndoKey),first);
+  const saved=await reloadRecovery(page,context);await page.waitForTimeout(150);assert.equal(await page.evaluate(()=>localStorage.getItem('pace-board-v1')),saved['pace-board-v1']);assert.equal(await page.evaluate(()=>localStorage.getItem('pace-down-sheet-v1')),saved['pace-down-sheet-v1']);
+  await page.getByRole('button',{name:'RETRY PENDING SAVE',exact:true}).click();
+  await page.waitForFunction(key=>localStorage.getItem(key)===null,pairKey);
+  const data=await page.evaluate(()=>({bus:JSON.parse(localStorage.getItem('pace-board-v1')).buses[0],entry:JSON.parse(localStorage.getItem('pace-down-sheet-v1')).entries[0]}));
+  assert.deepEqual(data.bus.defects.map(d=>d.id),['original-defect']);assert.equal(data.bus.defects[0].state,'completed');assert.equal(data.entry.repairItems[0].defectId,'original-defect');
+  await page.getByRole('button',{name:'UNDO',exact:true}).click();await page.waitForFunction(key=>localStorage.getItem(key)===null,entryUndoKey);
+  const restored=await page.evaluate(()=>JSON.parse(localStorage.getItem('pace-board-v1')).buses[0].defects);assert.deepEqual(restored.map(d=>[d.id,d.state]),[['original-defect','open']]);
+ }finally{await context.close()}
+});
+for(const failed of ['pace-down-sheet-v1','pace-board-v1'])test('sheet-first undo '+failed+' refusal keeps durable pending restore on reload',async()=>{
+ const {page,context}=await recoveryDraft();try{
+  await page.getByRole('button',{name:'Mark fixed: bus 17507',exact:true}).click();await refuseRecord(page,failed);await page.getByRole('button',{name:'UNDO',exact:true}).click();
+  assert.equal(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).pending,entryUndoKey),true);
+  const saved=await reloadRecovery(page,context);await page.waitForTimeout(150);assert.equal(await page.getByText(/was marked fixed and closed out/).count(),0);assert.equal(await page.evaluate(()=>localStorage.getItem('pace-board-v1')),saved['pace-board-v1']);assert.equal(await page.evaluate(()=>localStorage.getItem('pace-down-sheet-v1')),saved['pace-down-sheet-v1']);
+  await page.getByRole('button',{name:'RETRY PENDING SAVE',exact:true}).click();await page.waitForFunction(key=>localStorage.getItem(key)===null,pairKey);assert.equal(await page.evaluate(key=>localStorage.getItem(key),entryUndoKey),null);
+  const restored=await page.evaluate(()=>JSON.parse(localStorage.getItem('pace-board-v1')).buses[0].defects);assert.deepEqual(restored.map(d=>[d.id,d.state]),[['original-defect','open']]);
+ }finally{await context.close()}
+});
+
+test('a sheet edit after Mark Fixed is not overwritten by Undo',async()=>{
+ const {page,context}=await recoveryDraft();try{
+  await page.getByRole('button',{name:'Mark fixed: bus 17507',exact:true}).click();
+  const before=await page.evaluate(()=>{const p=JSON.parse(localStorage.getItem('pace-down-sheet-v1'));p.entries[0].quickNote='Concurrent sheet edit';const text=JSON.stringify(p);localStorage.setItem('pace-down-sheet-v1',text);return text});
+  await page.getByRole('button',{name:'UNDO',exact:true}).click();assert.equal(await page.evaluate(()=>localStorage.getItem('pace-down-sheet-v1')),before);assert.ok(await page.evaluate(key=>localStorage.getItem(key),entryUndoKey));
+ }finally{await context.close()}
+});
+test('a bus deleted from persisted data after editor opened cannot save an orphan sheet row',async()=>{
+ const draft=await busDraft('/down-sheet'),{page,context,form}=draft;try{
+  page.on('dialog',d=>d.dismiss());await page.evaluate(()=>{const p=JSON.parse(localStorage.getItem('pace-board-v1'));p.buses=p.buses.filter(b=>b.n!=='18505');localStorage.setItem('pace-board-v1',JSON.stringify(p))});
+  const before=await persistedBusDraft(page);await draft.save();assert.equal(await form.isVisible(),true);assert.deepEqual(await persistedBusDraft(page),before);
+ }finally{await context.close()}
+});
+test('restore intent survives refused replacement of a pending Mark Fixed journal',async()=>{
+ const {page,context}=await recoveryDraft();try{
+  await refuseRecord(page,'pace-down-sheet-v1');await page.getByRole('button',{name:'Mark fixed: bus 17507',exact:true}).click();
+  await page.evaluate(()=>{Storage.prototype.setItem=window.qaNativeSet});await refuseRecord(page,pairKey);
+  await page.getByRole('button',{name:'RESTORE BEFORE ATTEMPT',exact:true}).click();
+  assert.equal(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).restoring,entryUndoKey),true);
+  await reloadRecovery(page,context);await page.getByRole('button',{name:'RETRY PENDING SAVE',exact:true}).click();
+  await page.waitForFunction(key=>localStorage.getItem(key)===null,pairKey);
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('pace-down-sheet-v1')).entries[0].workflow),'Scheduled');
+  assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('pace-board-v1')).buses[0].defects.map(d=>d.state)),['open']);
+ }finally{await context.close()}
+});
+test('another Down Sheet tab refreshes both records when recovery finishes',async()=>{
+ const {page,context}=await recoveryDraft();try{
+  const other=await context.newPage();await other.goto(base+'/down-sheet');await other.getByRole('button',{name:/ADD DOWN BUS/}).click();await other.locator('.repair-editor').getByRole('button',{name:'CANCEL',exact:true}).click();
+  await refuseRecord(page,'pace-down-sheet-v1');await page.getByRole('button',{name:'Mark fixed: bus 17507',exact:true}).click();
+  await other.getByRole('button',{name:'RETRY PENDING SAVE',exact:true}).waitFor();
+  await page.evaluate(()=>{Storage.prototype.setItem=window.qaNativeSet});await page.getByRole('button',{name:'RETRY PENDING SAVE',exact:true}).click();
+  await other.waitForFunction(key=>localStorage.getItem(key)===null,pairKey);await other.getByRole('button',{name:'Mark fixed: bus 17507',exact:true}).waitFor({state:'hidden'});
+  assert.equal(await other.getByRole('button',{name:'RETRY PENDING SAVE',exact:true}).count(),0);
+ }finally{await context.close()}
+});
+
+test('Map operator clear and undo-clear refuse before touching data or ledgers during recovery',async()=>{
+ const {page,context,form}=await open('/down-sheet',{existing:true});try{
+  await form.getByRole('button',{name:'CANCEL',exact:true}).click();await page.goto(base+'/?operator=1');
+  const modal=page.getByRole('dialog',{name:'AI Operator',exact:true});await modal.waitFor();
+  await page.evaluate(key=>localStorage.setItem(key,'unreadable journal retained'),pairKey);
+  for(const command of ['Clear the entire down sheet','Undo down sheet clear']){
+   const before=await recoveryValues(page);await modal.getByRole('textbox',{name:'QUESTION OR COMMAND'}).fill(command);await modal.getByRole('button',{name:'ASK / PREVIEW',exact:false}).click();
+   await modal.getByRole('button',{name:'APPLY CHANGE',exact:true}).click();
+   assert.deepEqual(await recoveryValues(page),before);assert.ok(await modal.getByText(/Finish pending Down Sheet recovery first/).count());
+  }
+ }finally{await context.close()}
 });

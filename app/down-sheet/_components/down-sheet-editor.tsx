@@ -10,7 +10,7 @@ import {findingMatchKey,readFindingsMemory,recallFindings} from "@/src/lib/defec
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 import {
   aggregateRepairItemEstimates,
-  blankRepairItem,
+  blankRepairItem,hasRepairDraft,
   normalizeRepairItems,
   repairItemsProgress,
   repairItemsReason,
@@ -55,7 +55,7 @@ const ESTIMATE_FIELDS:{key:Exclude<keyof RepairTimeEstimate,"notes">;label:strin
 
 function hoursValue(minutes:number){return Number((minutes/60).toFixed(2))}
 
-export default function DownSheetEditor({entry,fleet,entries,defaultInitials,carriedInitials,focusRepairId="",onClose,onSave,onOpenExisting}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void;carriedInitials?:string;focusRepairId?:string;onOpenExisting?:(entryId:string,typedInitials:string,repairs:DownSheetRepairItem[])=>void}){
+export default function DownSheetEditor({entry,fleet,entries,defaultInitials,carriedInitials,focusRepairId="",onClose,onSave,onOpenExisting,recoveryPending=false,onRetryRecovery}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;recoveryPending?:boolean;onRetryRecovery?:()=>void;onSave:(entry:DownSheetRecord)=>void;carriedInitials?:string;focusRepairId?:string;onOpenExisting?:(entryId:string,typedInitials:string,repairs:DownSheetRepairItem[])=>void}){
   const formRef=useRef<HTMLFormElement>(null);
   const [draft,setDraft]=useState(()=>({...entry,repairItems:normalizeRepairItems(entry.repairItems,{category:entry.category,repair:entry.repair,details:entry.customReason,timeEstimate:entry.timeEstimate})}));
   /* Initials typed before ADD TO THAT ENTRY come across with it. That button
@@ -122,7 +122,10 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
     if(!bus){alert("Select a bus number.");return}
     if(!operator){alert("Enter your initials before saving this update.");return}
     const now=new Date().toISOString();
-    const repairItems=draft.repairItems.filter(item=>item.category||item.repair||item.details||item.estimateEnabled);
+    const repairItems=draft.repairItems.filter(hasRepairDraft);
+    if(repairItems.some(item=>!item.category&&!item.repair&&!item.details&&(item.done||item.actionTaken||item.finding||item.repairHours||item.diagnosticHours||item.quantity))){
+     alert("This repair has completion data but no repair identity. Add a category, repair or details before saving; your draft was kept.");return;
+    }
     const first=repairItems[0];
     const action=(isNew?"Created down-sheet entry":"Updated repair entry - "+draft.workflow)+(estimateTotal?" - mechanic estimate "+formatRepairTime(estimateTotal):" - no time estimate");
     onSave({
@@ -183,6 +186,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
            knowing the bus. Nothing is focused when
            it opens: the bus box opens its list on a tap, without the keyboard. */}
           <BusSelector fleet={fleet} busId={draft.busId}
+           restore={busId=>{const bus=fleet.find(item=>item.id===busId);setDraft(current=>({...current,busId,busNumber:bus?.n||""}))}}
            select={busId=>{const bus=fleet.find(item=>item.id===busId);setDraft(current=>({...current,busId,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}/>
           {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={openExisting}>ADD TO THAT ENTRY</button>}</p>}
         <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
@@ -307,6 +311,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
         <label className="operator-initials">UPDATED BY - INITIALS<input required maxLength={6} autoCapitalize="characters" value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z0-9]/gi,""))} placeholder="Initials"/><small>Required.</small></label>
       </div>
       {draft.history.length>0&&<section className="repair-history editor-history"><b>RECENT CHANGE HISTORY</b>{draft.history.slice(-5).reverse().map((item,index)=><div key={item.at+index}><strong>{item.initials}</strong><span>{item.action}</span><time>{new Date(item.at).toLocaleString()}</time></div>)}</section>}
+      {recoveryPending&&<p className="repair-existing-entry" role="status"><b>A save is pending.</b><span>Retry finishes the previous attempt. Any newer draft edits stay here to save afterward.</span><button type="button" onClick={onRetryRecovery}>RETRY PENDING SAVE</button></p>}
       <div className="repair-editor-actions"><button type="button" onClick={onClose}>CANCEL</button><button className="save-repair" type="submit">SAVE UPDATE</button></div>
     </form>
   </div>;

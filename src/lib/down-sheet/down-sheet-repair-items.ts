@@ -7,6 +7,7 @@ import {
 
 export type DownSheetRepairItem = {
   id: string;
+  defectId?: string;
   category: string;
   repair: string;
   details: string;
@@ -90,6 +91,7 @@ export function normalizeRepairItems(
       const repair = typeof source.repair === "string" ? source.repair : "";
       return {
         id: typeof source.id === "string" && source.id ? source.id : itemId(index),
+        ...(typeof source.defectId === "string" && source.defectId ? {defectId:source.defectId} : {}),
         category,
         repair,
         details: typeof source.details === "string" ? source.details : "",

@@ -797,16 +797,16 @@ test("a board that did not save says so instead of failing silently",async()=>{
 
  // WHY it failed has to travel with the failure, because the answers differ:
  // a full device needs room, an unreadable board must not be overwritten.
- const full={getItem:()=>board,setItem:quota};
+ const full={getItem:key=>key==="pace-board-v1"?board:null,setItem:quota};
  assert.equal(writeFleetStorageResult(full,[{id:"a",n:"1",defects:[]}]).reason,"storage-full");
  // The recovery snapshot is the FIRST write to hit a full device, so without
  // propagating the real cause this reported "no recovery copy" and sent
  // somebody looking for a corrupt store when what they needed was space.
  assert.notEqual(writeFleetStorageResult(full,[{id:"a",n:"1",defects:[]}]).reason,"no-snapshot");
- const unreadable={getItem:()=>"not json at all",setItem:()=>{}};
+ const unreadable={getItem:key=>key==="pace-board-v1"?"not json at all":null,setItem:()=>{}};
  assert.equal(writeFleetStorageResult(unreadable,[{id:"a",n:"1",defects:[]}]).reason,"unreadable");
  // A snapshot refused for its own reasons still blocks the write and says so.
- const snapshotOnly={getItem:()=>board,setItem:k=>{if(String(k).includes("recovery"))throw new Error("no")}};
+ const snapshotOnly={getItem:key=>key==="pace-board-v1"?board:null,setItem:k=>{if(String(k).includes("recovery"))throw new Error("no")}};
  assert.equal(writeFleetStorageResult(snapshotOnly,[{id:"a",n:"1",defects:[]}]).reason,"no-snapshot");
 
  // The boolean form every existing caller uses is untouched.
@@ -821,7 +821,7 @@ test("a board that did not save says so instead of failing silently",async()=>{
  assert.doesNotThrow(()=>writeDownSheetStorageResult(fullSheet,[]));
  assert.equal(writeDownSheetStorageResult(fullSheet,[]).reason,"storage-full");
  // And a sheet written by a newer build is refused rather than overwritten.
- assert.equal(writeDownSheetStorageResult({getItem:()=>"not json",setItem:()=>{}},[]).reason,"unreadable");
+ assert.equal(writeDownSheetStorageResult({getItem:key=>key==="pace-down-sheet-v1"?"not json":null,setItem:()=>{}},[]).reason,"unreadable");
  assert.doesNotThrow(()=>writeSetting(full,"anything","x"));
  assert.equal(writeSetting(full,"anything","x").reason,"storage-full");
  assert.deepEqual(writeSetting(store(),"k","v"),{ok:true});

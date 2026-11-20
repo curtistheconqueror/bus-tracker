@@ -21,6 +21,7 @@ export type SyncFleetBus={
 
 export type SyncRepairItem={
  id:string;
+ defectId?:string;
  category:string;
  repair:string;
  details:string;
@@ -110,7 +111,7 @@ function legacyDefectIds(entry:SyncDownEntry){
    restated next to the cleanup, because two copies of this rule would drift and
    the symptom would be silent: duplicates quietly coming back days later. */
 export function downSheetDefectIdCandidates(entry:SyncDownEntry){
- return [...legacyDefectIds(entry),...carriedItems(entry).map(item=>"downsheet-"+entryKey(entry)+"-"+item.id)];
+ return [...legacyDefectIds(entry),...carriedItems(entry).flatMap(item=>[clean(item.defectId),"downsheet-"+entryKey(entry)+"-"+item.id])].filter(Boolean);
 }
 
 /* A repair the bus is already carrying is that repair, whoever wrote it down.
@@ -152,10 +153,12 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
  }
  return items.map((item,index)=>{
   const own="downsheet-"+entryKey(entry)+"-"+item.id;
-  const mine=current.some(defect=>defect.id===own);
+  const pinned=clean(item.defectId);
+  const owned=pinned&&!taken.has(pinned)&&current.some(defect=>defect.id===pinned)?pinned:own;
+  const mine=current.some(defect=>defect.id===owned);
   const adopts=index===0&&legacy&&!mine&&!taken.has(legacy.id);
   const adopted=adopts||mine?undefined:adopt(item.category,item.repair,item.details);
-  const id=adopts?legacy.id:mine?own:adopted?.id||own;
+  const id=adopts?legacy.id:mine?owned:adopted?.id||own;
   taken.add(id);
   return {id,category:item.category,repair:item.repair,details:adopted?adopted.details:item.details,done:item.done===true,
    actionTaken:item.actionTaken,finding:item.finding,quantity:item.quantity,repairHours:item.repairHours,diagnosticHours:item.diagnosticHours};
@@ -174,6 +177,17 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
    what the save does, because it IS what the save does. */
 export function downSheetDefectIds(entry:SyncDownEntry,defects:StructuredDefect[]){
  return defectTargets(entry,defects).map(target=>target.id).filter(Boolean);
+}
+
+/* Resolve adoption once, before either durable write. Persist the result on
+   the entry so completed adopted records stay linked on later edits/retries. */
+export function bindDownEntryDefectIds<E extends SyncDownEntry>(entry:E,defects:StructuredDefect[],persisted?:SyncDownEntry):E{
+ // An open editor may predate a recovered save; retain its durable card links.
+ if(persisted&&persisted.id===entry.id&&persisted.busId===entry.busId){const links=new Map((persisted.repairItems||[]).map(item=>[item.id,item.defectId]));entry={...entry,defectId:entry.defectId||persisted.defectId,repairItems:entry.repairItems?.map(item=>({...item,defectId:item.defectId||links.get(item.id)}))}}
+ const targets=defectTargets(entry,defects),items=carriedItems(entry);
+ if(!items.length)return {...entry,defectId:targets[0]?.id};
+ const ids=new Map(items.map((item,index)=>[item.id,targets[index]?.id]));
+ return {...entry,repairItems:entry.repairItems?.map(item=>ids.has(item.id)?{...item,defectId:ids.get(item.id)}:item)};
 }
 
 export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:SyncDownEntry,now=new Date().toISOString()):T[]{
