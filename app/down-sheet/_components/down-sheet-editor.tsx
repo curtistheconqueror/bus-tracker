@@ -148,7 +148,12 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
   if(!focusRepairId)return;
   const frame=requestAnimationFrame(()=>{
    const card=Array.from(formRef.current?.querySelectorAll<HTMLElement>("[data-repair-id]")||[]).find(node=>node.dataset.repairId===focusRepairId);
-   card?.focus({preventScroll:true});card?.scrollIntoView({block:"nearest"});
+   const category=card?.querySelector<HTMLInputElement>(".repair-item-fields input.combo-input");
+   /* The first input in a card is FINISHED, not the next editing step. Focus
+      Category visibly for the shop keyboard, and never raise a touch keyboard
+      merely because ADD TO THAT ENTRY opened a fresh editor. */
+   category?.scrollIntoView({block:"center"});
+   /* ComboField owns read-only browse focus; no native typing focus here. */
   });
   return ()=>cancelAnimationFrame(frame);
  },[focusRepairId]);
@@ -205,6 +210,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
                     strings with no optgroup and no display label. The stored
                     identity is untouched; only what is drawn changes. */}
                 <ComboField label="CATEGORY" className="wide" browseFirst
+                 focusForBrowse={item.id===focusRepairId}
                  value={item.category}
                  display={item.category?repairCategoryLabel(item.category):""}
                  placeholder="Tap to choose"

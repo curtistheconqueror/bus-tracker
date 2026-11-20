@@ -129,7 +129,7 @@ test('ADD TO THAT ENTRY preserves drafted cards, initials, original repair and o
   const symptom=field(form,'SPECIFIC REPAIR');await page.keyboard.type('misfire');await symptom.press('Enter');
   await form.getByLabel('UPDATED BY - INITIALS',{exact:false}).fill('ZZ');
   await form.getByRole('button',{name:'ADD TO THAT ENTRY'}).click();
-  await page.waitForFunction(()=>document.activeElement?.matches('.repair-item-card'));
+  await page.waitForFunction(()=>document.activeElement?.matches('.repair-item-fields input.combo-input'));
   assert.equal(await form.locator('.repair-item-card').count(),3);
   const choices=await form.locator('input.combo-input').evaluateAll(xs=>xs.map(x=>x.value));
   assert.ok(choices.some(value=>/Brake chamber leak/.test(value)));
@@ -160,7 +160,7 @@ test('cleared initials remain empty and changed tracker status requires explicit
   assert.equal(await form.getByLabel('BUS STATUS ON TRACKER',{exact:false}).inputValue(),'unknown');
   page.once('dialog',d=>d.accept());
   await form.getByRole('button',{name:'ADD TO THAT ENTRY'}).click();
-  await page.waitForFunction(()=>document.activeElement?.matches('.repair-item-card'));
+  await page.waitForFunction(()=>document.activeElement?.matches('.repair-item-fields input.combo-input'));
   assert.equal(await initials.inputValue(),'','never substitute the previous author');
   assert.equal(await form.getByLabel('BUS STATUS ON TRACKER',{exact:false}).inputValue(),'out');
  }finally{await context.close();}
@@ -220,7 +220,7 @@ test('a refused sheet write keeps the transferred repair draft and initials open
   const symptom=field(form,'SPECIFIC REPAIR');await page.keyboard.type('misfire');await symptom.press('Enter');
   await form.getByLabel('UPDATED BY - INITIALS',{exact:false}).fill('ZZ');
   await form.getByRole('button',{name:'ADD TO THAT ENTRY'}).click();
-  await page.waitForFunction(()=>document.activeElement?.matches('.repair-item-card'));
+  await page.waitForFunction(()=>document.activeElement?.matches('.repair-item-fields input.combo-input'));
   const before=await page.evaluate(()=>localStorage.getItem('pace-down-sheet-v1'));
   await page.evaluate(()=>{
    const original=Storage.prototype.setItem;
@@ -323,5 +323,53 @@ for(const route of ['/defect-log','/down-sheet'])test(route+': explicit Save rem
   const saved=await page.evaluate(()=>({buses:JSON.parse(localStorage.getItem('pace-board-v1')).buses,entries:JSON.parse(localStorage.getItem('pace-down-sheet-v1')).entries}));
   if(route==='/down-sheet')assert.equal(saved.entries.length,1);
   else assert.ok(saved.buses.find(bus=>bus.n==='18505').defects.some(d=>/misfire/i.test(d.issue)));
+ }finally{await context.close()}
+});
+
+for(const count of [1,5])for(const mode of ['keyboard','mouse','touch','hybrid'])test(`${count} existing repairs / ${mode} handoff`,async()=>{
+ const originals=Array.from({length:count},(_,i)=>({id:'old-'+i,category:'Brakes',repair:'Brake chamber leak',details:'Original '+i,estimateEnabled:false,timeEstimate:{},done:i%2===1}));
+ const {page,context,form}=await open('/down-sheet',{touch:mode==='touch'||mode==='hybrid',existing:true,originalEntry:{...entry,completedBy:'CT',repairItems:originals}});
+ try{
+  await page.setViewportSize({width:mode==='touch'||mode==='hybrid'?390:1180,height:900});
+  await bus(form,'17507');await form.getByLabel('UPDATED BY - INITIALS',{exact:false}).fill('ZZ');
+  if(mode==='hybrid')await page.evaluate(()=>{
+   const original=window.matchMedia.bind(window);
+   window.matchMedia=query=>query==='(pointer: fine)'?{...original(query),matches:true}:original(query);
+  });
+  const button=form.getByRole('button',{name:'ADD TO THAT ENTRY'});
+  if(mode==='keyboard'){await button.focus();await button.press('Enter')}
+  else if(mode==='touch'||mode==='hybrid')await button.tap();else await button.click();
+  await page.waitForFunction(()=>document.querySelectorAll('.repair-item-card').length>=2);
+  const card=form.locator('.repair-item-card').last();
+  const category=field(card,'CATEGORY');
+  await page.waitForFunction(touch=>{
+   const last=[...document.querySelectorAll('.repair-item-card')].at(-1);
+   const input=last?.querySelector('.repair-item-fields input.combo-input');
+   if(!input)return false;
+   const r=input.getBoundingClientRect(),p=input.closest('.repair-form').getBoundingClientRect();
+   return r.top>=p.top&&r.bottom<=p.bottom&&(touch?!last.contains(document.activeElement):document.activeElement===input);
+  },mode==='touch');
+  const measure=await category.evaluate(el=>{
+   const active=document.activeElement,r=el.getBoundingClientRect(),p=el.closest('.repair-form').getBoundingClientRect();
+   return {focusCategory:active===el,activeTag:active?.tagName,activeType:active?.getAttribute('type'),activeClass:active?.className,categoryTop:r.top,categoryBottom:r.bottom,portTop:p.top,portBottom:p.bottom,visible:r.top>=p.top&&r.bottom<=p.bottom,coarse:matchMedia('(pointer: coarse)').matches};
+  });
+  assert.equal(measure.visible,true);
+  assert.equal(measure.focusCategory,mode!=='touch');
+  if(mode==='touch')assert.notEqual(measure.activeTag,'INPUT');
+  else{
+   assert.equal(await category.getAttribute('readonly'),'','programmatic handoff cannot request a software keyboard');
+   assert.equal(await category.getAttribute('inputmode'),'none');
+  }
+  await page.keyboard.press('Space');
+  const afterSpace=await card.getByRole('checkbox',{name:/MARK THIS REPAIR FINISHED/}).isChecked();
+  console.log(JSON.stringify({count,mode,...measure,newDoneAfterSpace:afterSpace}));
+  assert.equal(afterSpace,false);
+  await category.click();await category.fill('engine');await category.press('Enter');
+  const symptom=field(card,'SPECIFIC REPAIR');await page.keyboard.type('misfire');await symptom.press('Enter');
+  await form.getByRole('button',{name:'SAVE UPDATE',exact:true}).click();await form.waitFor({state:'hidden'});
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('pace-down-sheet-v1')).entries);
+  assert.equal(saved.length,1);assert.equal(saved[0].updatedBy,'ZZ');assert.equal(saved[0].repairItems.length,count+1);
+  for(const old of originals){const actual=saved[0].repairItems.find(r=>r.id===old.id);assert.ok(actual);assert.equal(actual.repair,old.repair);assert.equal(actual.details,old.details);assert.equal(Boolean(actual.done),old.done)}
+  const added=saved[0].repairItems.find(r=>!r.id.startsWith('old-'));assert.match(added.repair,/misfire/i);assert.equal(Boolean(added.done),false);
  }finally{await context.close()}
 });

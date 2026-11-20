@@ -84,7 +84,7 @@ export type ComboOption={
    pages that draw this today ask for it: the Defect Log, and the Down Sheet's
    editor on Curtis's word, "make downsheet operate similarly". Without the
    flag every line below behaves exactly as it did. */
-export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen="",typeAs,exactPick,onType,onCancel,retainExactFocus=false}:{
+export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen="",typeAs,exactPick,onType,onCancel,retainExactFocus=false,focusForBrowse=false}:{
  label:string;
  value:string;
  /* What the closed field shows. Passed in rather than looked up here, because
@@ -131,6 +131,8 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  onCancel?:()=>void;
  /* Only an automatically resolved bus number keeps desktop typing focus. */
  retainExactFocus?:boolean;
+ /* Programmatic handoff stays read-only, including touch screens with trackpads. */
+ focusForBrowse?:boolean;
 }){
  const [open,setOpen]=useState(false);
  /* Only ever true with `browseFirst`. Mirrored in a ref because the focus and
@@ -283,6 +285,16 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   input.readOnly=!on;
   if(!on)input.setAttribute("inputmode","none");else if(typeAs)input.setAttribute("inputmode",typeAs);else input.removeAttribute("inputmode");
  };
+ useEffect(()=>{
+  if(!focusForBrowse||!browseFirst||disabled||typeof matchMedia!=="function"||!matchMedia("(pointer: fine)").matches)return;
+  const input=inputRef.current;
+  if(!input)return;
+  typingRef.current=false;setTyping(false);
+  input.readOnly=true;input.setAttribute("inputmode","none");
+  browsingFocus.current=true;
+  input.focus({preventScroll:true});
+  browsingFocus.current=false;
+ },[focusForBrowse,browseFirst,disabled]);
  /* A SHUT LIST ENDS TYPING, so the next tap opens the list again rather than
     the keyboard. The focus stays where it is: Escape on the shop computer
     should not throw the cursor out of the field. */
