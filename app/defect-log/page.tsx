@@ -919,9 +919,12 @@ export default function DefectLog(){
  const [quickFilterLeftOutHeights,setQuickFilterLeftOutHeights]=useState<Record<string,number>>({});
  /* WHICH LIST A SHARE WAS STARTED FOR. A copy still in flight when a bus is
     left out finished afterwards and put COPIED! over the new list, about a
-    clipboard holding the old one (CodeRabbit on PR 52). A share reports
-    only if the list has not changed since it began. */
- const quickFilterShareRevision=useRef(0);
+    clipboard holding the old one (CodeRabbit on PR 52). The list is named by
+    the filter and the buses it would send, kept current by an effect below;
+    a share reports only if that name is unchanged when it finishes. Naming
+    the list rather than counting LEAVE OUT and PUT BACK means a change of
+    filter or of time window counts too, which the count missed (cold read). */
+ const quickFilterShareKey=useRef("");
  /* The focus view's own, kept apart from the drawer's: both can be open at
     once and a shared status would have one of them reporting the other's
     outcome. Cleared when the focus view closes, so reopening a bus never
@@ -1444,6 +1447,8 @@ export default function DefectLog(){
     is still counted from it. */
  const quickFilterLeaveOutOffered=quickFilterCanLeaveOut(quickFilter);
  const quickFilterScope=quickFilterShareScope(quickFilterBuses,quickFilterLeaveOutOffered?quickFilterLeftOut:[]);
+ const quickFilterShareListKey=(quickFilter||"")+"|"+quickFilterScope.buses.map(bus=>bus.id).join(",");
+ useEffect(()=>{quickFilterShareKey.current=quickFilterShareListKey},[quickFilterShareListKey]);
  const quickFilterShareEmpty=quickFilterShareIsEmpty(quickFilterScope);
  /* HOW FAR BACK THE PRINTED LINES MAY REACH, for `logged` alone. The window
     picked the buses; this stops a bus that qualified on a 14:20 defect from
@@ -1867,8 +1872,8 @@ export default function DefectLog(){
  /* ALL THREE READ `quickFilterScope.buses` AND ALL THREE REFUSE AN EMPTIED
     LIST, each in its own body: SHARE falls back to COPY, so a guard on one
     path would be a guard on the path somebody happened to take. */
- const quickFilterShareReport=(revision:number,status:Parameters<typeof setQuickFilterShareStatus>[0])=>{if(revision===quickFilterShareRevision.current)setQuickFilterShareStatus(status)};
- const copyQuickFilterList=async()=>{if(!quickFilter||quickFilterShareEmpty)return;const revision=quickFilterShareRevision.current;try{await copyText(quickFilterShareText(quickFilterShareLabel,quickFilterScope.buses,quickFilter,quickFilterShareOptions));quickFilterShareReport(revision,"copied")}catch{quickFilterShareReport(revision,"error")}};
+ const quickFilterShareReport=(started:string,status:Parameters<typeof setQuickFilterShareStatus>[0])=>{if(started===quickFilterShareKey.current)setQuickFilterShareStatus(status)};
+ const copyQuickFilterList=async()=>{if(!quickFilter||quickFilterShareEmpty)return;const started=quickFilterShareListKey;try{await copyText(quickFilterShareText(quickFilterShareLabel,quickFilterScope.buses,quickFilter,quickFilterShareOptions));quickFilterShareReport(started,"copied")}catch{quickFilterShareReport(started,"error")}};
  /* LEAVE A BUS OUT OF WHAT GETS SHARED. It writes to nothing but this page's
     own state: the bus, its defects and the log are not touched, which is the
     whole of what was asked - "not delete the defect report itself".
@@ -1882,7 +1887,6 @@ export default function DefectLog(){
  const leaveQuickFilterBusOut=(busId:string,busNumber:string,card?:Element|null)=>{
   const height=card?card.getBoundingClientRect().height:0;
   setQuickFilterLeftOutHeights(current=>({...current,[busId]:height}));
-  quickFilterShareRevision.current++;
   setQuickFilterLeftOut(current=>excludeFromFocusShare(current,busId));
   setQuickFilterLeaveNote("LEFT OUT OF THIS SHARE \u2014 BUS "+busNumber);
   setQuickFilterShareStatus("");
@@ -1890,7 +1894,6 @@ export default function DefectLog(){
  };
  /* THE BUS WHOSE ROW WAS PRESSED COMES BACK - not the last one left out. */
  const putQuickFilterBusBack=(busId:string,busNumber:string)=>{
-  quickFilterShareRevision.current++;
   setQuickFilterLeftOut(current=>restoreLeftOutBus(current,busId));
   setQuickFilterLeaveNote("PUT BACK \u2014 BUS "+busNumber);
   setQuickFilterShareStatus("");
@@ -1977,11 +1980,11 @@ export default function DefectLog(){
   const stamp=new Date().toLocaleString();
   const html=quickFilterShareHtml(quickFilterShareLabel,quickFilterScope.buses,quickFilter,stamp,quickFilterShareOptions);
   const blob=new Blob([html],{type:"text/html"});
-  const revision=quickFilterShareRevision.current;
+  const started=quickFilterShareListKey;
   const outcome=await shareOrDownloadFile(blob,quickFilterShareFilename(quickFilterShareLabel),quickFilterShareLabel+" bus list");
-  quickFilterShareReport(revision,outcome==="cancelled"?null:outcome==="shared"?"shared":"copied");
+  quickFilterShareReport(started,outcome==="cancelled"?null:outcome==="shared"?"shared":"copied");
  };
- const shareQuickFilterList=async()=>{if(!quickFilter||quickFilterShareEmpty)return;const text=quickFilterShareText(quickFilterShareLabel,quickFilterScope.buses,quickFilter,quickFilterShareOptions);if(typeof navigator.share!=="function"){await copyQuickFilterList();return}const revision=quickFilterShareRevision.current;try{await navigator.share({title:quickFilterShareLabel+" bus list",text});quickFilterShareReport(revision,"shared")}catch(error){if((error as Error).name!=="AbortError")quickFilterShareReport(revision,"error")}};
+ const shareQuickFilterList=async()=>{if(!quickFilter||quickFilterShareEmpty)return;const text=quickFilterShareText(quickFilterShareLabel,quickFilterScope.buses,quickFilter,quickFilterShareOptions);if(typeof navigator.share!=="function"){await copyQuickFilterList();return}const started=quickFilterShareListKey;try{await navigator.share({title:quickFilterShareLabel+" bus list",text});quickFilterShareReport(started,"shared")}catch(error){if((error as Error).name!=="AbortError")quickFilterShareReport(started,"error")}};
  
  /* Colours come from displayStyleVars, which OMITS any left at the shipped
     default so the theme-aware fallback behind it in defect-log.css can answer.

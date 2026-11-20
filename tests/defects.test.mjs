@@ -10382,15 +10382,17 @@ test("a bus can be left out of a shared Defects Logged list, and put back",async
     nothing below it moves (BT52-LS-F1). Recorded by every LEAVE OUT. */
  assert.match(bodyOfSource(code,"leaveQuickFilterBusOut"),/const height=card\?card\.getBoundingClientRect\(\)\.height:0;\s*setQuickFilterLeftOutHeights\(current=>\(\{\.\.\.current,\[busId\]:height\}\)\);/);
  assert.match(code,/<article className="quick-filter-bus-card left-out" key=\{bus\.id\} style=\{quickFilterLeftOutHeights\[bus\.id\]\?\{minHeight:quickFilterLeftOutHeights\[bus\.id\]\+"px"\}:undefined\}>/);
- /* A share reports only on the list it began with (CodeRabbit on PR 52):
-    every outcome goes through the revision check, none straight to the setter. */
+ /* A share reports only on the list it began with (CodeRabbit on PR 52).
+    The list is named by the filter and the buses it would send, so leaving
+    out, putting back, a new filter and a new time window all change it. */
+ assert.match(code,/const quickFilterShareListKey=\(quickFilter\|\|""\)\+"\|"\+quickFilterScope\.buses\.map\(bus=>bus\.id\)\.join\(","\);/);
+ assert.match(code,/useEffect\(\(\)=>\{quickFilterShareKey\.current=quickFilterShareListKey\},\[quickFilterShareListKey\]\);/);
+ assert.match(code,/const quickFilterShareReport=\(started:string,status:[^)]*\)=>\{if\(started===quickFilterShareKey\.current\)setQuickFilterShareStatus\(status\)\};/);
  for(const name of ["copyQuickFilterList","shareQuickFilterList"]){
   const body=bodyOfSource(code,name);
-  assert.match(body,/const revision=quickFilterShareRevision\.current;/,name+" notes which list it was started for");
-  assert.doesNotMatch(body,/setQuickFilterShareStatus\(/,name+" reports through the revision check only");
+  assert.match(body,/const started=quickFilterShareListKey;/,name+" notes which list it was started for");
+  assert.doesNotMatch(body,/setQuickFilterShareStatus\(/,name+" reports through the list check only");
  }
- for(const name of ["leaveQuickFilterBusOut","putQuickFilterBusBack"])
-  assert.match(bodyOfSource(code,name),/quickFilterShareRevision\.current\+\+;/,name+" makes an earlier share's outcome stale");
  /* Thumb-sized targets on a phone. */
  assert.match(css,/@media\(max-width:760px\)\{\s*\.quick-filter-bus-card\.can-leave-out>\.quick-filter-leave-out\{min-width:56px\}/);
  assert.match(css,/\.quick-filter-bus-card\.left-out>\.quick-filter-put-back\{min-width:72px;/);
