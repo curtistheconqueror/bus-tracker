@@ -4,13 +4,13 @@ import {BROWSE_ALL,CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} fr
 import ComboField from "@/src/components/shared/combo-field";
 import BusSelector from "@/src/components/shared/bus-selector";
 import HoursField from "@/src/components/shared/hours-field";
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {defectCountField,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,repairCategoryLabel} from "@/src/lib/defects/repair-catalog";
 import {findingMatchKey,readFindingsMemory,recallFindings} from "@/src/lib/defects/findings-memory";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 import {
   aggregateRepairItemEstimates,
-  blankRepairItem,
+  blankRepairItem,hasRepairDraft,
   normalizeRepairItems,
   repairItemsProgress,
   repairItemsReason,
@@ -34,7 +34,7 @@ export type DownSheetRecord={
   assignmentType:AssignmentType;assignedTo:string;section:RepairSection;shift:Shift;
   workflow:Workflow;operationalStatus:FleetStatus;priority:"Routine"|"High"|"Critical";
   timeEstimate:RepairTimeEstimate;
-  createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;history:RepairHistory[];
+  createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;completedBy?:string;history:RepairHistory[];
   /* Which area to park the bus in when this is saved, by name. Absent means
      leave it where it is, which is what every entry written before this said. */
   location?:string;
@@ -55,9 +55,15 @@ const ESTIMATE_FIELDS:{key:Exclude<keyof RepairTimeEstimate,"notes">;label:strin
 
 function hoursValue(minutes:number){return Number((minutes/60).toFixed(2))}
 
-export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onClose,onSave,onOpenExisting}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void;onOpenExisting?:(entryId:string)=>void}){
+export default function DownSheetEditor({entry,fleet,entries,defaultInitials,carriedInitials,focusRepairId="",onClose,onSave,onOpenExisting,recoveryPending=false,onRetryRecovery}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;recoveryPending?:boolean;onRetryRecovery?:()=>void;onSave:(entry:DownSheetRecord)=>void;carriedInitials?:string;focusRepairId?:string;onOpenExisting?:(entryId:string,typedInitials:string,repairs:DownSheetRepairItem[])=>void}){
+  const formRef=useRef<HTMLFormElement>(null);
   const [draft,setDraft]=useState(()=>({...entry,repairItems:normalizeRepairItems(entry.repairItems,{category:entry.category,repair:entry.repair,details:entry.customReason,timeEstimate:entry.timeEstimate})}));
-  const [initials,setInitials]=useState(defaultInitials||entry.updatedBy);
+  /* Initials typed before ADD TO THAT ENTRY come across with it. That button
+     opens a fresh editor on the existing entry, and seeding from that entry
+     would put whoever last updated it in the box — a foreman who had already
+     typed his own and did not look again saves under somebody else's name. */
+  const [initials,setInitials]=useState(carriedInitials??(defaultInitials||entry.updatedBy));
+  const [statusTouched,setStatusTouched]=useState(false);
   /* Named so the "leave it" option can say where that actually is. A foreman
      deciding whether to move a bus needs to know where it is sitting now. */
   const currentArea=sectionForLocation(fleet.find(bus=>bus.id===draft.busId)?.l||"");
@@ -116,7 +122,10 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
     if(!bus){alert("Select a bus number.");return}
     if(!operator){alert("Enter your initials before saving this update.");return}
     const now=new Date().toISOString();
-    const repairItems=draft.repairItems.filter(item=>item.category||item.repair||item.details||item.estimateEnabled);
+    const repairItems=draft.repairItems.filter(hasRepairDraft);
+    if(repairItems.some(item=>!item.category&&!item.repair&&!item.details&&(item.done||item.actionTaken||item.finding||item.repairHours||item.diagnosticHours||item.quantity))){
+     alert("This repair has completion data but no repair identity. Add a category, repair or details before saving; your draft was kept.");return;
+    }
     const first=repairItems[0];
     const action=(isNew?"Created down-sheet entry":"Updated repair entry - "+draft.workflow)+(estimateTotal?" - mechanic estimate "+formatRepairTime(estimateTotal):" - no time estimate");
     onSave({
@@ -138,9 +147,28 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
      through to the page behind: 610px of it on a phone, which is what made the
      modal feel like it was fighting back. */
   useEffect(()=>lockPageScroll("down-editor-open"),[]);
+ useEffect(()=>{
+  if(!focusRepairId)return;
+  const frame=requestAnimationFrame(()=>{
+   const card=Array.from(formRef.current?.querySelectorAll<HTMLElement>("[data-repair-id]")||[]).find(node=>node.dataset.repairId===focusRepairId);
+   const category=card?.querySelector<HTMLInputElement>(".repair-item-fields input.combo-input");
+   /* The first input in a card is FINISHED, not the next editing step. Focus
+      Category visibly for the shop keyboard, and never raise a touch keyboard
+      merely because ADD TO THAT ENTRY opened a fresh editor. */
+   category?.scrollIntoView({block:"center"});
+   /* ComboField owns read-only browse focus; no native typing focus here. */
+  });
+  return ()=>cancelAnimationFrame(frame);
+ },[focusRepairId]);
+ const openExisting=()=>{
+  if(!existingEntry||!onOpenExisting)return;
+  const metadataChanged=(statusTouched&&draft.operationalStatus!==existingEntry.operationalStatus)||draft.repairItems.some(item=>item.done)||(["section","shift","workflow","priority","assignmentType","assignedTo","location","completedBy"] as const).some(key=>draft[key]!==entry[key]);
+  if(metadataChanged&&!confirm("The existing entry keeps its section, shift, workflow, assignment, bus status, move instruction and FIXED BY completion sign-off. Finished draft repairs will use that existing sign-off. Your repair cards and UPDATED BY initials will come across. Continue?"))return;
+  onOpenExisting(existingEntry.id,initials.trim(),draft.repairItems);
+ };
 
   return <div className="down-shade" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}>
-    <form className="repair-editor" onSubmit={submit}>
+    <form className="repair-editor" onSubmit={submit} ref={formRef}>
       <div className="repair-editor-head"><span>DOWN SHEET ENTRY<h2>{isNew?"Add Down Bus":"Bus "+draft.busNumber}</h2></span><button type="button" onClick={onClose}>X</button></div>
       <div className="repair-form">
         {/* THE SAME PICKER THE DEFECT LOG USES, not a second one.
@@ -148,20 +176,19 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
            This was a bare <select> over `availableFleet` — no way to type a
            fleet number at all, and the list additionally hid every bus that
            already had an active entry, so a bus could be both un-typable and
-           un-listable. The Defect Log had solved this twice over already, with
-           generation chips and a typed box backed by a datalist, and copying it
-           across would have made two of them to keep in step.
+           un-listable. The Defect Log had solved this already, and copying it
+           across would have made two of them to keep in step. It is one BUS
+           box now on both (Curtis's B): browse by generation, or type.
 
            `fleet` rather than `availableFleet`: typing a number that is already
            on the sheet has to RESOLVE, so the uniqueness rule below can say so
            in words. A number that silently matches nothing reads as the app not
-           knowing the bus.
-
-           autoFocus off, because this editor opens with the section and the
-           workflow above it and stealing focus moves the page under a thumb. */}
-          <BusSelector fleet={fleet} busId={draft.busId} listId="down-sheet-bus-numbers" autoFocus={false}
+           knowing the bus. Nothing is focused when
+           it opens: the bus box opens its list on a tap, without the keyboard. */}
+          <BusSelector fleet={fleet} busId={draft.busId}
+           restore={busId=>{const bus=fleet.find(item=>item.id===busId);setDraft(current=>({...current,busId,busNumber:bus?.n||""}))}}
            select={busId=>{const bus=fleet.find(item=>item.id===busId);setDraft(current=>({...current,busId,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}/>
-          {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={()=>onOpenExisting(existingEntry.id)}>ADD TO THAT ENTRY</button>}</p>}
+          {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={openExisting}>ADD TO THAT ENTRY</button>}</p>}
         <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
 
         <fieldset className="repair-items wide">
@@ -169,7 +196,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
           <div className="repair-items-head"><span><b>BUS TOTAL</b><small>Each repair keeps its own optional estimate.</small></span><strong>{estimateTotal?formatRepairTime(estimateTotal):"NOT SET"}</strong></div>
           <div className="repair-item-list">{draft.repairItems.map((item,index)=>{
             const itemTotal=item.estimateEnabled?repairItemsTotal([item]):0;
-            return <section className="repair-item-card" key={item.id}>
+            return <section className="repair-item-card" key={item.id} data-repair-id={item.id} role="group" aria-label={"Repair "+(index+1)} tabIndex={-1}>
               <header><b>DEFECT {index+1}</b><span>{item.estimateEnabled?formatRepairTime(itemTotal):"No estimate"}</span>{draft.repairItems.length>1&&<button type="button" onClick={()=>setDraft(current=>({...current,repairItems:current.repairItems.filter(candidate=>candidate.id!==item.id)}))}>REMOVE</button>}</header>
               <label className="repair-item-done"><input type="checkbox" checked={item.done===true} onChange={event=>setRepairDone(item.id,event.target.checked)}/><span>{item.done?"FINISHED":"MARK THIS REPAIR FINISHED"}</span></label>
               <div className="repair-item-fields">
@@ -186,19 +213,27 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
                     stored "Group - Item" identity — a flat wall of prefixed
                     strings with no optgroup and no display label. The stored
                     identity is untouched; only what is drawn changes. */}
-                <ComboField label="CATEGORY" className="wide"
+                <ComboField label="CATEGORY" className="wide" browseFirst
+                 focusForBrowse={item.id===focusRepairId}
                  value={item.category}
                  display={item.category?repairCategoryLabel(item.category):""}
-                 placeholder="Type or tap to choose a category"
+                 placeholder="Tap to choose"
                  emptyText="No category matches that"
                  search={query=>searchCategories(query).map(row=>({value:row.value,label:row.label}))}
                  onPick={category=>updateItem(item.id,current=>({...current,category,repair:"",quantity:undefined,estimateEnabled:Boolean(category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}/>
-                <ComboField label="SPECIFIC REPAIR" className="wide"
+                {/* THE SAME PICKERS AS THE DEFECT LOG'S, asked for by name: Curtis,
+                    "make downsheet operate similarly". The list opens without
+                    the keyboard; tap the box again, or TYPE, to type. */}
+                <ComboField label="SPECIFIC REPAIR" className="wide" browseFirst
+                 openWhen={item.category}
                  value={item.repair}
                  display={item.repair?(CATALOG_OPTIONS.find(row=>row.value===item.repair&&(!item.category||row.category===item.category))?.label||CATALOG_OPTIONS.find(row=>row.value===item.repair)?.label||item.repair):""}
-                 placeholder={item.category?"Type or tap - or leave it and save the category alone":"Type what is wrong, or tap to browse"}
+                 /* SHORTER THAN THE DEFECT LOG'S, because this box sits inside a
+                    repair card: 240px wide at 360, 122px of it left for text once
+                    TYPE and the arrow have their room. Measured. */
+                 placeholder={item.category?"Tap or type":"Tap to browse"}
                  emptyText="Nothing in the catalog matches that"
-                 footnote={item.category?undefined:"Searching every category. Picking one sets the category for you."}
+                 footnote={item.category?"Optional. You can save the category alone.":"Searching every category. Picking one sets the category for you."}
                  search={query=>{
                   const {inCategory,elsewhere}=searchCatalogForCategory(query,item.category,query.trim()?40:BROWSE_ALL);
                   /* Headings while browsing, the group on each row while
@@ -269,13 +304,14 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
         <label>{draft.assignmentType.toUpperCase()} ASSIGNED<input value={draft.assignedTo} onChange={event=>update("assignedTo",event.target.value)} placeholder={draft.assignmentType==="Vendor"?"Vendor or company":"Mechanic name or initials"}/></label>
         <label>SCHEDULED SHIFT<select value={draft.shift} onChange={event=>update("shift",event.target.value as Shift)}><option>1st</option><option>2nd</option><option>3rd</option></select></label>
         <label>REPAIR WORKFLOW<select value={draft.workflow} onChange={event=>setWorkflow(event.target.value as Workflow)}>{WORKFLOWS.map(value=><option key={value}>{value}</option>)}</select></label>
-        <label>BUS STATUS ON TRACKER<select value={draft.operationalStatus} onChange={event=>update("operationalStatus",event.target.value as FleetStatus)}>{STATUS_OPTIONS.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select><small>{draft.location?"Saving will also move this bus, and the status follows where it parks.":"A bus keeps the status its parking space implies. Move it below to change that."}</small></label>
+        <label>BUS STATUS ON TRACKER<select value={draft.operationalStatus} onChange={event=>{setStatusTouched(true);update("operationalStatus",event.target.value as FleetStatus)}}>{STATUS_OPTIONS.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select><small>{draft.location?"Saving will also move this bus, and the status follows where it parks.":"A bus keeps the status its parking space implies. Move it below to change that."}</small></label>
         <label>MOVE BUS TO<select value={draft.location||""} onChange={event=>update("location",event.target.value||undefined)}><option value="">Leave where it is{currentArea?" - "+currentArea:""}</option>{Object.keys(RELOCATION_AREAS).map(area=><option value={area} key={area}>{area}</option>)}</select><small>The CNG lots always read out of service and a shop bay always reads work in progress, so a bus going back in service has to leave the lot.</small></label>
         {repairItemsProgress(draft.repairItems).done>0&&<label className="wide completion-signoff">FIXED BY<input maxLength={12} autoCapitalize="characters" value={draft.completedBy||assignedMechanic} onChange={event=>update("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/><small>{assignedMechanic?"Starts from the assigned mechanic. What was done goes on each repair above.":"Who closed this entry out. What was done goes on each repair above."}</small></label>}
         <label>PRIORITY<select value={draft.priority} onChange={event=>update("priority",event.target.value as DownSheetRecord["priority"])}><option>Routine</option><option>High</option><option>Critical</option></select></label>
         <label className="operator-initials">UPDATED BY - INITIALS<input required maxLength={6} autoCapitalize="characters" value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z0-9]/gi,""))} placeholder="Initials"/><small>Required.</small></label>
       </div>
       {draft.history.length>0&&<section className="repair-history editor-history"><b>RECENT CHANGE HISTORY</b>{draft.history.slice(-5).reverse().map((item,index)=><div key={item.at+index}><strong>{item.initials}</strong><span>{item.action}</span><time>{new Date(item.at).toLocaleString()}</time></div>)}</section>}
+      {recoveryPending&&<p className="repair-existing-entry" role="status"><b>A save is pending.</b><span>Retry finishes the previous attempt. Any newer draft edits stay here to save afterward.</span><button type="button" onClick={onRetryRecovery}>RETRY PENDING SAVE</button></p>}
       <div className="repair-editor-actions"><button type="button" onClick={onClose}>CANCEL</button><button className="save-repair" type="submit">SAVE UPDATE</button></div>
     </form>
   </div>;

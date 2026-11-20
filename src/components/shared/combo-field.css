@@ -152,3 +152,20 @@
  .combo-back>b{font-size:11px}
  .combo-back>small{font-size:11px}
 }
+
+/* ── Browse first: the TYPE / LIST button ─────────────────────────────────────
+   Only drawn on a field that opens its list without the keyboard (see the note
+   in combo-field.tsx), and only while the × is not: the two take turns at the
+   right-hand end. With TYPE showing, the arrow moves in by its width and the
+   text stops before both. Inset by the input's 1px border so that border still
+   draws round it. */
+.combo-mode{position:absolute;top:1px;right:1px;width:56px;height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;border-left:1px solid #b7c3d5;border-radius:0 5px 5px 0;background:#f2f6fc;color:#0b64bd;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.5px;line-height:1;padding:0;cursor:pointer}
+.combo-mode:disabled{opacity:.45;cursor:default}
+.combo-box.with-mode .combo-caret{right:58px}
+.combo-box.with-mode .combo-input{padding-right:98px!important}
+
+@media(max-width:760px){
+ .combo-mode{width:60px;height:42px;font-size:9px}
+ .combo-box.with-mode .combo-caret{right:62px}
+ .combo-box.with-mode .combo-input{padding-right:108px!important}
+}

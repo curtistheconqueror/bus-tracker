@@ -9,13 +9,14 @@ import {Fragment,useEffect,useMemo,useRef,useState,type CSSProperties} from "rea
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
 import "./down-sheet.css";
+import {PAIR_RECOVERY_KEY,beginPairJournal,makePairJournal,readPairJournal,resumePairJournal,sameRecoveryValue,type PairData,type PairJournal} from "@/src/lib/down-sheet/pair-recovery";
 import DownSheetEditor from "./_components/down-sheet-editor";
 import DownSheetScanner from "./_components/down-sheet-scanner";
 import ScanPaper from "@/src/components/scan/scan-paper";
 import {PAPER_DOOR,PAPER_PHOTOS_PARAM,PAPER_SCAN_PARAM} from "@/src/lib/scan/paper-kinds";
 import {paperHandIn,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
 import {readSweep,startSweep} from "@/src/lib/fleet/facility-sweep";
-import {applyDownEntryToFleet} from "@/src/lib/down-sheet/down-sheet-sync";
+import {applyDownEntryToFleet,bindDownEntryDefectIds} from "@/src/lib/down-sheet/down-sheet-sync";
 import {matchingUnresolvedDefectId} from "@/src/lib/defects/duplicate-defects";
 import {learnFinding,readFindingsMemory,writeFindingsMemory} from "@/src/lib/defects/findings-memory";
 import {clearDownSheetState,DOWN_SHEET_CLEAR_UNDO_KEY,readDownSheetClearSnapshot,restoreDownSheetState} from "@/src/lib/down-sheet/down-sheet-clear";
@@ -25,7 +26,7 @@ import {addMintedEntries,mintSkippedMessage} from "@/src/lib/down-sheet/sheet-mi
 import {clearAddedInApp,entryOriginLabel,markAddedInApp} from "@/src/lib/down-sheet/entry-origin";
 import {reconcileRoadCallsFromSheet} from "@/src/lib/fleet/road-calls";
 import {estimateFromHours,formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type RepairTimeEstimate} from "@/src/lib/down-sheet/repair-time-estimates";
-import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsProgress,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "@/src/lib/down-sheet/down-sheet-repair-items";
+import {blankRepairItem,combineRepairDrafts,isQuarantineEntry,normalizeRepairItems,repairItemsProgress,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "@/src/lib/down-sheet/down-sheet-repair-items";
 import type {ScanImportRecord} from "@/src/lib/down-sheet/down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "@/src/lib/down-sheet/down-sheet-replace";
 import {recordSheetSwap} from "@/src/lib/down-sheet/sheet-ledger";
@@ -136,14 +137,14 @@ const COUNTS_OPEN_KEY="pace-down-sheet-counts-open-v1";
 function readStoredDownSettings():Record<string,unknown>{
  try{return JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}")||{}}catch{return {}}
 }
-type RowAction={kind:"deleted"|"fixed";id:string;busNumber:string};
+type RowAction={kind:"deleted"|"fixed"|"pending-fix";id:string;busNumber:string};
 function readRowAction(raw:string|null):RowAction|null{
  if(!raw)return null;
  try{const parsed=JSON.parse(raw);const entry=parsed?.entry;
   if(!entry||typeof entry.id!=="string"||typeof entry.busId!=="string")return null;
   /* Anything written before this carried a delete and nothing else, so an
      absent kind reads as one rather than throwing the copy away. */
-  return {kind:parsed.kind==="fixed"?"fixed":"deleted",id:entry.id,busNumber:String(entry.busNumber||"")};
+  return {kind:parsed.kind==="fixed"?(parsed.pending?"pending-fix":"fixed"):"deleted",id:entry.id,busNumber:String(entry.busNumber||"")};
  }catch{return null}
 }
 const STATUS_LABELS:Record<FleetStatus,string>={service:"In Service / On Road",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown"};
@@ -243,6 +244,25 @@ export default function DownSheet(){
  const [fixedToday,setFixedToday]=useState(false);
  const [hydrated,setHydrated]=useState(false);
  const [editing,setEditing]=useState<DownEntry|null>(null);
+ /* Initials typed in the editor before ADD TO THAT ENTRY, handed to the
+    editor that opens on the existing entry. Forgotten when the editor shuts,
+    so the next entry opened starts the ordinary way. */
+ const [carriedInitials,setCarriedInitials]=useState<string|undefined>(undefined);
+ const [focusRepairId,setFocusRepairId]=useState("");
+ useEffect(()=>{if(!editing){setCarriedInitials(undefined);setFocusRepairId("")}},[editing]);
+ const openExistingEntry=(entryId:string,typedInitials:string,draftedItems:DownSheetRepairItem[])=>{
+  const found=entries.find(item=>item.id===entryId);
+  if(!found)return;
+  if(entries.filter(item=>item.id===entryId).length!==1||entries.filter(item=>item.busId===found.busId&&item.workflow!=="Completed").length!==1){
+   alert("More than one active entry matches this bus. Resolve the duplicate entries before adding repairs.");return;
+  }
+  const prior=normalizeRepairItems(found.repairItems,{category:found.category,repair:found.repair,details:found.customReason,timeEstimate:found.timeEstimate});
+  const combined=combineRepairDrafts(prior,draftedItems);
+  if(combined.duplicates&&!confirm("Some drafted repairs match repairs already on this entry. Keep both copies? Cancel returns to your unchanged draft."))return;
+  setCarriedInitials(typedInitials);
+  setFocusRepairId(combined.focusRepairId);
+  setEditing({...found,repairItems:combined.repairItems});
+ };
  /* Absent means closed, like the Defect Log's. A device that has never opened
     the panel does not have to write anything to say so. */
  useEffect(()=>{setAdvancedOpen(localStorage.getItem(ADVANCED_OPEN_KEY)==="1")},[]);
@@ -321,6 +341,7 @@ export default function DownSheet(){
  /* The bus number is held with the id so the notice can name the bus it would
     take back, rather than saying "the last one". */
  const [rowAction,setRowAction]=useState<RowAction|null>(null);
+ const [pairPending,setPairPending]=useState(false);
  /* MYSTERY BUSES moved here from the Defect Log — every bus it lists is a bus
     that is NOT on this sheet, which is the question a foreman reading the sheet
     is actually asking.
@@ -384,7 +405,7 @@ export default function DownSheet(){
     one of them cited wrongly, on a project whose stated rule is that a rule in
     two places is the hazard. The rule is in `src/lib/down-sheet/sheet-mint.ts`
     now and both paths here call it. */
- useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),minted=addMintedEntries(restored,entriesFromFleet(nextFleet),MINT_RULES);setEntries(minted.entries);setMintSkipped(mintSkippedMessage(minted.skipped,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setSectionOrder(normalizeDownSheetSectionOrder(settings.sectionOrder));setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
+ useEffect(()=>{const recovery=readPairJournal(localStorage);setPairPending(Boolean(recovery.journal||recovery.error));try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),minted=recovery.journal||recovery.error?{entries:restored,skipped:[]}:addMintedEntries(restored,entriesFromFleet(nextFleet),MINT_RULES);setEntries(minted.entries);setMintSkipped(mintSkippedMessage(minted.skipped,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setSectionOrder(normalizeDownSheetSectionOrder(settings.sectionOrder));setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
  /* A door on ANOTHER page sends a Vehicle Down Sheet here to be read. No
     page has one today — the Defect Log's was taken off — and this is kept so
     that putting SCAN SHEET on any other page is one button and no plumbing.
@@ -409,9 +430,9 @@ export default function DownSheet(){
     scan, a hand-typed row, a cloud merge — so a road call that arrived on paper
     reaches the bus record no matter which of those brought it. The alternative
     was hooking the scanner alone, which would have covered one of the three. */
- useEffect(()=>{if(!hydrated)return;setSaveProblem(writeDownSheetStorageResult(localStorage,entries).reason||"");const activeIds=entries.filter(isActive).map(entry=>entry.busId);setFleet(current=>{const membership=reconcileDownSheetMembership(current,activeIds);const roadCalled=reconcileRoadCallsFromSheet(membership,entries).fleet;if(roadCalled!==current)writeFleetStorage(localStorage,roadCalled);return roadCalled})},[entries,hydrated]);
+ useEffect(()=>{if(!hydrated)return;const recovery=readPairJournal(localStorage);if(recovery.journal||recovery.error)return;setSaveProblem(writeDownSheetStorageResult(localStorage,entries).reason||"");const activeIds=entries.filter(isActive).map(entry=>entry.busId);setFleet(current=>{const membership=reconcileDownSheetMembership(current,activeIds);const roadCalled=reconcileRoadCallsFromSheet(membership,entries).fleet;if(roadCalled!==current)writeFleetStorage(localStorage,roadCalled);return roadCalled})},[entries,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify({...readStoredDownSettings(),showCompleted,defaultInitials,defaultShift,quickNotes:savedQuickNotes,sectionOrder,extraTiles,showQuickNotes,display:displaySettings}))},[showCompleted,defaultInitials,defaultShift,savedQuickNotes,sectionOrder,extraTiles,showQuickNotes,displaySettings,hydrated]);
- useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){const payload=readFleetPayload<FleetBus>(event.newValue);if(payload.valid){const nextFleet=payload.buses;setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find(item=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),minted=addMintedEntries(merged,entriesFromFleet(nextFleet),MINT_RULES);return minted.entries})}}if(event.key===DOWN_KEY&&event.newValue){const payload=readDownSheetPayload<DownEntry>(event.newValue);if(payload.valid)setEntries(payload.entries.map(normalizeEntry))}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)));if(event.key===SCAN_UNDO_KEY)setUndoScanAvailable(Boolean(event.newValue));if(event.key===ENTRY_UNDO_KEY)setRowAction(readRowAction(event.newValue));/* Settings are edited on the shared page now. This page writes its whole settings object back whenever a field changes, so it has to take the new values into its own state or its next write would put the stale copy over them. */if(event.key===SETTINGS_KEY){try{const saved=JSON.parse(event.newValue||"{}");setShowCompleted(saved.showCompleted===true);if(typeof saved.defaultInitials==="string")setDefaultInitials(saved.defaultInitials);if(saved.defaultShift==="1st"||saved.defaultShift==="2nd"||saved.defaultShift==="3rd")setDefaultShift(saved.defaultShift);setDisplaySettings(normalizeDownSheetDisplay(saved.display))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ useEffect(()=>{const receive=(event:StorageEvent)=>{if([PAIR_RECOVERY_KEY,FLEET_KEY,DOWN_KEY].includes(event.key||"")){const recovery=readPairJournal(localStorage);setPairPending(Boolean(recovery.journal||recovery.error));if(recovery.journal||recovery.error)return;if(event.key===PAIR_RECOVERY_KEY){try{const buses=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),sheet=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY));if(!buses.valid||!sheet.valid)throw Error();setFleet(buses.buses);setEntries(sheet.entries.map(normalizeEntry));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)))}catch{setSaveProblem("unreadable")}return}}if(event.key===FLEET_KEY&&event.newValue){const payload=readFleetPayload<FleetBus>(event.newValue);if(payload.valid){const nextFleet=payload.buses;setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find(item=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),minted=addMintedEntries(merged,entriesFromFleet(nextFleet),MINT_RULES);return minted.entries})}}if(event.key===DOWN_KEY&&event.newValue){const payload=readDownSheetPayload<DownEntry>(event.newValue);if(payload.valid)setEntries(payload.entries.map(normalizeEntry))}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)));if(event.key===SCAN_UNDO_KEY)setUndoScanAvailable(Boolean(event.newValue));if(event.key===ENTRY_UNDO_KEY)setRowAction(readRowAction(event.newValue));/* Settings are edited on the shared page now. This page writes its whole settings object back whenever a field changes, so it has to take the new values into its own state or its next write would put the stale copy over them. */if(event.key===SETTINGS_KEY){try{const saved=JSON.parse(event.newValue||"{}");setShowCompleted(saved.showCompleted===true);if(typeof saved.defaultInitials==="string")setDefaultInitials(saved.defaultInitials);if(saved.defaultShift==="1st"||saved.defaultShift==="2nd"||saved.defaultShift==="3rd")setDefaultShift(saved.defaultShift);setDisplaySettings(normalizeDownSheetDisplay(saved.display))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const active=useMemo(()=>entries.filter(isActive),[entries]);
  /* Where each bus actually is, which is the first thing the section rules ask.
@@ -651,21 +672,78 @@ export default function DownSheet(){
   if(!wroteDown.ok){setSaveProblem(wroteDown.reason||"failed");alert("Bus "+label+" was updated, but the Down Sheet could not be saved on this device. Check the sheet before relying on it.");return}
   if(applied.saved<applied.attempted)alert("Bus "+label+" was updated, but "+(applied.attempted-applied.saved)+" of its repairs would not save. Check the bus on the Defect Log.");
  };
- const saveEntry=(next:DownEntry)=>{if(next.workflow!=="Completed"&&entries.some(entry=>entry.id!==next.id&&entry.workflow!=="Completed"&&entry.busId===next.busId)){alert("That bus already has an active down-sheet entry.");return}const nextFleet=applyDownEntryToFleet(fleet,next);setFleet(nextFleet);writeFleetStorage(localStorage,nextFleet);
-  /* MOVE BUS TO is an instruction, not a property of the repair, so it is
-     cleared once it has been carried out. Left on the entry it would re-run on
-     every later save: park the bus somewhere on the map, reopen the entry to
-     fix a typo, and the bus would jump back to wherever the sheet last said. */
-  next={...next,location:undefined};/* Every repair on the entry teaches its own cause, under its own symptom. */
- const found=(next.repairItems||[]).filter(item=>normalizeFinding(item.finding));
- if(found.length)writeFindingsMemory(localStorage,found.reduce((memory,item)=>learnFinding(memory,{category:item.category,issue:item.repair,finding:item.finding}),readFindingsMemory(localStorage)));setEntries(current=>current.some(entry=>entry.id===next.id)?current.map(entry=>entry.id===next.id?next:entry):[...current,next]);setEditing(null)};
- const clearEntireDownSheet=()=>{if(!entries.length&&!fleet.some(bus=>bus.down)){alert("The down sheet is already clear.");return}if(!confirm("Clear the entire down sheet and uncheck every tracker bus marked on it? Bus locations and defects will stay unchanged."))return;const result=clearDownSheetState(entries,fleet);setSaveProblem(writeSetting(localStorage,DOWN_SHEET_CLEAR_UNDO_KEY,JSON.stringify(result.snapshot)).reason||"");
+ /* Recovery stores fixed per-record before/after patches. Retries never
+    recompute defect adoption or relocation and never replace unrelated rows. */
+ const readSavedPair=():PairData=>{
+  const buses=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),sheet=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY));
+  if(!buses.valid||!buses.supported||!sheet.valid||!sheet.supported)throw Error("Unreadable fleet or sheet");
+  return {fleet:buses.buses,sheet:sheet.entries};
+ };
+ const pairIO={read:readSavedPair,write:{fleet:(rows:PairData["fleet"],operationId:string)=>writeFleetStorageResult(localStorage,rows as FleetBus[],{recoveryOperationId:operationId}),sheet:(rows:PairData["sheet"],operationId:string)=>writeDownSheetStorageResult(localStorage,rows as DownEntry[],{recoveryOperationId:operationId})}};
+ const undoSnapshot=()=>{try{return JSON.parse(localStorage.getItem(ENTRY_UNDO_KEY)||"null")}catch{return null}};
+ const finalizePair=(journal:PairJournal)=>{
+  if(journal.kind==="save")return true;
+  const copy=undoSnapshot();
+  if(copy&&copy.entry?.id!==journal.entryId)return false;
+  if(journal.kind==="mark-fixed")return Boolean(copy)&&!copy.restoring&&writeSetting(localStorage,ENTRY_UNDO_KEY,JSON.stringify({...copy,pending:false})).ok;
+  try{localStorage.removeItem(ENTRY_UNDO_KEY);return localStorage.getItem(ENTRY_UNDO_KEY)===null}catch{return false}
+ };
+ const refreshPairState=()=>{
+  const current=readSavedPair();setFleet(current.fleet as FleetBus[]);setEntries((current.sheet as DownEntry[]).map(normalizeEntry));
+  const pending=readPairJournal(localStorage);setPairPending(Boolean(pending.journal||pending.error));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));
+ };
+ const retryPendingPair=()=>{
+  const copy=undoSnapshot(),pending=readPairJournal(localStorage);
+  // A refused journal replacement must not turn an explicit restore back into completion.
+  if(copy?.restoring&&pending.journal?.kind==="mark-fixed"){undoFixEntry(normalizeEntry(copy.entry),copy.bus);return}
+  const result=resumePairJournal(localStorage,pairIO,finalizePair);
+  try{refreshPairState()}catch{/* Keep the current view and durable copy on unreadable storage. */}
+  setSaveProblem(result.ok?"":"failed");
+  if(!result.ok)alert("Recovery is still pending ("+result.reason+"). No conflicting record was overwritten. Keep the recovery copy and retry after resolving the problem.");
+  /* Keep any open editor, including changes typed after the failed attempt. */
+ };
+ const saveEntry=(incoming:DownEntry,markFixed=false)=>{
+  const pending=readPairJournal(localStorage);
+  if(pending.journal||pending.error||undoSnapshot()?.pending){setPairPending(Boolean(pending.journal||pending.error));alert("Finish the pending save or RESTORE BEFORE ATTEMPT before saving another update. Your draft was kept.");return false}
+  let before:PairData;
+  try{before=readSavedPair()}catch{setSaveProblem("unreadable");alert("NOT SAVED: fleet or sheet cannot be read. Your draft was kept.");return false}
+  const currentEntries=before.sheet as DownEntry[],currentFleet=before.fleet as FleetBus[];
+  if(currentFleet.filter(bus=>bus.id===incoming.busId).length!==1){alert("That bus is no longer available or has an ambiguous identity. Nothing was saved; your draft was kept.");return false}
+  if(incoming.workflow!=="Completed"&&currentEntries.some(entry=>entry.id!==incoming.id&&entry.workflow!=="Completed"&&entry.busId===incoming.busId)){alert("That bus already has an active down-sheet entry.");return false}
+  const next=bindDownEntryDefectIds(incoming,currentFleet.find(bus=>bus.id===incoming.busId)?.defects||[],currentEntries.find(entry=>entry.id===incoming.id));
+  const appliedFleet=applyDownEntryToFleet(currentFleet,next);
+  const savedNext={...next,location:undefined};
+  const nextEntries=currentEntries.some(entry=>entry.id===next.id)?currentEntries.map(entry=>entry.id===next.id?savedNext:entry):[...currentEntries,savedNext];
+  const nextFleet=reconcileRoadCallsFromSheet(reconcileDownSheetMembership(appliedFleet,nextEntries.filter(isActive).map(entry=>entry.busId)),nextEntries).fleet;
+  let journal:PairJournal;
+  try{journal=makePairJournal(markFixed?"mark-fixed":"save",next.id,next.busNumber,before,{fleet:nextFleet,sheet:nextEntries})}catch{alert("NOT SAVED: record identities are ambiguous. Your draft was kept; nothing was changed.");return false}
+  if(markFixed){
+   const bus=currentFleet.find(item=>item.id===next.busId),afterBus=nextFleet.find(item=>item.id===next.busId),entry=currentEntries.find(item=>item.id===next.id);
+   if(!entry||!bus){alert("That row is no longer available. Nothing was changed.");return false}
+   const fields=(item:FleetBus)=>({id:item.id,s:item.s,defects:item.defects||[],pendingRepair:item.pendingRepair||""});
+   const undoCopy={kind:"fixed",pending:true,fixedAt:next.updatedAt,entry,bus:fields(bus),afterBus:afterBus&&fields(afterBus),afterEntry:savedNext};
+   if(!writeSetting(localStorage,ENTRY_UNDO_KEY,JSON.stringify(undoCopy)).ok){setSaveProblem("storage-full");alert("NOT SAVED: this device could not keep the original undo copy. Nothing was changed.");return false}
+  }
+  const prepared=beginPairJournal(localStorage,journal);
+  if(!prepared.ok){setSaveProblem("failed");setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));alert("NOT SAVED: the recovery copy could not be saved ("+prepared.reason+"). No fleet or sheet data was changed; your draft was kept.");return false}
+  setPairPending(true);
+  const result=resumePairJournal(localStorage,pairIO,finalizePair);
+  try{refreshPairState()}catch{setPairPending(true)}setSaveProblem(result.ok?"":"failed");
+  if(!result.ok){
+   alert(result.failedStore==="sheet"?"The bus was updated, but the Down Sheet was NOT SAVED. The durable recovery copy and your draft were kept. Use RETRY PENDING SAVE.":"NOT SAVED completely ("+result.reason+"). The recovery copy was kept; use RETRY PENDING SAVE or RESTORE BEFORE ATTEMPT.");return false;
+  }
+  const found=(next.repairItems||[]).filter(item=>normalizeFinding(item.finding));
+  if(found.length)writeFindingsMemory(localStorage,found.reduce((memory,item)=>learnFinding(memory,{category:item.category,issue:item.repair,finding:item.finding}),readFindingsMemory(localStorage)));
+  setEditing(null);return true;
+ };
+ const recoveryBlocksAction=()=>{const pending=readPairJournal(localStorage);if(!pending.journal&&!pending.error&&!undoSnapshot()?.pending)return false;alert("Finish pending recovery or RESTORE BEFORE ATTEMPT first. Nothing was changed.");return true};
+ const clearEntireDownSheet=()=>{if(recoveryBlocksAction())return;if(!entries.length&&!fleet.some(bus=>bus.down)){alert("The down sheet is already clear.");return}if(!confirm("Clear the entire down sheet and uncheck every tracker bus marked on it? Bus locations and defects will stay unchanged."))return;const result=clearDownSheetState(entries,fleet);setSaveProblem(writeSetting(localStorage,DOWN_SHEET_CLEAR_UNDO_KEY,JSON.stringify(result.snapshot)).reason||"");
   /* Written down so the removal actually travels. A push only sends what the
      sheet still carries, so without this the cleared rows stayed live on the
      server and the next pull handed every one of them back — which is why
      clearing the sheet and watching it refill was reproducible. */
   rememberRemovedEntries(localStorage,entries.map(entry=>entry.id),new Date().toISOString());writeDownSheetStorage(localStorage,result.entries);writeFleetStorage(localStorage,result.fleet);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(true)};
- const undoClear=()=>{const snapshot=readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY));if(!snapshot){setUndoClearAvailable(false);alert("There is no cleared down sheet to restore.");return}const restoredAt=new Date().toISOString(),held=new Set(entries.map(entry=>entry.id)),plain=restoreDownSheetState(entries,fleet,snapshot);
+ const undoClear=()=>{if(recoveryBlocksAction())return;const snapshot=readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY));if(!snapshot){setUndoClearAvailable(false);alert("There is no cleared down sheet to restore.");return}const restoredAt=new Date().toISOString(),held=new Set(entries.map(entry=>entry.id)),plain=restoreDownSheetState(entries,fleet,snapshot);
   /* Off the removal ledger, and restamped as touched now.
 
      Both halves are needed. The ledger is what refuses an entry on the way back
@@ -676,6 +754,7 @@ export default function DownSheet(){
   forgetRemovedEntries(localStorage,snapshot.entries.map(entry=>entry.id));
   const result={...plain,entries:plain.entries.map(entry=>held.has(entry.id)?entry:{...entry,updatedAt:restoredAt})};writeDownSheetStorage(localStorage,result.entries);writeFleetStorage(localStorage,result.fleet);localStorage.removeItem(DOWN_SHEET_CLEAR_UNDO_KEY);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(false)};
  const importScan=(records:ScanImportRecord[])=>{
+  if(recoveryBlocksAction())return;
   const now=new Date().toISOString(),incomingIds=new Set(records.map(record=>record.busId)),removed=scannedSheetRemovals(entries,incomingIds),baseFleet=prepareFleetForScannedReplacement(fleet,removed,now);
   const imported=records.map((record,index)=>{
    /* THE PAPER NAMING THE BUS IS WHAT PROMOTES THE ROW. A scan writes ONTO
@@ -745,7 +824,7 @@ export default function DownSheet(){
      startSweep does not reset a walk already under way. */
   if(!readSweep(localStorage))setSweepAsk("ask");
  };
- const undoScan=()=>{try{const snapshot=JSON.parse(localStorage.getItem(SCAN_UNDO_KEY)||"null");if(!snapshot||!Array.isArray(snapshot.entries)||!Array.isArray(snapshot.fleet))throw new Error();
+ const undoScan=()=>{if(recoveryBlocksAction())return;try{const snapshot=JSON.parse(localStorage.getItem(SCAN_UNDO_KEY)||"null");if(!snapshot||!Array.isArray(snapshot.entries)||!Array.isArray(snapshot.fleet))throw new Error();
   /* The undo is itself a removal in one direction and a restore in the other:
      rows the scan created go, rows it replaced come back. Both have to reach
      the other devices or the import undoes itself only here. */
@@ -768,6 +847,7 @@ export default function DownSheet(){
     reconciled from the entries that remain, so a bus carrying a second open row
     keeps its badge and a bus down to none loses it. */
  const deleteEntry=(entry:DownEntry)=>{
+  if(readPairJournal(localStorage).journal||readPairJournal(localStorage).error||undoSnapshot()?.pending){alert("Finish pending recovery before replacing the undo copy. Nothing was deleted.");return;}
   const reason=reasonLabel(entry);
   if(!confirm("Delete bus "+(entry.busNumber||"this bus")+" from the Down Sheet?"+(reason?"\n\n"+reason:"")+"\n\nThe bus keeps its defects, status and location. The other devices are told, and PUT BACK undoes this."))return;
   const now=new Date().toISOString(),remaining=entries.filter(item=>item.id!==entry.id);
@@ -812,6 +892,7 @@ export default function DownSheet(){
     defects are completed, its status is recomputed from that, and the findings
     it taught are learned. One press must not mean a different kind of save. */
  const markEntryFixed=(entry:DownEntry)=>{
+  if(readPairJournal(localStorage).journal||readPairJournal(localStorage).error||undoSnapshot()?.pending){alert("Finish pending recovery or RESTORE BEFORE ATTEMPT before another MARK FIXED. The original copy was kept.");return;}
   /* It used to close out on one press, on the reasoning that a foreman working
      down a sheet presses it many times in a row and a dialog each time is the
      thing that makes people stop using a button. That held while it sat in the
@@ -837,15 +918,8 @@ export default function DownSheet(){
      So the fields the completion actually changes are kept and put back as
      they were. Location and whoever has the bus are deliberately not, because
      they may have moved on and are not this undo's business. */
-  const bus=fleet.find(item=>item.id===entry.busId);
-  if(!writeSetting(localStorage,ENTRY_UNDO_KEY,JSON.stringify({kind:"fixed",fixedAt:now,entry,bus:bus&&{id:bus.id,s:bus.s,defects:bus.defects||[],pendingRepair:bus.pendingRepair||""}})).ok){
-   setSaveProblem("storage-full");
-   alert("This device has no room to save an undo copy, so nothing was changed. Export a backup and clear space, then try again.");
-   return;
-  }
   saveEntry(normalizeEntry({...entry,workflow:"Completed",completedAt:now,completedBy:who,updatedAt:now,updatedBy:who||entry.updatedBy,
-   history:[...(entry.history||[]),{at:now,initials:who||"—",action:"Marked fixed from the Down Sheet"}]}));
-  setRowAction({kind:"fixed",id:entry.id,busNumber:entry.busNumber});
+   history:[...(entry.history||[]),{at:now,initials:who||"-",action:"Marked fixed from the Down Sheet"}]}),true);
  };
  /* Putting a closed-out row back is not the same operation as putting a deleted
     one back. Nothing was removed, so there is no tombstone to forget and no
@@ -853,17 +927,31 @@ export default function DownSheet(){
     active. Both halves are restored rather than re-derived: the entry as it
     was, and the bus fields the completion changed. */
  const undoFixEntry=(saved:DownEntry,bus?:{id:string;s:FleetStatus;defects:StructuredDefect[];pendingRepair:string})=>{
-  const nextEntries=entries.some(item=>item.id===saved.id)?entries.map(item=>item.id===saved.id?saved:item):[...entries,saved];
-  const written=writeDownSheetStorageResult(localStorage,nextEntries);
-  if(!written.ok){
-   setSaveProblem(written.reason||"failed");
-   alert("This device could not save the change, so the entry was left closed out. Export a backup and clear space, then try again.");
-   return;
-  }
-  const nextFleet=bus?fleet.map(item=>item.id===bus.id?{...item,s:bus.s,defects:bus.defects,pendingRepair:bus.pendingRepair}:item):fleet;
-  if(bus)setSaveProblem(writeFleetStorageResult(localStorage,nextFleet).reason||"");else setSaveProblem("");
-  localStorage.removeItem(ENTRY_UNDO_KEY);
-  setFleet(nextFleet);setEntries(nextEntries);setRowAction(null);
+  const pending=readPairJournal(localStorage);
+  if(pending.error){alert("The recovery copy is unreadable. It was kept; nothing was restored.");return}
+  if(pending.journal?.kind==="restore"){retryPendingPair();return}
+  if(pending.journal&&(pending.journal.kind!=="mark-fixed"||pending.journal.entryId!==saved.id)){alert("Finish the other pending save before restoring this row.");return}
+  let before:PairData;try{before=readSavedPair()}catch{alert("The current data cannot be read. The original copy was kept.");return}
+  const currentFleet=before.fleet as FleetBus[],currentEntries=before.sheet as DownEntry[],copy=undoSnapshot();
+  const fields=(item:FleetBus)=>({id:item.id,s:item.s,defects:item.defects||[],pendingRepair:item.pendingRepair||""});
+  const currentBus=bus&&currentFleet.find(item=>item.id===bus.id);
+  const currentEntry=currentEntries.find(item=>item.id===saved.id);
+  if(!copy?.afterBus||!copy.afterEntry){alert("This older undo copy has no checked after-state. It was kept for manual recovery; automatic restore would risk overwriting later edits.");return}
+  if(!currentBus||!currentEntry||(!sameRecoveryValue(currentEntry,copy.entry)&&!sameRecoveryValue(currentEntry,copy.afterEntry))){alert("The sheet changed after this attempt. The original copy was kept; nothing was overwritten.");return}
+  if(copy?.afterBus&&currentBus&&!sameRecoveryValue(fields(currentBus),copy.afterBus)&&!sameRecoveryValue(fields(currentBus),copy.bus)){alert("The tracker changed after this attempt. The original copy was kept; nothing was overwritten.");return}
+  const nextEntries=currentEntries.some(item=>item.id===saved.id)?currentEntries.map(item=>item.id===saved.id?saved:item):[...currentEntries,saved];
+  const restored=bus?currentFleet.map(item=>item.id===bus.id?{...item,s:bus.s,defects:bus.defects,pendingRepair:bus.pendingRepair}:item):currentFleet;
+  const nextFleet=reconcileRoadCallsFromSheet(reconcileDownSheetMembership(restored,nextEntries.filter(isActive).map(entry=>entry.busId)),nextEntries).fleet;
+  // This marker is durable BEFORE either sheet-first restoration write.
+  if(!copy||!writeSetting(localStorage,ENTRY_UNDO_KEY,JSON.stringify({...copy,pending:true,restoring:true})).ok){alert("The restore intent could not be saved. No restoration was started; the original copy was kept.");return}
+  setRowAction({kind:"pending-fix",id:saved.id,busNumber:saved.busNumber});
+  let journal:PairJournal;
+  try{journal=makePairJournal("restore",saved.id,saved.busNumber,before,{fleet:nextFleet,sheet:nextEntries})}catch{alert("The saved records have ambiguous identities. No restoration was started; the original copy was kept.");return}
+  const prepared=beginPairJournal(localStorage,journal,pending.journal?.id);
+  if(!prepared.ok){alert("The restore recovery copy could not be saved. Retry RESTORE BEFORE ATTEMPT; the original copy was kept.");return}
+  setPairPending(true);
+  const result=resumePairJournal(localStorage,pairIO,finalizePair);try{refreshPairState()}catch{setPairPending(true)}setSaveProblem(result.ok?"":"failed");
+  if(!result.ok)alert(result.failedStore==="fleet"?"The Down Sheet was restored, but the tracker was NOT RESTORED. The original copy and durable restore intent were kept. Retry RESTORE BEFORE ATTEMPT.":"Restoration is still pending ("+result.reason+"). The original copy was kept; retry RESTORE BEFORE ATTEMPT.");
  };
  const undoDeleteEntry=()=>{
   let saved:{kind?:string;entry?:Partial<DownEntry>;bus?:{id:string;s:FleetStatus;defects:StructuredDefect[];pendingRepair:string}}|null=null;
@@ -871,6 +959,7 @@ export default function DownSheet(){
   if(!saved?.entry?.id){localStorage.removeItem(ENTRY_UNDO_KEY);setRowAction(null);alert("There is nothing on this row to take back.");return}
   const entry=normalizeEntry(saved.entry as DownEntry);
   if(saved.kind==="fixed")return undoFixEntry(entry,saved.bus);
+  if(recoveryBlocksAction())return;
   if(entries.some(item=>item.id===entry.id)){localStorage.removeItem(ENTRY_UNDO_KEY);setRowAction(null);return}
   /* One active row per bus is the sheet's rule and the editor refuses a save
      that breaks it. Putting a row back must not walk around the rule. */
@@ -1053,7 +1142,8 @@ export default function DownSheet(){
 
   {/* Loud, and on the page rather than behind MORE. An accidental delete is
       exactly when nobody goes hunting through a menu for the way back. */}
-  {rowAction&&<p className={"down-deleted-note"+(rowAction.kind==="fixed"?" fixed":"")} role="status">Bus <b>{rowAction.busNumber||"—"}</b> {rowAction.kind==="fixed"?"was marked fixed and closed out.":"was deleted from the sheet. Its defects, status and location were kept."} <button type="button" onClick={undoDeleteEntry}>{rowAction.kind==="fixed"?"UNDO":"PUT BACK"}</button></p>}
+  {pairPending&&!editing&&<p className="down-deleted-note" role="status">INCOMPLETE SAVE OR RESTORE — the recovery copy was kept. <button type="button" onClick={retryPendingPair}>RETRY PENDING SAVE</button></p>}
+  {rowAction&&<p className={"down-deleted-note"+(rowAction.kind==="fixed"?" fixed":"")} role="status">Bus <b>{rowAction.busNumber||"—"}</b> {rowAction.kind==="pending-fix"?"has an incomplete MARK FIXED save. Check the sheet and tracker; RESTORE BEFORE ATTEMPT recovers the saved copy.":rowAction.kind==="fixed"?"was marked fixed and closed out.":"was deleted from the sheet. Its defects, status and location were kept."} <button type="button" onClick={undoDeleteEntry}>{rowAction.kind==="pending-fix"?"RESTORE BEFORE ATTEMPT":rowAction.kind==="fixed"?"UNDO":"PUT BACK"}</button></p>}
   {/* Under the counts and above the sheet: it answers "what is in the building
       that this sheet does not know about", which is read right after the
       totals and before the rows themselves. */}
@@ -1212,7 +1302,13 @@ export default function DownSheet(){
   {/* "we just add to it" — the existing entry is opened with a fresh blank
       repair card on the end, so the new work is typed straight into the row
       that is already there rather than refused. */}
-  {editing&&<DownSheetEditor onOpenExisting={entryId=>{const found=entries.find(item=>item.id===entryId);if(found)setEditing({...found,repairItems:[...normalizeRepairItems(found.repairItems,{category:found.category,repair:found.repair,details:found.customReason,timeEstimate:found.timeEstimate}),blankRepairItem()]})}} entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
+  {/* KEYED TO THE ENTRY IT SHOWS. The editor copies its entry into a draft
+      once, when it mounts, so swapping the entry under a mounted editor changed
+      nothing on screen: ADD TO THAT ENTRY flipped the heading to "Bus 17507"
+      and SAVE UPDATE, kept the blank draft, and the save was refused as a
+      second entry for the bus. Measured on main with one entry seeded. A new
+      key is a new editor, opened on the entry it was handed. */}
+  {editing&&<DownSheetEditor key={editing.id} carriedInitials={carriedInitials} focusRepairId={focusRepairId} onOpenExisting={openExistingEntry} entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry} recoveryPending={pairPending} onRetryRecovery={retryPendingPair}/>}
   
   {scannerOpen&&<DownSheetScanner fleet={fleet} currentEntries={active} defaultShift={defaultShift} handed={handed} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}
   {paperOpen&&<ScanPaper here={PAPER_HERE} onClose={()=>setPaperOpen(false)} onHere={openPaperHere}/>}

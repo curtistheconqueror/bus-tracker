@@ -190,6 +190,13 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
  const pickBus=useCallback((busId:string)=>{onBusPicked(busId);setValue(current=>({...current,busId}))},[onBusPicked]);
  const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined||draft.defect.finding));
  useEffect(()=>lockPageScroll("defect-editor-open"),[]);
+ /* THE FORM TAKES FOCUS, NOT A FIELD. Nothing in it is focused when it opens,
+    so a phone raises no keyboard - and on the shop computer the cursor stayed
+    on the LOG DEFECT button behind it, where the first Tab went to the board's search
+    box under the editor (SDET review, BT53-F2). Focusing the form itself
+    raises no keyboard anywhere, and the next Tab is the first field. */
+ const editorRef=useRef<HTMLFormElement|null>(null);
+ useEffect(()=>{editorRef.current?.focus({preventScroll:true})},[]);
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
  const repairs=REPAIR_OPTIONS[value.defect.category]||[];
  /* A record can hold wording the picker no longer offers: a merged category kept
@@ -503,19 +510,22 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
    initial={value.defect.partNumber||""}
    close={()=>setPartPrompt(false)}
    confirm={number=>{setPartPrompt(false);/* ALWAYS `partsUsed:true`, WHICH IS WHAT ENTER LATER PROMISES. The prompt says in as many words that the repair "is marked MISSING PART # on the Fixed Repairs page until the number is added", and ENTER LATER arrives here with an empty number - which the assembler read as "no parts were used", so the repair saved completed with no flag at all and the promise on screen was false. The third argument is the checkbox's answer and ENTER LATER is somebody saying a part WAS used. THROUGH THE ASSEMBLER. This patched `{partsUsed:true,partNumber}` straight onto the record, so on a repair that already held a `parts` array the mirrored pair said one thing and the array another - and the number typed here was never learned, because the save reads the array. It becomes the FIRST row now, which is the one the memory takes. */const rows=normalizeDefectParts(value.defect.parts,value.defect);const first=rows[0];/* ENTER LATER MUST NOT ERASE A NUMBER ALREADY TYPED. It arrives here with an EMPTY number, and writing that over the first row wiped a part the mechanic had entered on the form a moment earlier - the prompt even opens prefilled with it. "I will enter it later" is a statement about a number that is NOT there; with one on the record it is a press of the wrong button, and losing the number is the expensive reading. Only a number given here replaces the row. */const next=number?[{id:first?first.id:"part-0",partNumber:number,...(first?.partName?{partName:first.partName}:{})},...rows.slice(1)]:rows;validateAndSave(true,{},{rows:next,used:true});}}/>}
-  <form className="log-editor" onSubmit={submit}>
+  <form className="log-editor" onSubmit={submit} ref={editorRef} tabIndex={-1}>
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    {coach&&<FormCoachBar step={coach} hide={()=>setCoachHidden(true)}/>}
    <div className="log-form">
+    {/* ONE BUS BOX, opened like the category: nothing takes the cursor when
+        the form opens, and there is no suggestion list for iOS to draw as the
+        grey card Curtis saw repeating the number. */}
     <BusSelector fleet={fleet} busId={value.busId} select={pickBus} coach="bus"/>
     {/* TWO FIELDS, NOT FOUR. Curtis asked for a search beside each picker and
         named the risk in the same breath — "just try to make it look clean".
         One control per picker does both jobs: tap it and the whole list opens
         the way the <select> did, type in it and the same list narrows. */}
-    <ComboField label="DEFECT CATEGORY" className="wide" coach="category"
+    <ComboField label="DEFECT CATEGORY" className="wide" coach="category" browseFirst
      value={value.defect.category}
      display={value.defect.category?repairCategoryLabel(value.defect.category):""}
-     placeholder="Type or tap to choose a category"
+     placeholder="Tap to choose a category"
      emptyText="No category matches that"
      search={query=>searchCategories(query).map(row=>({value:row.value,label:row.label}))}
      onPick={category=>chooseCategory(category)}/>
@@ -524,12 +534,16 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
         you anything, so a mechanic had to know a wiper motor lives under Bus
         Accessories before he could log one. Now he types "wiper motor", picks
         it, and the category fills itself in behind him. */}
-    <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide" coach="issue"
+    <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide" coach="issue" browseFirst
+     openWhen={value.defect.category}
      value={value.quickIssue}
      display={value.quickIssue?issueDisplay(value.quickIssue,value.defect.category):""}
-     placeholder={value.defect.category?"Type or tap — or leave it and save the category alone":"Type what is wrong, or tap to browse"}
+     /* SHORT ENOUGH TO FIT. The old wording needed 403px in a 276px box and was
+        cut off mid-word; the half that says the defect is optional moved to the
+        line under the box, where it has room. */
+     placeholder={value.defect.category?"Tap to choose, or type":"Tap to browse, or type"}
      emptyText="Nothing in the catalog matches that"
-     footnote={value.defect.category?undefined:"Searching every category. Picking one sets the category for you."}
+     footnote={value.defect.category?"Optional. You can save the category alone.":"Searching every category. Picking one sets the category for you."}
      search={query=>{
       const {inCategory,elsewhere}=searchCatalogForCategory(query,value.defect.category,query.trim()?40:BROWSE_ALL);
       /* HEADINGS WHEN BROWSING, THE GROUP ON EACH ROW WHEN SEARCHING, and that
@@ -640,6 +654,17 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
      extraFluids.length?"QUANTITY — "+pickedFluid.toUpperCase():"QUANTITY"
     }<input type="number" min="0.5" step="0.5" inputMode="decimal" value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}/></label><label>UNIT<select value={value.defect.unit||"quarts"} onChange={event=>updateDefect("unit",event.target.value)}><option value="quarts">Quarts</option><option value="gallons">Gallons</option><option value="liters">Liters</option></select></label></>}
     {countField&&<label className="defect-count-field" data-coach="count">{countField.label}<select value={value.defect.quantity||""} onChange={event=>setValue(current=>({...current,defect:{...current.defect,quantity:event.target.value?Number(event.target.value):undefined,unit:countField.unit}}))}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={count} key={count}>{count}</option>)}</select></label>}
+    {/* THE DOWN SHEET DECISION SITS UNDER THE DEFECT IT IS ABOUT. Curtis's E:
+        the symptom is the reason for a referral, so whether it goes to the
+        sheet is asked straight after it — after the count and the pickers that
+        belong to the symptom itself, before the optional notes. It lived below
+        ADVANCED DETAILS, about two and a half screens down on a phone.
+
+        The two rows stay together and in this order: apart, somebody reaches
+        for the wrong one, because they read almost identically and do very
+        different things. DEFERRED and NOT DUPLICATED stay at the bottom. */}
+    <label className="wide downsheet-check downsheet-recommend-check"><input type="checkbox" checked={recommended} onChange={event=>toggleDownSheetRecommendation(event.target.checked)}/><span><b>RECOMMEND FOR DOWN SHEET</b><small>{recommended&&recommendedBy?"Put forward by "+recommendedBy+".":"Put it forward for the sheet. Not added yet."}</small></span></label>
+    <label className="wide downsheet-check"><input type="checkbox" checked={value.onDownSheet} disabled={value.defect.state==="completed"} onChange={event=>toggleOnDownSheet(event.target.checked)}/><span><b>DOWN SHEET</b><small>Add it to the sheet now.</small></span></label>
     {/* BULLET starts a new line with a dot on it, which is the whole feature:
         the breaks somebody types are kept now, so a dot at the start of a line
         IS a bullet and nothing has to parse anything. It appends rather than
@@ -786,13 +811,6 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
       :"Decimal hours: .5 is half an hour. Diagnostic time starts at "+MINIMUM_DIAGNOSTIC_HOURS+" hour and only goes up. Leave blank if no time is being billed."}</small>
     </fieldset>
     </div></details>}
-    {/* Both rows stay below ADVANCED DETAILS, where the Down Sheet control has
-        always lived and where anyone looking for a Down Sheet thing looks. The
-        recommendation goes directly above the escalation rather than up with
-        the work states: apart, somebody reaches for the wrong one, because the
-        two read almost identically and do very different things. */}
-    <label className="wide downsheet-check downsheet-recommend-check"><input type="checkbox" checked={recommended} onChange={event=>toggleDownSheetRecommendation(event.target.checked)}/><span><b>RECOMMEND FOR DOWN SHEET</b><small>{recommended&&recommendedBy?"Put forward by "+recommendedBy+".":"Put it forward for the sheet. Not added yet."}</small></span></label>
-    <label className="wide downsheet-check"><input type="checkbox" checked={value.onDownSheet} disabled={value.defect.state==="completed"} onChange={event=>toggleOnDownSheet(event.target.checked)}/><span><b>DOWN SHEET</b><small>Add it to the sheet now.</small></span></label>
     {/* Disabled while the repair is on the sheet, because the Down Sheet has
         a "Deferred" workflow of its own that writes this same state. Left
         enabled, the two boxes both read as ticked and the form claims a
@@ -1472,7 +1490,7 @@ export default function DefectLog(){
    and matchesSearch can answer honestly: type "brake", log a brake defect on
    any bus at all, and the search still describes it and stays. */
  const clearSearchIfBusIsOutside=(busId:string)=>{
-  if(!search.trim()||busSearch.kind!=="numbers")return;
+  if(!busId||!search.trim()||busSearch.kind!=="numbers")return;
   if(!busSearchIds.has(busId))setSearch("");
  };
  const clearSearchIfItHides=(busId:string,defect:StructuredDefect)=>{

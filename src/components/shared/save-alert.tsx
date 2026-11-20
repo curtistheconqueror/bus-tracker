@@ -27,6 +27,7 @@ import {useState} from "react";
 import type {FleetWriteReason} from "@/src/lib/storage/storage";
 
 const ADVICE:Record<FleetWriteReason,{title:string;detail:string}>={
+ "pending-recovery":{title:"NOT SAVED - RECOVERY IS PENDING",detail:"Finish the pending save or restoration on the Down Sheet before making more changes. The recovery copy was kept."},
  "storage-full":{
   title:"NOT SAVED — THIS DEVICE IS FULL",
   detail:"What is on screen has not been written down. Export a backup now, then clear space on the device — old photos usually free the most — and make a change to try again.",

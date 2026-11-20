@@ -69,3 +69,11 @@ export function locationLabel(location:string|undefined,fallback="Location not s
  const at=String(location??"").trim();
  return knownLocationLabel(at)||at||fallback;
 }
+
+/* The bus picker uses this formatter beside the location table it names.
+   Keeping lookup/search free of a runtime import also preserves its standalone
+   Node test path without adding a TS5097 diagnostic to the project baseline. */
+export function busPickerDisplay(bus:{n:string;l:string}){
+ const where=bus.l?locationLabel(bus.l):"";
+ return "Bus "+bus.n+(where?" · "+where:"");
+}

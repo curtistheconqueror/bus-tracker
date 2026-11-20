@@ -952,7 +952,9 @@ test("phone layouts expose large primary controls and category-only defect entry
   assert.match(defectPage, /<details className="advanced-defect-details"/);
   assert.match(defectPage, /<b>ADVANCED DETAILS<\/b><small>Diagnosis, repair, parts and initials<\/small>/);
   assert.ok(defectPage.indexOf('className="save-log-middle-actions"')<defectPage.indexOf('className="advanced-defect-details"'));
-  assert.ok(defectPage.indexOf('className="advanced-defect-details"')<defectPage.indexOf('className="wide downsheet-check"'));
+  assert.ok(defectPage.indexOf('className="wide downsheet-check"')<defectPage.indexOf('className="advanced-defect-details"'),
+    "the Down Sheet ticks moved up under the symptom (Curtis's E)");
+  assert.ok(defectPage.indexOf('className="advanced-defect-details"')<defectPage.indexOf('className="wide downsheet-check deferred-check"'));
   assert.match(defectCss, /\.advanced-defect-details summary\{[^}]*min-height:46px/);
   assert.match(defectPage, /save-log-middle-actions[\s\S]*\{saveLabel\}[\s\S]*>CLOSE</);
   assert.doesNotMatch(defectPage, /SAVE & CLOSE/);
@@ -1273,7 +1275,7 @@ test("the Down Sheet can move a bus, which is what makes a status change stick",
  // it would re-run on every later save and drag the bus back from wherever
  // somebody had since parked it.
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
- assert.match(page,/next=\{\.\.\.next,location:undefined\}/);
+ assert.match(page,/const savedNext=\{\.\.\.next,location:undefined\}/);
  const editor=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
  assert.match(editor,/MOVE BUS TO/);
  assert.doesNotMatch(editor,/Status only; location stays unchanged/);
@@ -2229,7 +2231,7 @@ test("the Down Sheet writes a removal down wherever one happens, and takes it ba
  /* DELETE, one row at a time — the third door onto the same ledger, and the
     one a foreman uses daily. A row merely dropped from this device stays live
     on the server and comes back on the next pull. */
- assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,1800}?rememberRemovedEntries\(localStorage,\[entry\.id\],now\)/,"a deleted row has to be written to the removal ledger or it will not travel");
+ assert.match(page.slice(page.indexOf("const deleteEntry="),page.indexOf("const markEntryFixed=")),/rememberRemovedEntries\(localStorage,\[entry\.id\],now\)/,"a deleted row has to be written to the removal ledger or it will not travel");
  /* Sliced rather than matched within a character window: this handler routes
     two kinds of undo now, and a window wide enough to clear the routing is wide
     enough to match the wrong function. */
@@ -2238,7 +2240,7 @@ test("the Down Sheet writes a removal down wherever one happens, and takes it ba
  assert.match(undoDelete,/\{\.\.\.entry,updatedAt:restoredAt\}/,"and be restamped, or it loses to its own tombstone on the next pull");
  /* The undo copy is written before the row goes, and the delete gives up if it
     cannot be: a removal with no way back is the door this app does not build. */
- assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,900}?if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,400}?return;/);
+ assert.match(page.slice(page.indexOf("const deleteEntry="),page.indexOf("const markEntryFixed=")),/if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,400}?return;/);
 
  /* MARK FIXED is one press and writes no tombstone: nothing was removed, the
     row only stopped being active. It goes through saveEntry so a quick close-out
@@ -2247,7 +2249,9 @@ test("the Down Sheet writes a removal down wherever one happens, and takes it ba
  assert.match(fix,/workflow:"Completed",completedAt:now/,"a closed-out row is stamped when it was closed");
  assert.match(fix,/saveEntry\(normalizeEntry\(/,"one press must not mean a different kind of save");
  assert.ok(!fix.includes("rememberRemovedEntries"),"marking fixed removes nothing, so it must not write a tombstone");
- assert.match(fix,/if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,600}?return;/,"and the way back is written before the change, because there is no confirm");
+ const savePart=page.slice(page.indexOf("const saveEntry="),page.indexOf("const clearEntireDownSheet="));
+ assert.match(savePart,/if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,600}?return false\b/,"the original undo copy is checked before the journal/data writes");
+ assert.ok(savePart.indexOf("writeSetting(localStorage,ENTRY_UNDO_KEY")<savePart.indexOf("resumePairJournal("));
 
  /* The undo restores the BUS, not just the entry, and this is the whole reason
     it is not simply "save the old entry again".
@@ -2260,9 +2264,9 @@ test("the Down Sheet writes a removal down wherever one happens, and takes it ba
     one fault is the thing this app must never do. */
  const unfix=page.slice(page.indexOf("const undoFixEntry="),page.indexOf("const undoDeleteEntry="));
  assert.match(unfix,/bus\?:\{id:string;s:FleetStatus;defects:StructuredDefect\[\];pendingRepair:string\}/,"the fields the completion changed have to be carried in the copy");
- assert.match(unfix,/fleet\.map\(item=>item\.id===bus\.id\?\{\.\.\.item,s:bus\.s,defects:bus\.defects,pendingRepair:bus\.pendingRepair\}:item\)/,"and put back as they were rather than re-derived from the entry");
+ assert.match(unfix,/currentFleet\.map\(item=>item\.id===bus\.id\?\{\.\.\.item,s:bus\.s,defects:bus\.defects,pendingRepair:bus\.pendingRepair\}:item\)/,"and put back as they were rather than re-derived from the entry");
  assert.ok(!unfix.includes("saveEntry("),"re-saving the entry is exactly what duplicated the defect");
- assert.match(fix,/const bus=fleet\.find\(item=>item\.id===entry\.busId\)/,"the snapshot is taken before the change, not after");
+ assert.match(savePart,/const bus=currentFleet\.find\(item=>item\.id===next\.busId\)/,"the snapshot uses freshly read pre-write data");
 
  /* And the tombstone goes only AFTER a write that succeeded. The other order
     reads the same until the device is full, and then it tells the shop cloud to
@@ -2433,21 +2437,21 @@ test("the Down Sheet uses the Defect Log's bus picker, and adds to a bus already
  assert.match(editorCode,/\{existingEntry&&<p className="repair-existing-entry">/,
   "the notice renders when the bus is already on the sheet");
  assert.match(editorCode,/is already on the sheet\./);
- assert.match(editorCode,/\{onOpenExisting&&<button type="button" onClick=\{\(\)=>onOpenExisting\(existingEntry\.id\)\}>ADD TO THAT ENTRY<\/button>\}/,
+ assert.match(editorCode,/\{onOpenExisting&&<button type="button" onClick=\{openExisting\}>ADD TO THAT ENTRY<\/button>\}/,
   "and the way through is wired to that entry");
 
  /* And "add to it" means exactly that: the existing entry opens with a fresh
     blank repair card on the end, so the new work is typed into the row that is
     already there rather than refused. */
- assert.match(page,/onOpenExisting=\{entryId=>/);
- assert.match(page,/\.\.\.normalizeRepairItems\(found\.repairItems[^)]*\),blankRepairItem\(\)\]/);
+ assert.match(page,/onOpenExisting=\{openExistingEntry\}/);
+ assert.match(page,/combineRepairDrafts\(prior,draftedItems\)/);
 
- /* autoFocus off here: this editor opens with the section and the workflow
-    above the picker, and stealing focus moves the page under a thumb. */
- assert.match(editor,/autoFocus=\{false\}/);
- /* Two of these on one page would otherwise share a datalist id. */
- assert.match(editor,/listId="down-sheet-bus-numbers"/);
- assert.match(picker,/listId="bus-number-options"/,"and the default is its own");
+ /* NOTHING STEALS FOCUS when this editor opens — it opens with the section
+    and the workflow above the picker, and a cursor there would move the page
+    under a thumb. The one-box picker (Curtis's B) never focuses on its own,
+    and it has no <datalist> for two of them on one page to share an id. */
+ assert.doesNotMatch(strip(picker),/autoFocus|datalist|listId/);
+ assert.match(editor,/<BusSelector fleet=\{fleet\} busId=\{draft\.busId\}\n/);
 });
 
 test("ADD DOWN BUS opens with no bus chosen, so a save cannot land on a random one",async()=>{
@@ -3893,4 +3897,26 @@ test("moving a bus never writes its Down Sheet membership",async()=>{
     honest rather than removed - but "the badge disappeared after I moved it"
     was reachable, and Curtis's rule is about what a foreman sees, not only
     about what is stored. It is gone; the test above holds that. */
+});
+
+test("ADD TO THAT ENTRY opens the entry it names, not a heading over the blank draft",async()=>{
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ const editor=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
+ /* The editor seeds its draft ONCE, from the entry it mounted with. */
+ assert.match(editor,/const \[draft,setDraft\]=useState\(\(\)=>\(\{\.\.\.entry,/,
+  "if the draft ever follows the prop instead, this test's reason is gone and it should be rewritten");
+ /* So the page must hand a different entry to a NEW editor. Without the key,
+    ADD TO THAT ENTRY changed the heading to the bus and SAVE UPDATE while the
+    form kept the blank draft, and the save was refused as a second entry for
+    the bus — measured on main. */
+ assert.match(page,/\{editing&&<DownSheetEditor key=\{editing\.id\} carriedInitials=\{carriedInitials\} focusRepairId=\{focusRepairId\} onOpenExisting=\{/);
+ /* The new editor is seeded from the entry, so the initials somebody already
+    typed would be replaced — on a device with no default, by whoever last
+    updated that entry. A cold read found it. They come across instead, and
+    are forgotten when the editor shuts. */
+ assert.match(editor,/useState\(carriedInitials\?\?\(defaultInitials\|\|entry\.updatedBy\)\)/);
+ assert.match(page,/setCarriedInitials\(typedInitials\);/);
+ assert.match(page,/if\(!editing\)\{setCarriedInitials\(undefined\);setFocusRepairId\(""\)\}/);
+ /* And what it is handed is the existing entry plus one blank card to add to. */
+ assert.match(page,/setEditing\(\{\.\.\.found,repairItems:combined\.repairItems\}\)/);
 });

@@ -1,3 +1,4 @@
+import {pairWriteAllowed} from "./recovery-gate.mjs";
 export const FLEET_STORAGE_KEY="pace-board-v1";
 export const FLEET_STORAGE_VERSION=4;
 export const DOWN_SHEET_STORAGE_KEY="pace-down-sheet-v1";
@@ -21,7 +22,7 @@ type JsonRecord=Record<string,unknown>;
 type StorageReader=Pick<Storage,"getItem">;
 type StorageWriter=Pick<Storage,"getItem"|"setItem">;
 
-export type FleetWriteOptions={allowBulkDefectLoss?:boolean;skipRecoverySnapshot?:boolean};
+export type FleetWriteOptions={allowBulkDefectLoss?:boolean;skipRecoverySnapshot?:boolean;recoveryOperationId?:string};
 export type FleetRecoverySnapshot={version:1;savedAt:string;busCount:number;defectCount:number;raw:string};
 type FleetBackupReminder={version:1;lastExportedAt:string;lastExportedDefectLogCount:number};
 
@@ -131,6 +132,7 @@ function warnBulkLoss(currentDefects:number,nextDefects:number,currentBuses:numb
    working as designed and needs the recovery copy. "Could not save" alone tells
    somebody standing at a bus nothing they can act on. */
 export type FleetWriteReason=
+ |"pending-recovery"
  |"unreadable"    /* what is stored is corrupt, or written by a newer build */
  |"bulk-loss"     /* the safety stop refused a change that drops records */
  |"no-snapshot"   /* the recovery copy could not be written, so neither is this */
@@ -171,6 +173,7 @@ function announceWrite(key:string){
 }
 
 export function writeFleetStorageResult<T>(storage:StorageWriter,buses:T[],options:FleetWriteOptions={}):StorageWriteResult{
+ if(!pairWriteAllowed(storage,options.recoveryOperationId))return {ok:false,reason:"pending-recovery"};
  const raw=storage.getItem(FLEET_STORAGE_KEY),current=readFleetPayload<T>(raw);
  if(raw!==null&&(!current.valid||!current.supported))return {ok:false,reason:"unreadable"};
  const currentDefects=fleetDefectCount(current.buses),nextDefects=fleetDefectCount(buses),bulkLoss=currentDefects-nextDefects>=5||current.buses.length-buses.length>=5;
@@ -200,11 +203,13 @@ export function writeFleetStorage<T>(storage:StorageWriter,buses:T[],options:Fle
    Nothing here may throw. A lost UI preference is a shrug; a board that stops
    responding while somebody is standing at a bus is not. */
 export function writeSetting(storage:StorageWriter,key:string,value:string):StorageWriteResult{
+ if((key===FLEET_STORAGE_KEY||key===DOWN_SHEET_STORAGE_KEY)&&!pairWriteAllowed(storage))return {ok:false,reason:"pending-recovery"};
  try{storage.setItem(key,value);return OK}
  catch(error){return {ok:false,reason:isQuotaError(error)?"storage-full":"failed"}}
 }
 
-export function writeDownSheetStorageResult<T>(storage:StorageWriter,entries:T[]):StorageWriteResult{
+export function writeDownSheetStorageResult<T>(storage:StorageWriter,entries:T[],options:{recoveryOperationId?:string}={}):StorageWriteResult{
+ if(!pairWriteAllowed(storage,options.recoveryOperationId))return {ok:false,reason:"pending-recovery"};
  const raw=storage.getItem(DOWN_SHEET_STORAGE_KEY),current=readDownSheetPayload<T>(raw);
  if(raw!==null&&(!current.valid||!current.supported))return {ok:false,reason:"unreadable"};
  /* This setItem was not wrapped at all, which is worse than a silent failure: a

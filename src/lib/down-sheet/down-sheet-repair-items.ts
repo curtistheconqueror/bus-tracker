@@ -7,6 +7,7 @@ import {
 
 export type DownSheetRepairItem = {
   id: string;
+  defectId?: string;
   category: string;
   repair: string;
   details: string;
@@ -53,6 +54,32 @@ export function blankRepairItem(index = 0): DownSheetRepairItem {
   };
 }
 
+export function hasRepairDraft(item:DownSheetRepairItem){
+  return Boolean(item.category||item.repair||item.details||item.finding||item.actionTaken||item.estimateEnabled||item.quantity||item.repairHours||item.diagnosticHours||item.done);
+}
+
+/* An existing entry owns its metadata and original repairs. New draft cards
+   are appended without silently deduplicating potentially different work. */
+export function combineRepairDrafts(existing:DownSheetRepairItem[],drafted:DownSheetRepairItem[]){
+  const repairItems=existing.filter(hasRepairDraft).map(item=>({...item}));
+  const ids=new Set(repairItems.map(item=>item.id));
+  const identity=(item:DownSheetRepairItem)=>[item.category,item.repair||item.details].map(value=>value.trim().toLowerCase()).join("|");
+  const seen=new Set(repairItems.map(identity));
+  let duplicates=false;
+  let focusRepairId="";
+  for(const item of drafted.filter(hasRepairDraft)){
+    const key=identity(item);
+    if(seen.has(key))duplicates=true;
+    seen.add(key);
+    const next={...item,id:ids.has(item.id)?blankRepairItem(repairItems.length).id:item.id};
+    ids.add(next.id);repairItems.push(next);
+    if(!focusRepairId)focusRepairId=next.id;
+  }
+  const blank=blankRepairItem(repairItems.length);
+  repairItems.push(blank);
+  return {repairItems,duplicates,focusRepairId:focusRepairId||blank.id};
+}
+
 export function normalizeRepairItems(
   value: unknown,
   legacy: {category?: string; repair?: string; details?: string; timeEstimate?: unknown; entryCompleted?: boolean},
@@ -64,6 +91,7 @@ export function normalizeRepairItems(
       const repair = typeof source.repair === "string" ? source.repair : "";
       return {
         id: typeof source.id === "string" && source.id ? source.id : itemId(index),
+        ...(typeof source.defectId === "string" && source.defectId ? {defectId:source.defectId} : {}),
         category,
         repair,
         details: typeof source.details === "string" ? source.details : "",

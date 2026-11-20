@@ -105,7 +105,7 @@ const blank=(value:unknown)=>!String(value??"").trim();
    is nothing to do to the form that fixes it, and "use the existing defect"
    is the whole of the advice. */
 const GUIDANCE:Record<string,string>={
- bus:"Tap a generation to shorten the list, or type the fleet number.",
+ bus:"Tap BUS and pick a generation, or tap TYPE and enter the fleet number.",
  category:"Brakes, Engine, A/C — type a word or tap to pick. Or type the fault below and this fills itself in.",
  count:"This repair is recorded as a number.",
  initials:"WORK STATUS is set to Fixed, so this saves as a completed repair and this device asks who signed it off.",
