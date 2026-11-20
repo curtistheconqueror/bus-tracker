@@ -78,6 +78,11 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
     const cards=formRef.current?.querySelectorAll(".repair-item-card");
     const last=cards?.[cards.length-1];
     last?.querySelector<HTMLElement>(".repair-item-fields")?.focus({preventScroll:true});
+    /* And brought into view: with several repairs on the entry the new card
+       sits below the form's visible part, and focus nobody can see is not
+       much of a place to start (CodeRabbit on PR 55). Nearest, so a card
+       already on screen does not move. */
+    last?.scrollIntoView({block:"nearest"});
   },[reopened]);
   /* Named so the "leave it" option can say where that actually is. A foreman
      deciding whether to move a bus needs to know where it is sitting now. */

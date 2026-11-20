@@ -3915,6 +3915,10 @@ test("ADD TO THAT ENTRY opens the entry it names, not a heading over the blank d
     device, and the next Tab is CATEGORY, not the MARK FINISHED tick. */
  assert.match(editor,/if\(!reopened\)return;/);
  assert.match(editor,/last\?\.querySelector<HTMLElement>\("\.repair-item-fields"\)\?\.focus\(\{preventScroll:true\}\);/);
+ /* The NEW card - the last - not the entry's first (SDET BT55-F3), and on
+    screen when the entry already has several (CodeRabbit on PR 55). */
+ assert.match(editor,/const last=cards\?\.\[cards\.length-1\];/);
+ assert.match(editor,/last\?\.scrollIntoView\(\{block:"nearest"\}\);/);
  assert.match(editor,/<div className="repair-item-fields" tabIndex=\{-1\}>/);
  assert.doesNotMatch(editor,/pointer: fine/);
  /* The new editor is seeded from the entry, so the initials somebody already
