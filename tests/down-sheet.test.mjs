@@ -3911,8 +3911,12 @@ test("ADD TO THAT ENTRY opens the entry it names, not a heading over the blank d
     fine pointer only, so a phone raises no keyboard. Forgotten with the editor. */
  assert.match(page,/if\(found\)setReopened\(true\);/);
  assert.match(page,/useEffect\(\(\)=>\{if\(!editing\)\{setCarriedInitials\(""\);setReopened\(false\)\}\},\[editing\]\);/);
- assert.match(editor,/if\(!reopened\|\|typeof matchMedia!=="function"\|\|!matchMedia\("\(pointer: fine\)"\)\.matches\)return;/);
- assert.match(editor,/last\?\.querySelector<HTMLElement>\("input,select,textarea"\)\?\.focus\(\{preventScroll:true\}\);/);
+ /* The box around the blank card's fields, not a field: no keyboard on any
+    device, and the next Tab is CATEGORY, not the MARK FINISHED tick. */
+ assert.match(editor,/if\(!reopened\)return;/);
+ assert.match(editor,/last\?\.querySelector<HTMLElement>\("\.repair-item-fields"\)\?\.focus\(\{preventScroll:true\}\);/);
+ assert.match(editor,/<div className="repair-item-fields" tabIndex=\{-1\}>/);
+ assert.doesNotMatch(editor,/pointer: fine/);
  /* The new editor is seeded from the entry, so the initials somebody already
     typed would be replaced — on a device with no default, by whoever last
     updated that entry. A cold read found it. They come across instead, and

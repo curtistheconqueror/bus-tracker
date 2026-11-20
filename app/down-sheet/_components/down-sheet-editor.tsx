@@ -66,15 +66,18 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
      on the existing entry, and the button that had focus goes with the old
      one, so focus fell to the page and the next Tab landed on the header's X:
      Tab then Enter closed the form and the new blank card with it (SDET
-     review, BT55-F1). Reopened that way, focus goes to the blank card the new
-     work is typed into. Only with a mouse-and-keyboard pointer: on a phone a
-     focused field raises the keyboard, which is why nothing here autofocuses. */
+     review, BT55-F1). Reopened that way, focus goes to the FIELDS of the blank
+     card the new work is typed into - the box around them, not a field in it.
+     A box raises no keyboard on any device, so this needs no guess about
+     which screens have one (a cold read caught a pointer test here that an
+     iPad with a trackpad would fail), and the next Tab is the card's CATEGORY
+     rather than its MARK FINISHED tick, which a field search found first. */
   const formRef=useRef<HTMLFormElement|null>(null);
   useEffect(()=>{
-    if(!reopened||typeof matchMedia!=="function"||!matchMedia("(pointer: fine)").matches)return;
+    if(!reopened)return;
     const cards=formRef.current?.querySelectorAll(".repair-item-card");
     const last=cards?.[cards.length-1];
-    last?.querySelector<HTMLElement>("input,select,textarea")?.focus({preventScroll:true});
+    last?.querySelector<HTMLElement>(".repair-item-fields")?.focus({preventScroll:true});
   },[reopened]);
   /* Named so the "leave it" option can say where that actually is. A foreman
      deciding whether to move a bus needs to know where it is sitting now. */
@@ -190,7 +193,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
             return <section className="repair-item-card" key={item.id}>
               <header><b>DEFECT {index+1}</b><span>{item.estimateEnabled?formatRepairTime(itemTotal):"No estimate"}</span>{draft.repairItems.length>1&&<button type="button" onClick={()=>setDraft(current=>({...current,repairItems:current.repairItems.filter(candidate=>candidate.id!==item.id)}))}>REMOVE</button>}</header>
               <label className="repair-item-done"><input type="checkbox" checked={item.done===true} onChange={event=>setRepairDone(item.id,event.target.checked)}/><span>{item.done?"FINISHED":"MARK THIS REPAIR FINISHED"}</span></label>
-              <div className="repair-item-fields">
+              <div className="repair-item-fields" tabIndex={-1}>
                 {/* TYPE OR TAP, and the repair box is NOT locked behind the
                     category. These were two plain <select>s, and the second
                     carried disabled={!item.category} — so you had to know a
