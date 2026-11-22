@@ -2435,14 +2435,17 @@ test("the Down Sheet uses the Defect Log's bus picker, and adds to a bus already
  assert.match(editorCode,/\{existingEntry&&<p className="repair-existing-entry">/,
   "the notice renders when the bus is already on the sheet");
  assert.match(editorCode,/is already on the sheet\./);
- assert.match(editorCode,/\{onOpenExisting&&<button type="button" onClick=\{\(\)=>onOpenExisting\(existingEntry\.id,initials\.trim\(\)\)\}>ADD TO THAT ENTRY<\/button>\}/,
+ assert.match(editorCode,/\{onOpenExisting&&<button type="button" onClick=\{\(\)=>onOpenExisting\(existingEntry\.id,initials\.trim\(\),isNew\?draft\.repairItems\.filter\(item=>item\.category\|\|item\.repair\|\|item\.details\|\|item\.estimateEnabled\):\[\]\)\}>ADD TO THAT ENTRY<\/button>\}/,
   "and the way through is wired to that entry");
 
- /* And "add to it" means exactly that: the existing entry opens with a fresh
-    blank repair card on the end, so the new work is typed into the row that is
-    already there rather than refused. */
- assert.match(page,/onOpenExisting=\{\(entryId,typedInitials\)=>/);
- assert.match(page,/\.\.\.normalizeRepairItems\(found\.repairItems[^)]*\),blankRepairItem\(\)\]/);
+ /* And "add to it" means exactly that: the existing entry opens with the
+    repairs typed into the new entry on the end - or a fresh blank card when
+    none were - so the new work goes into the row that is already there. */
+ assert.match(page,/onOpenExisting=\{\(entryId,typedInitials,typedRepairs\)=>/);
+ /* Repairs typed before ADD TO THAT ENTRY come across, after the entry's own;
+    the blank card only when nothing was typed. */
+ assert.match(page,/\.\.\.\(typedRepairs\.length\?typedRepairs:\[blankRepairItem\(\)\]\)\]/);
+ assert.match(page,/\.\.\.normalizeRepairItems\(found\.repairItems[^)]*\),\.\.\.\(typedRepairs\.length\?typedRepairs:\[blankRepairItem\(\)\]\)\]/);
 
  /* NOTHING STEALS FOCUS when this editor opens — it opens with the section
     and the workflow above the picker, and a cursor there would move the page
@@ -3931,5 +3934,5 @@ test("ADD TO THAT ENTRY opens the entry it names, not a heading over the blank d
  assert.match(page,/if\(found\)setCarriedInitials\(typedInitials\);/);
  assert.match(page,/if\(!editing\)\{setCarriedInitials\(""\);/);
  /* And what it is handed is the existing entry plus one blank card to add to. */
- assert.match(page,/if\(found\)setEditing\(\{\.\.\.found,repairItems:\[\.\.\.normalizeRepairItems\(found\.repairItems[^)]*\),blankRepairItem\(\)\]\}\)/);
+ assert.match(page,/if\(found\)setEditing\(\{\.\.\.found,repairItems:\[\.\.\.normalizeRepairItems\(found\.repairItems[^)]*\),\.\.\.\(typedRepairs\.length\?typedRepairs:\[blankRepairItem\(\)\]\)\]\}\)/);
 });
