@@ -1218,15 +1218,24 @@ export default function DownSheet(){
       computes and never writes, so there is no save path to go around. */}
   {reportOpen&&<StatusReportModal fleet={fleet as never} entries={entries as never} close={()=>setReportOpen(false)}/>}
   {/* "we just add to it" — the existing entry is opened with a fresh blank
-      repair card on the end, so the new work is typed straight into the row
-      that is already there rather than refused. */}
+      repair card on the end - or the repairs already typed, see below - so the
+      new work goes straight into the row that is already there rather than
+      being refused. */}
+  {/* THE REPAIRS ALREADY TYPED COME ACROSS. A repair typed into the new entry
+      before ADD TO THAT ENTRY was pressed was dropped, and the existing entry
+      opened with a blank card instead. Now the typed repairs are added to the
+      end of that entry's own, and the blank card is offered only when nothing
+      was typed. Empty cards are left behind, by the same test a save uses.
+      Only from a NEW entry: an existing entry whose bus is changed to one
+      already on the sheet carries nothing, or its repairs would be copied
+      onto the other bus and their hours counted twice (cold read). */}
   {/* KEYED TO THE ENTRY IT SHOWS. The editor copies its entry into a draft
       once, when it mounts, so swapping the entry under a mounted editor changed
       nothing on screen: ADD TO THAT ENTRY flipped the heading to "Bus 17507"
       and SAVE UPDATE, kept the blank draft, and the save was refused as a
       second entry for the bus. Measured on main with one entry seeded. A new
       key is a new editor, opened on the entry it was handed. */}
-  {editing&&<DownSheetEditor key={editing.id} carriedInitials={carriedInitials} reopened={reopened} onOpenExisting={(entryId,typedInitials)=>{const found=entries.find(item=>item.id===entryId);if(found)setCarriedInitials(typedInitials);if(found)setReopened(true);if(found)setEditing({...found,repairItems:[...normalizeRepairItems(found.repairItems,{category:found.category,repair:found.repair,details:found.customReason,timeEstimate:found.timeEstimate}),blankRepairItem()]})}} entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
+  {editing&&<DownSheetEditor key={editing.id} carriedInitials={carriedInitials} reopened={reopened} onOpenExisting={(entryId,typedInitials,typedRepairs)=>{const found=entries.find(item=>item.id===entryId);if(found)setCarriedInitials(typedInitials);if(found)setReopened(true);if(found)setEditing({...found,repairItems:[...normalizeRepairItems(found.repairItems,{category:found.category,repair:found.repair,details:found.customReason,timeEstimate:found.timeEstimate}),...(typedRepairs.length?typedRepairs:[blankRepairItem()])]})}} entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
   
   {scannerOpen&&<DownSheetScanner fleet={fleet} currentEntries={active} defaultShift={defaultShift} handed={handed} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}
   {paperOpen&&<ScanPaper here={PAPER_HERE} onClose={()=>setPaperOpen(false)} onHere={openPaperHere}/>}

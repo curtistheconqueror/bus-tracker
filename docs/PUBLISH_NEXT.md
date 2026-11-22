@@ -1,15 +1,73 @@
 # Publish next
 
-**STATUS: TWO RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`, and 199, from `a3b8158`. NOT PUBLISHED.** 199 sits on top of 198; publishing 199 publishes both. Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
+**STATUS: THREE RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; and 200, from `24752d3`. NOT PUBLISHED.** Each sits on top of the one before; **publish `24752d3` (release 200), which carries all three.** It keeps the AI Operator fix and the typed repairs Codex asked for. Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
 
 **What is live:** Sites Version 194 / application release 197, deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Rollback for 198: Sites 194 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
 
-2 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
+3 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
 
 | Release | What it is | State |
 | --- | --- | --- |
+| 200 | ADD TO THAT ENTRY keeps the repairs already typed into a new entry | On `main`, pending publication — **publish this; it includes 198 and 199** |
 | 199 | The AI Operator moves buses when told "Moves buses … to CNG West" or "Buses … to CNG West", instead of asking which status to apply | On `main`, pending publication |
 | 198 | Reopening the last page at real phone speeds; the log-a-defect pickers without the keyboard; one BUS box; the symptom list opening itself; the Down Sheet ticks moved up; leaving a bus out of a shared Defects Logged list; ADD TO THAT ENTRY fixed; a Shop Cloud pull that did not finish is asked for again | On `main`, pending publication |
+
+## 200 — ADD TO THAT ENTRY keeps the repairs already typed
+
+### Source
+
+Release source: `24752d3`. Previous: `be290af`, the commit that queued 199. Run at `24752d3`:
+
+```
+$ git log --oneline be290af..24752d3
+24752d3 Down Sheet: repairs typed before ADD TO THAT ENTRY are kept
+```
+
+```
+$ git diff --name-only be290af..24752d3 -- app src tests
+app/down-sheet/_components/down-sheet-editor.tsx
+app/down-sheet/page.tsx
+tests/down-sheet.test.mjs
+```
+
+```
+$ git diff --shortstat be290af..24752d3
+ 3 files changed, 26 insertions(+), 14 deletions(-)
+```
+
+Proof of no infrastructure change. This returned nothing:
+
+```
+$ git diff --name-only be290af..24752d3 -- supabase package.json package-lock.json .github public worker
+```
+
+### Migrations
+
+None. No storage key is added, renamed or read differently.
+
+### What was wrong
+
+Found by Codex while verifying 199. On the Down Sheet's ADD DOWN BUS, a repair typed into the new entry before pressing **ADD TO THAT ENTRY** was dropped. The existing entry opened with a blank card instead.
+
+### What changed
+
+The repairs typed into the new entry come across, added after the existing entry's own. The blank card appears only when nothing was typed. This applies only to a **new** entry: an existing entry whose bus is changed to one already on the sheet carries nothing, as before. A cold read found that otherwise its repairs would be copied onto the other bus.
+
+### Verified
+
+- `npm test` on Windows — **478 pass, 0 fail**. `npm run lint` — no error. Type-check 240, the same as 199.
+- Dev server, one entry seeded (17507, Brakes / Brake chamber leak). ADD DOWN BUS, then Engine / Overheating on the card, then bus 17507, then ADD TO THAT ENTRY. The form showed both repairs. SAVE UPDATE stored one entry for 17507 holding both, with no alert. With nothing typed, it showed the entry's repairs and one blank card, as before.
+- **Not verified:** on a phone.
+
+### What to check once it is live
+
+1. On the Down Sheet, tap ADD DOWN BUS. Pick a category and repair on the card, then pick a bus that is already on the sheet.
+2. Tap **ADD TO THAT ENTRY**. The bus's existing repairs and the one you typed should all show. Save. The entry should hold all of them.
+3. The AI Operator check from 199 below.
+
+### Rollback
+
+Release 199 at `be290af`, if 199 is live; otherwise Sites 194 / release 197 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
 
 ## 199 — the AI Operator moves buses however the move is said
 

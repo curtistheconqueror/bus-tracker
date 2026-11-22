@@ -55,7 +55,7 @@ const ESTIMATE_FIELDS:{key:Exclude<keyof RepairTimeEstimate,"notes">;label:strin
 
 function hoursValue(minutes:number){return Number((minutes/60).toFixed(2))}
 
-export default function DownSheetEditor({entry,fleet,entries,defaultInitials,carriedInitials="",reopened=false,onClose,onSave,onOpenExisting}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void;carriedInitials?:string;reopened?:boolean;onOpenExisting?:(entryId:string,typedInitials:string)=>void}){
+export default function DownSheetEditor({entry,fleet,entries,defaultInitials,carriedInitials="",reopened=false,onClose,onSave,onOpenExisting}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void;carriedInitials?:string;reopened?:boolean;onOpenExisting?:(entryId:string,typedInitials:string,typedRepairs:DownSheetRepairItem[])=>void}){
   const [draft,setDraft]=useState(()=>({...entry,repairItems:normalizeRepairItems(entry.repairItems,{category:entry.category,repair:entry.repair,details:entry.customReason,timeEstimate:entry.timeEstimate})}));
   /* Initials typed before ADD TO THAT ENTRY come across with it. That button
      opens a fresh editor on the existing entry, and seeding from that entry
@@ -66,8 +66,8 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
      on the existing entry, and the button that had focus goes with the old
      one, so focus fell to the page and the next Tab landed on the header's X:
      Tab then Enter closed the form and the new blank card with it (SDET
-     review, BT55-F1). Reopened that way, focus goes to the FIELDS of the blank
-     card the new work is typed into - the box around them, not a field in it.
+     review, BT55-F1). Reopened that way, focus goes to the FIELDS of the last
+     card - the blank one, or the last repair carried across from a new entry - the box around them, not a field in it.
      A box raises no keyboard on any device, so this needs no guess about
      which screens have one (a cold read caught a pointer test here that an
      iPad with a trackpad would fail), and the next Tab is the card's CATEGORY
@@ -185,7 +185,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
            it opens: the bus box opens its list on a tap, without the keyboard. */}
           <BusSelector fleet={fleet} busId={draft.busId}
            select={busId=>{const bus=fleet.find(item=>item.id===busId);setDraft(current=>({...current,busId,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}/>
-          {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={()=>onOpenExisting(existingEntry.id,initials.trim())}>ADD TO THAT ENTRY</button>}</p>}
+          {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={()=>onOpenExisting(existingEntry.id,initials.trim(),isNew?draft.repairItems.filter(item=>item.category||item.repair||item.details||item.estimateEnabled):[])}>ADD TO THAT ENTRY</button>}</p>}
         <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
 
         <fieldset className="repair-items wide">
