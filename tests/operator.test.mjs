@@ -452,3 +452,67 @@ test("the hand-typed spoken shorthand reaches one repair each, or it is not ther
   assert.equal(full.plan?.defect?.issue,row.issue,"the full wording must still resolve");
  }
 });
+
+test("the operator moves buses however the command is phrased, and CNG West marks them Out of Service",async()=>{
+ const {planOperatorCommand}=await import("../src/lib/operator/operator-engine.ts");
+ const {applyOperatorBatch}=await import("../src/lib/operator/operator-batch.ts");
+ const nums=["17563","17534","18507","17514","18508","17558","17544","15514","17560","17540","18505","17509"];
+ const fleet=nums.map((n,i)=>({id:"b"+n,n,s:"service",l:"road-"+(i+1),down:false,pendingRepair:"",defects:[]}));
+ const areas=[{name:"CNG WEST LOT",slots:Array.from({length:20},(_,i)=>"west-"+(i+1))},{name:"IN SERVICE / ON ROAD",slots:fleet.map(bus=>bus.l)}];
+ /* Curtis's own two messages, word for word. "Moves" was not a move word -
+    \bmove\b fails on the s - so both fell to the status path and the operator
+    asked "Tell me which status to apply to those buses." */
+ for(const text of [
+  "Moves buses 17563, 34, 18507,17514, 18508, 17558, 44, 15514, 17560, 17540, and 18505 to CNG West",
+  "Moves buses 17563, 34, 18507,17514, 18508, 17558, 44, 15514, 17560, 17540, and 18505 to CNG West. Status down out if service",
+  /* And the other ways he says it: buses first, the verb after; no verb at all. */
+  "Buses 17563, 34, 18507 move to CNG West",
+  "Buses 17563 34 18507 to CNG West",
+  "Move buses 17563, 34, 18507 to CNG West",
+  "Send buses 17563 and 18507 to CNG West",
+  "Put 17563, 18507 in CNG West",
+ ]){
+  const result=planOperatorCommand(text,fleet,areas);
+  assert.equal(result.kind,"plan",text);
+  assert.equal(result.plan.kind,"batch",text);
+  assert.ok(result.plan.items.every(item=>item.areaName==="CNG WEST LOT"),text);
+  assert.doesNotMatch(result.plan.summary,/which status/i);
+ }
+ /* NOTHING ASKS FOR A STATUS. A bus parked in CNG East or West is Out of
+    Service by the app's own rule (statusForLocation), as it is on the map. */
+ const plan=planOperatorCommand("Moves buses 17563, 34, 18507,17514, 18508, 17558, 44, 15514, 17560, 17540, and 18505 to CNG West",fleet,areas).plan;
+ assert.equal(plan.items.length,11);
+ const moved=applyOperatorBatch(fleet,plan.items,areas).fleet.filter(bus=>bus.l.startsWith("west-"));
+ assert.equal(moved.length,11);
+ assert.deepEqual([...new Set(moved.map(bus=>bus.s))],["out"],"every bus moved to CNG West is Out of Service");
+ /* A QUESTION IS NEVER READ AS A MOVE, and the Down Sheet is not a place. */
+ assert.equal(planOperatorCommand("Is bus 17563 in CNG West?",fleet,areas).kind,"message");
+ assert.equal(planOperatorCommand("Which buses moved today?",fleet,areas).kind,"message","past tense is how a question asks");
+ assert.equal(planOperatorCommand("Add bus 17563 to the down sheet",fleet,areas).plan?.kind,"downsheet");
+ /* "down" is not a status word: "which buses are down?" must not turn into
+    an offer to set one. */
+ assert.doesNotMatch(planOperatorCommand("Which buses are down?",fleet,areas).message||"",/should be set to/);
+
+ /* A COLD READ of the first version found these turned into moves: a
+    question using "moving", what/how questions with no question mark, a bus
+    number then "to" somewhere in a sentence, defect notes naming the WAITING
+    AREA, and a status with a "belongs to". None of them is a move. */
+ const wider=[...areas,{name:"WAITING AREA",slots:["waiting-1"]},{name:"MAIN GARAGE (BAYS 1-10)",slots:["garage-1"]}];
+ for(const text of [
+  "Is 17563 moving to CNG West?",
+  "Moving 17563 to CNG West?",
+  "What happened to 17563 in CNG West",
+  "How did 17563 get to CNG West",
+  "17563 was moved to CNG West yesterday",
+  "compare 17563 to CNG West",
+  "Bus 17563 defect horn, waiting on parts to come in",
+  "Bus 17563 horn defect, needs to go to the garage",
+  "Set 17563 out of service, it belongs to CNG West",
+  "17563 to 18507 in CNG West",
+ ]){
+  const result=planOperatorCommand(text,fleet,wider);
+  assert.ok(!(result.kind==="plan"&&(result.plan.kind==="move"||(result.plan.kind==="batch"&&result.plan.items.some(item=>item.areaName)))),"not a move: "+text);
+ }
+ /* And ", shifting the rest later" no longer splits a working move in two. */
+ assert.equal(planOperatorCommand("Move 17563 and 18507 to CNG West, shifting the rest later",fleet,areas).kind,"plan");
+});
