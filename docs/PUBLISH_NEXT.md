@@ -1,14 +1,76 @@
 # Publish next
 
-**STATUS: ONE RELEASE PENDING ON `main` — application release 198, from `2ee1bb5`. NOT PUBLISHED.** Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
+**STATUS: TWO RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`, and 199, from `a3b8158`. NOT PUBLISHED.** 199 sits on top of 198; publishing 199 publishes both. Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
 
 **What is live:** Sites Version 194 / application release 197, deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Rollback for 198: Sites 194 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
 
-1 release is pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
+2 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
 
 | Release | What it is | State |
 | --- | --- | --- |
+| 199 | The AI Operator moves buses when told "Moves buses … to CNG West" or "Buses … to CNG West", instead of asking which status to apply | On `main`, pending publication |
 | 198 | Reopening the last page at real phone speeds; the log-a-defect pickers without the keyboard; one BUS box; the symptom list opening itself; the Down Sheet ticks moved up; leaving a bus out of a shared Defects Logged list; ADD TO THAT ENTRY fixed; a Shop Cloud pull that did not finish is asked for again | On `main`, pending publication |
+
+## 199 — the AI Operator moves buses however the move is said
+
+### Source
+
+Release source: `a3b8158`. Previous: `eaf1c32`, the commit that queued 198. Run at `a3b8158`:
+
+```
+$ git log --oneline eaf1c32..a3b8158
+a3b8158 AI Operator: "Moves buses ... to CNG West" moves them, without asking for a status
+```
+
+```
+$ git diff --name-only eaf1c32..a3b8158 -- app src tests
+src/lib/operator/operator-engine.ts
+tests/operator.test.mjs
+```
+
+```
+$ git diff --shortstat eaf1c32..a3b8158
+ 2 files changed, 98 insertions(+), 4 deletions(-)
+```
+
+Proof of no infrastructure change. This returned nothing:
+
+```
+$ git diff --name-only eaf1c32..a3b8158 -- supabase package.json package-lock.json .github public worker
+```
+
+### Migrations
+
+None. No storage key is added, renamed or read differently.
+
+### What was wrong
+
+Curtis told the AI Operator *"Moves buses 17563, 34, 18507,17514, 18508, 17558, 44, 15514, 17560, 17540, and 18505 to CNG West"* and it answered *"Tell me which status to apply to those buses."* — twice. It only recognised the word "move", not "moves", so it did not see a move at all and fell through to asking for a status.
+
+### What changed
+
+- "Moves", "sends", "puts", "places" and the like count as move words, as "move" always did.
+- A command that is only bus numbers, "to" or "into", and a place — *"Buses 17563 34 18507 to CNG West"* — is a move.
+- "out if service" reads as Out of Service, which is how dictation hears it.
+- **No status question on a move.** A bus put in CNG West or East is marked Out of Service by the app's own rule, exactly as when it is dragged on the map. That rule was already there; the operator simply never reached it.
+- Questions and defect notes that mention a place stay what they are. A cold read of the first version found several turning into moves, and each case is now a test.
+
+### Verified
+
+- `npm test` on Windows — **478 pass, 0 fail**. `npm run lint` — no error. Type-check 240, the same as 198.
+- Curtis's two messages, word for word, plus four other phrasings, each produce a move to CNG West. Applied, all 11 buses land in CNG West as Out of Service.
+- Old against new on 85 commands, including the reviewer's: 68 answer exactly as before; the 17 that differ are all intended moves.
+- **Not verified:** through the operator screen on a phone. The parser and the move were run directly.
+
+### What to check once it is live
+
+1. Open the AI Operator and type or dictate *"Moves buses …"* with two or three bus numbers *"… to CNG West"*. It should show a change to apply, not ask about status.
+2. Apply it. The buses should be in CNG West, marked Out of Service.
+3. Try *"Buses … to CNG West"* with no verb. Same result.
+
+### Rollback
+
+Release 198 at `eaf1c32`, if 198 is live; otherwise Sites 194 / release 197 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
 
 ## 198 — five merged PRs
 

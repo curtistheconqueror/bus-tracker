@@ -79,13 +79,34 @@ function statusFromCommand(command:string):FleetStatus|undefined{
  const text=normalized(command);
  if(/\b(?:decommissioned|down indefinitely|dark gr[ae]y)\b/.test(text))return "decommissioned";
  if(/\b(?:unknown|mystery)\b/.test(text))return "unknown";
- if(/\b(?:out of service|oos|red)\b/.test(text))return "out";
+ /* "out if service" is how dictation hears "out of service". Not "down":
+    "which buses are down?" is a question, and reading it as a status turned
+    the answer into an offer to set one. A move to CNG East or West marks the
+    buses Out of Service by itself (statusForLocation), so nothing needs it. */
+ if(/\b(?:out (?:of|if) service|oos|red)\b/.test(text))return "out";
  if(/\b(?:work in progress|wip|yellow)\b/.test(text))return "shop";
  if(/\b(?:in service with defects|serviceable defects|green)\b/.test(text))return "defect";
  if(/\b(?:fully in service|no defects|blue)\b/.test(text))return "service";
  if(/\b(?:mark|set|update|change)\b/.test(text)&&/\bin service\b/.test(text))return "service";
  return undefined;
 }
+/* THE MOVE WORDS, in one place, and in the forms people actually say them.
+   The list matched "move" and not "moves", because \bmove\b fails on the s -
+   and dictation hears "Moves buses 17563, 34 ... to CNG West" as often as
+   "Move". Curtis's command fell through to the status path and the operator
+   asked "Tell me which status to apply to those buses." The base word and its
+   -s form only. Not "moved" or "sent": that is how a QUESTION asks ("which
+   buses moved today?"). Not "moving", "putting", "shifting": a cold read found
+   "Is 17563 moving to CNG West?" became a move, and ", shifting the rest
+   later" split a working command in two. "return" stays as it was, since
+   returns are also something the Defect Log counts. */
+const MOVE_WORDS="moves?|relocates?|places?|sends?|puts?|transfers?|shifts?|brings?|return|move back|put back";
+/* Numbers first, then the place, and at most four words of place: "buses
+   17563 34 18507 to cng west", "17563 and 18507 into the waiting area". */
+const BARE_MOVE=/^(?:the |bus |buses )*\d+(?:(?: |, | and )+\d+)*(?: and)? (?:to|into) (?:the )?[a-z]+(?: [a-z0-9]+){0,3}$/;
+const MOVE_VERB=new RegExp("\\b(?:"+MOVE_WORDS+")\\b");
+const MOVE_CLAUSE_START=new RegExp(";|,(?=\\s*(?:"+MOVE_WORDS+"|add)\\b)","i");
+const MOVE_CLAUSE=new RegExp("\\b(?:"+MOVE_WORDS+"|add)\\b","i");
 function statusLabel(status:FleetStatus){return STATUS_LABELS[status]||status}
 
 function capacityMessage(area:OperatorArea,needed:number,open:number){return area.name+" has "+open+" open spaces but "+needed+" are needed. Nothing was prepared."+(area.name==="WAITING AREA"?" Clear or reassign buses already in the Waiting Area before trying again.":" Use the WAITING AREA if the buses need to be recorded before you can sort them.")}
@@ -349,7 +370,16 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
  }
 
 
- const areaMentions=findOperatorAreaMentions(command,areas),baseMoveAction=/\b(move|relocate|place|send|put|transfer|shift|bring|return|move back|put back)\b/.test(text),moveAction=baseMoveAction||(/\badd\b/.test(text)&&areaMentions.length>0),statusAction=/\b(mark|set|update|change)\b/.test(text)&&/\b(status|blue|green|yellow|red|in service|out of service|work in progress|wip|decommissioned|mystery|unknown)\b/.test(text),desiredStatus=statusFromCommand(command),explicitQueries=busQueries(command);
+ const areaMentions=findOperatorAreaMentions(command,areas),baseMoveAction=MOVE_VERB.test(text),explicitQueries=busQueries(command),
+  /* NO VERB AT ALL: "Buses 17563 34 18507 to CNG West". Only when that is
+     ALL the command says - bus numbers, then "to" or "into", then the one
+     place, and nothing else. The first version took any bus number, any "to"
+     and any place anywhere in the sentence, and a cold read turned questions
+     ("what happened to 17563 in CNG East", "17563 was moved to CNG West
+     yesterday") and defect notes ("horn defect, waiting on parts to come in",
+     which names the WAITING AREA) into moves. */
+  impliedMove=!baseMoveAction&&explicitQueries.length>0&&areaMentions.length===1&&!isQuestion(command)&&BARE_MOVE.test(text),
+  moveAction=baseMoveAction||impliedMove||(/\badd\b/.test(text)&&areaMentions.length>0),statusAction=/\b(mark|set|update|change)\b/.test(text)&&/\b(status|blue|green|yellow|red|in service|out of service|work in progress|wip|decommissioned|mystery|unknown)\b/.test(text),desiredStatus=statusFromCommand(command);
  const splitFleet=/\b(everything else|all other buses|all others|the rest|remaining buses|everyone else)\b/.test(text);
  /* Before the move and status paths: "put the last sweep back" contains a move
     word and "remove the most recent 24" contains something that looks like a
@@ -397,8 +427,8 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
   return {kind:"plan",plan:{kind:"bulkMove",requiresConfirmation:true,busIds:selected.map(bus=>bus.id),busNumbers:selected.map(bus=>bus.n),areaName:destination.name,status:desiredStatus,selectionLabel:"all buses in "+sourceLabel,summary:"Move all "+selected.length+" buses from "+sourceLabel+" to the first available spaces in "+destination.name+(desiredStatus?" and set status to "+statusLabel(desiredStatus):"")}};
  }
  if(moveAction&&!explicitQueries.length&&/\b(all|every)\b/.test(text)&&areaMentions.length===1)return {kind:"message",message:"I found the destination "+areaMentions[0].area.name+", but I need the source area too. Try: Move all buses from CNG West to the Waiting Area."};
- const repeatedClauses=command.split(/;|,(?=\s*(?:move|relocate|place|send|put|transfer|shift|bring|return|add)\b)/i).map(clause=>clause.trim()).filter(Boolean);
- if(repeatedClauses.length>1&&repeatedClauses.every(clause=>/\b(move|relocate|place|send|put|transfer|shift|bring|return|add)\b/i.test(clause))){
+ const repeatedClauses=command.split(MOVE_CLAUSE_START).map(clause=>clause.trim()).filter(Boolean);
+ if(repeatedClauses.length>1&&repeatedClauses.every(clause=>MOVE_CLAUSE.test(clause))){
   const items:OperatorBatchItem[]=[];
   for(const clause of repeatedClauses){
    const queries=busQueries(clause),resolved=resolveMany(fleet,queries),area=areaFromCommand(clause,areas),clauseStatus=statusFromCommand(clause);
