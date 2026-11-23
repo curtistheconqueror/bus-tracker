@@ -122,16 +122,114 @@ const MOVE_VERB=new RegExp("\\b(?:"+MOVE_WORDS+")\\b");
    asks when it opens - after a filler like "so", "ok" or "tell me" - on who,
    what, which or why, or on did or does (didn't, doesn't). when / where / how
    open clauses as often as questions, and do / is / have / can open requests,
-   so none of them asks. A move told NOT to happen ("Don't move ...") is not a
+   so each asks only in the shapes below. A move told NOT to happen ("Don't move ...") is not a
    move either. The question mark decides nothing: dictation adds one to
    "Moves buses ... to CNG West?", which is a command. */
 const ASK_VERB=new RegExp("\\b(?:"+MOVE_WORDS+"|add)\\b");
-const SENTENCE_FILLER="(?:(?:so|ok|okay|well|hey|and|um|uh|please|quick question|tell me|i need to know|i want to know|do you know)\\s+)*";
-const ASKING_SENTENCE=new RegExp("^"+SENTENCE_FILLER+"(?:who|whom|whose|what|which|why|(?:did|does)(?:n t)?)\\b");
-const REFUSED_SENTENCE=new RegExp("^"+SENTENCE_FILLER+"(?:don t|dont|do not|never)\\b");
+/* HOW THE SENTENCE OPENS DECIDES IT, NOT WHICH BUS IT NAMES.
+
+   The publisher's check of 201 found "When do these buses move?" preparing a
+   move. Lists of phrasings kept missing: three cold reads in a row found a
+   bus named some other way ("Can buses 17563 and 17534 move", "When do the
+   buses on the road move", "Can 17563 now move") or a request refused ("Can
+   they move ...", "Is 17563 done move it to CNG West"). So the rule reads only
+   the OPENING of the sentence that holds the move word, and the words
+   between that opening and the move word:
+
+   - who / what / which / why, or do / does / did: a question.
+   - when / where / how, then a helping verb (do, can, will, should ...): a
+     question - "When do these buses move", "How do I move ...".
+   - can / could / will / would / should / shall: a question when NO PERSON is
+     asked - "Can this bus move", "Will 17563 move". Asking a person is a
+     request, as it always was: "Can you / we / they / someone move ...",
+     "Should I move ...".
+   - am / is / are / was / were, alone or after when / where / how: these do
+     not take a bare verb, so a move word after them is a dictated command
+     run on with no punctuation - "Is 17563 done move it to CNG West", "Where
+     is 17563 move it ...", "How long is it gonna take move ..." - unless it
+     is "supposed / going / meant / scheduled / due to move", or "is there
+     room / are there any ... to move".
+   - "Has someone put ...", "Have you put ... yet": "put" is its own past.
+
+   Any of these is a command after all when the move word follows "and" or
+   "then": "Do me a favor and move 17563 to CNG West". The question mark
+   decides nothing: dictation adds one to "Moves buses ... to CNG West?". */
+const SENTENCE_START=/^(?:(?:so|ok|okay|well|hey|and|um|uh|please|wait|question|alright|all right|right|listen|yo|hmm|at|by|around|quick question|tell me|any idea|i need to know|i want to know|do you know|not sure|i m wondering|im wondering|wondering|never mind(?: that)?|why not|why don t (?:you|we)|why dont (?:you|we)|do you mind|would (?:you|ya) mind|will do|can do|do (?:me|us) a favou?r(?: and)?|do(?= (?:move|put|send|place|bring|transfer|shift|relocate|return|add)\b))\s+)*/;
+/* What a can / will / should question is ABOUT. It asks about the BUS when a
+   bus is named between the helping verb and the move word - a number, "bus",
+   "these", "this one", "it" - and nobody is: "Can 17563 now move", "Can the
+   buses in bay 3 move". Anybody else asked is a request, however they are
+   named - "Can you / they / JD / the porter / the night shift move ..." - and
+   so is no subject at all ("Should move 17563 ..."). Naming the people would
+   never end; the buses are named a few ways (fourth cold read). */
+const BUS_ASKED=/\b(?:\d+|bus|buses|these|those|this one|that one|ones|both|it)\b/;
+const PERSON_ASKED=/\b(?:you|u|ya|yall|y all|guys|we|i|someone|somebody|anyone|anybody|they|he|she|everyone|everybody)\b/;
+const JOINED_COMMAND=new RegExp("\\b(?:and|then) "+"(?:"+MOVE_WORDS+"|add)\\b");
+/* A RUN-ON COMMAND: a move word in its plain form, with its bus straight
+   after it, following a word that could not be asking it - "Does 17563 have
+   parts move it to CNG West", "Who cares move 17563 ...", "Did it get fixed
+   move it ...", "What a day, move 17563 ...". In a question the word before
+   the verb is who is asked, a helping verb, or a word like "still": "Did you
+   move 17563", "Who can move 17563", "Do we still move 17563" (fifth cold
+   read, against release 200). */
+const RUN_ON=/(?:^| )(\S+) (?:move|relocate|place|send|put|transfer|shift|bring|return|add) (?:it|them|these|those|this|that|both|all|bus|buses|number|\d+)\b/;
+const ASKING_WORD=/^(?:i|we|you|u|ya|yall|they|he|she|it|someone|somebody|anyone|anybody|everyone|everybody|who|whom|what|which|why|when|where|how|do|does|did|can|could|will|would|should|shall|must|might|may|to|the|a|an|gonna|wanna|gotta|still|now|actually|also|just|really|even|already|first|we ll|i ll|ll|\d+|bus|buses|these|those|both|one|ones|them)$/;
+const BE_TO_MOVE=new RegExp("\\b(?:(?:supposed|going|meant|scheduled|due|ready|set|cleared|allowed|the plan|plan) to|gonna) (?:"+MOVE_WORDS+"|add)\\b|^(?:is|are)(?:n t)? there (?:any|room|space|enough)\\b(?!(?: \\w+)? (?:way|chance)\\b).* to (?:"+MOVE_WORDS+"|add)\\b");
+/* The bus a move word is followed by. With one, a "they" before the verb is
+   the people asked ("Can they move 17563 ..."); without one, "they" are the
+   buses ("Will they move to CNG West tonight") - sixth cold read. */
+const OBJECT_AFTER=/^\S+ (?:it|them|these|those|this|that|both|all|bus|buses|number|\d+)\b/;
+function busIsAsked(subject:string,objectAfter:boolean){
+ const words=objectAfter?subject:subject.replace(/\bthey\b/g,"it");
+ return BUS_ASKED.test(words)&&!PERSON_ASKED.test(words);
+}
 export function asksAboutMove(command:string){
- const sentence=String(command??"").split(/[.?!;:]+/).map(normalized).find(part=>ASK_VERB.test(part));
- return Boolean(sentence)&&(ASKING_SENTENCE.test(sentence!)||REFUSED_SENTENCE.test(sentence!));
+ /* A clause ends at a full stop, a question mark, a semicolon, a colon, or a
+    comma - though not the comma between two bus numbers ("Can 17563, 17534
+    move ..."). "Do it, move them to CNG West" is a command after a remark;
+    "Wait, when do these buses move?" is a question after one (sixth cold
+    read: commas were not breaks, and both went wrong). */
+ const found=String(command??"").split(/[.?!;:]+|,(?!\s*\d)/).map(normalized).find(part=>ASK_VERB.test(part));
+ if(!found)return false;
+ /* "Whens 17563 move", typed without the apostrophe, is "when s" */
+ const sentence=found.replace(SENTENCE_START,"").replace(/^(when|where|how)s\b/,"$1 s");
+ /* "When is the move for these buses ..." - "move" as a noun, asked about */
+ if(/^(?:when|where|what|which)\b/.test(sentence)&&/\b(?:the|a|next) (?:move|transfer|return)\b/.test(sentence))return true;
+ /* told NOT to: "Don't move ...", "Never move ..." - but "Don't forget to
+    move ..." and "Don't wait, move ..." are commands */
+ if(new RegExp("^(?:don t|dont|do not|never) (?:"+MOVE_WORDS+"|add)\\b").test(sentence))return true;
+ if(JOINED_COMMAND.test(sentence))return false;
+ const runOn=RUN_ON.exec(sentence);
+ if(runOn&&!ASKING_WORD.test(runOn[1]))return false;
+ const verbAt=sentence.search(ASK_VERB),before=sentence.slice(0,verbAt),after=sentence.slice(verbAt),objectAfter=OBJECT_AFTER.test(after);
+ /* "These buses move to CNG West when?" */
+ if(/\b(?:when|where|what time)$/.test(sentence))return true;
+ /* AN EMBEDDED QUESTION about the bus, anywhere before the move word: "Any
+    idea when these buses move ...", "Can you tell me when these buses move
+    ...", "I wonder if 17563 moves ...". The words after the when / where /
+    if / whether name a BUS and nobody else. "When you get a chance move
+    17563 ..." names a person, and "When the shift starts move 17563 ..." no
+    bus, so both stay commands (sixth cold read). */
+ const embedded=/\b(?:when|where|whether|if)\b(?!.*\b(?:when|where|whether|if)\b)(.*)$/.exec(before);
+ /* "Where is 17563 move it ..." is a command run on after a question: the
+    is / are reading below decides those, not this */
+ if(embedded&&!/^(?:am|is|are|was|were)(?:n t)?\b/.test(embedded[1].trim())){
+  const words=embedded[1].trim();
+  if(/^(?:(?:do|does|did|will|would|should|shall|can|could)(?:n t)?|s)\b/.test(words))return true;
+  if(words&&busIsAsked(words,objectAfter))return true;
+ }
+ /* "Do it move it to CNG West", "Do these move them ...": do + a bus + the
+    move with its own bus after it is "do that, then move these" */
+ if(/^(?:do|does|did)\b/.test(sentence)&&objectAfter&&busIsAsked(before.replace(/^\w+ /,""),true))return false;
+ if(/^(?:who|whom|whose|what|which|why|do(?! not)|does|did|doesn t|didn t)\b/.test(sentence))return true;
+ /* "Any chance 17563 moves ...": a command says "move" */
+ if(/^(?:any chance|is it possible|is it ok(?:ay)? if)\b/.test(sentence)&&/^\S+s$/.test(after.split(" ")[0]))return true;
+ if(/^(?:when|where|how)(?: (?:long|soon|often|many|much|come))? (?:am|is|are|was|were)(?:n t)?\b/.test(sentence)||/^(?:am|is|are|was|were)(?:n t)?\b/.test(sentence))return BE_TO_MOVE.test(sentence.replace(/^(?:when|where|how)(?: \w+)? /,""));
+ if(/^(?:when|where|how)(?: (?:soon|long|often|many|much))? (?:(?:do|does|did|will|would|should|shall|can|could)(?:n t)?|s)\b/.test(sentence)||/^how (?:many|much|soon|long|often)\b/.test(sentence))return true;
+ if(/^(?:can|could|will|would|should|shall)(?:n t)?\b/.test(sentence))return busIsAsked(before.replace(/^\w+(?: n t)? /,""),objectAfter);
+ if(/^(?:has|hasn t)\b/.test(sentence)&&/\bput\b/.test(sentence))return true;
+ if(/^(?:have|haven t) (?:i|we|you|they) put\b/.test(sentence))return true;
+ return false;
 }
 const MOVE_CLAUSE_START=new RegExp(";|,(?=\\s*(?:"+MOVE_WORDS+"|add)\\b)","i");
 const MOVE_CLAUSE=new RegExp("\\b(?:"+MOVE_WORDS+"|add)\\b","i");
@@ -597,5 +695,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
   return {kind:"plan",plan:{kind:"inspect",requiresConfirmation:false,busId:bus.id,busNumber:bus.n,summary:"Inspect Bus "+bus.n,response:"Bus "+bus.n+" is in "+areaLabel(bus,areas)+" with status “"+(STATUS_LABELS[bus.s]||bus.s)+".”"+repair+defectLine+(bus.down?" It is on the active down sheet.":" It is not marked on the active down sheet.")}};
  }
 
+ /* A question about moving it is told so, and how to say the move. */
+ if(asking)return {kind:"message",message:"That reads as a question, so nothing was prepared. To move Bus "+bus.n+", say it as an instruction, such as “Move "+bus.n+" to "+(areaFromCommand(command,areas)?.name||"CNG WEST LOT")+".”"};
  return {kind:"message",message:"I found Bus "+bus.n+", but I need an action. I can answer fleet questions, inspect or locate buses, move them to an area, add a catalog defect, or add/remove them from the down sheet."};
 }

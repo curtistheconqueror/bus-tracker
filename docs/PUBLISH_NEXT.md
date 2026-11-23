@@ -1,17 +1,109 @@
 # Publish next
 
-**STATUS: FOUR RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; 200, from `24752d3`; and 201, from `c96635a`. NOT PUBLISHED.** Each sits on top of the one before; **publish `c96635a` (release 201), which carries all four.** 201 fixes the two things Codex held 200 back for: "Who moves this bus?" and the FIXED BY conflict. Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
+**STATUS: FIVE RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; 200, from `24752d3`; 201, from `c96635a`; and 202, from `759f591`. NOT PUBLISHED.** Each sits on top of the one before; **publish `759f591` (release 202), which carries all five.** 202 fixes the two checks 201 failed in Codex's release check: a finished repair linked to a Defect Log record credited to the wrong mechanic after save, and "When do these buses move?" questions preparing a move. Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
 
 **What is live:** Sites Version 194 / application release 197, deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Rollback for 198: Sites 194 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
 
-4 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
+5 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
 
 | Release | What it is | State |
 | --- | --- | --- |
-| 201 | The two things Codex held 200 back for: "Who moves this bus?" no longer brings up a move, and ADD TO THAT ENTRY will not carry a FINISHED repair into an entry signed off by somebody else | On `main`, pending publication — **publish this; it includes 198, 199 and 200** |
+| 202 | The two checks 201 failed: the right mechanic is credited AFTER the save, and "When do these buses move?" prepares no move | On `main`, pending publication — **publish this; it includes 198 to 201** |
+| 201 | The two things Codex held 200 back for: "Who moves this bus?" no longer brings up a move, and ADD TO THAT ENTRY will not carry a FINISHED repair into an entry signed off by somebody else | On `main`, pending publication; failed two of Codex's checks, fixed in 202 |
 | 200 | ADD TO THAT ENTRY keeps the repairs already typed into a new entry | On `main`, pending publication |
 | 199 | The AI Operator moves buses when told "Moves buses … to CNG West" or "Buses … to CNG West", instead of asking which status to apply | On `main`, pending publication |
 | 198 | Reopening the last page at real phone speeds; the log-a-defect pickers without the keyboard; one BUS box; the symptom list opening itself; the Down Sheet ticks moved up; leaving a bus out of a shared Defects Logged list; ADD TO THAT ENTRY fixed; a Shop Cloud pull that did not finish is asked for again | On `main`, pending publication |
+
+## 202 — the two checks 201 failed: credit after the save, and "When do these buses move?"
+
+### Source
+
+Release source: `759f591`. Previous: `afd596d`, the commit that queued 201. Run at `759f591`:
+
+```
+$ git log --oneline afd596d..759f591
+759f591 Release 202: credit after the save, and "When do these buses move?"
+```
+
+```
+$ git diff --name-only afd596d..759f591 -- app src tests
+src/lib/down-sheet/down-sheet-sync.ts
+src/lib/operator/operator-engine.ts
+tests/down-sheet.test.mjs
+tests/operator.test.mjs
+```
+
+```
+$ git diff --shortstat afd596d..759f591
+ 4 files changed, 225 insertions(+), 9 deletions(-)
+```
+
+Proof of no infrastructure change. This returned nothing:
+
+```
+$ git diff --name-only afd596d..759f591 -- supabase package.json package-lock.json .github public worker
+```
+
+### Migrations
+
+None. No storage key is added, renamed or read differently. Nothing already saved is rewritten: the change decides the name written when a repair is finished from now on.
+
+### What was wrong
+
+Both found by Codex's release check of 201, which kept 201 off the live site.
+
+1. **A finished repair linked to a defect still credited the wrong mechanic.** When a save finished a repair, `applyDownEntryToFleet` credited the entry's FIXED BY first, then **the name already on the linked record**, and only then the entry's assigned mechanic. A Down Sheet card that adopts an OPEN record from the Defect Log (an exact repeat of a fault already logged) inherits whatever name that record held. So a repair finished on JD's entry, with FIXED BY showing JD, was saved as fixed by MK. 201's ADD TO THAT ENTRY check compared JD with JD and let it through; the wrong name came from the save, not from the transfer.
+2. **"When do these buses move?" still prepared a move.** 201 deliberately left when / where / how out of its question rule, because they open clauses in dictated commands ("When you get a chance move 17563 to CNG West"). With a group of buses remembered from the last answer, "When do these buses move to CNG West?" became a move of both. "Will these buses move …" and "Can 17563 move …" did the same.
+
+### What changed
+
+1. **The name a finished repair is saved under is the name FIXED BY showed** (`down-sheet-sync.ts`).
+   - A repair finished in this save is credited to the entry's FIXED BY, else its assigned mechanic, which is exactly what the form's FIXED BY box shows.
+   - When the form showed nobody (a vendor job), nobody is credited. A name on an OPEN record is not a completion.
+   - A repair **already completed** before this save keeps the name it was completed under, ahead of the entry's FIXED BY. That includes no name: a vendor repair stays unnamed. Before, MARK FIXED on the row stamped a FIXED BY on the entry, and that re-credited every repair finished earlier to whoever closed the entry. The cold read measured it.
+   - **One trade, written down.** Correcting a typo in an entry's FIXED BY no longer rewrites repairs already finished. Correct a finished repair's name on that repair, in Fixed Repairs.
+2. **How the clause opens decides it, not how the bus is named** (`asksAboutMove`). Six cold reads kept finding a bus or a person named some way a list of phrasings missed. So the rule reads the clause that holds the move word, ended by a full stop, question mark, semicolon, colon or comma (not the comma between two bus numbers). It looks at how that clause opens, and what sits between the opening and the move word:
+   - **who / what / which / why / do / does / did** — a question.
+   - **when / where / how + a helping verb** (do, can, will, should …), and **how soon / long / many / much** — a question: "When do these buses move", "When do the buses on the road move …", "How soon will 17563 move".
+   - **when / where / whether / if + a bus, anywhere before the move word** — a question: "Any idea when these buses move …", "Can you tell me when these buses move …", "If 17563 moves to CNG West will it be out of service". "When you get a chance move 17563 …" names a person and "When the shift starts move 17563 …" names no bus, so both stay commands.
+   - **"they" with nothing after the move word means the buses**: "Will they move to CNG West tonight?" is a question. "Can they move 17563 …" asks people and moves.
+   - **can / could / will / should + a BUS** (a number, "bus", "these", "this one", "it") — a question: "Can this bus move", "Can buses 17563 and 17534 move". **Anybody else asked** — "you", "they", "JD", "the porter", "the night shift", or no subject at all — is a request, and it moves, as it always has.
+   - **is / are / was / were** — a question only in "supposed / going / gonna / ready / set / cleared / allowed / due to move" or "is there room / are there any … to move". Otherwise the move word is a command run on without punctuation: "Is 17563 done move it to CNG West", "Where is 17563 move it …".
+   - **Always a command:**
+     - a remark, a comma, then the command: "Do it, move 17563 to CNG West", "Who's on it, move 17563 …";
+     - "and move" / "then move";
+     - a move word with its bus right after it, following a word that could not be asking it: "Does 17563 have parts move it to CNG West", "Who cares move 17563 …", "What a day, move 17563 …";
+     - "Do move …", "Do me a favor move …", "Why not move …", "Never mind, move …", "Don't forget to move …";
+     - "Don't move …" and "Never move …" are refused instead.
+   - A question about one bus is now told *"That reads as a question, so nothing was prepared. To move Bus 17563, say it as an instruction …"*, as several buses already were.
+   - **Judgement calls, written down:**
+     - "Can 17563 move to CNG West?", "Do I move 17563 to CNG West?" and "How do I move 17563 …" read as questions. "Can you move 17563 …" moves.
+     - Questions that ask permission or advice still prepare a proposal, which needs APPLY CHANGE, as they did in 200: "Should I move …", "Is it ok / safe / time to move …", "Is there a reason to move …".
+
+### Verified
+
+- `npm test` on Windows — **479 pass, 0 fail**. `npm run lint` — no error. Type-check 238, as 201.
+- **Credit after the save, run end to end** (new test, `tests/down-sheet.test.mjs`). It takes the bus with an open Defect Log record "Engine / Overheating" holding MK, and JD's entry on the sheet. It runs the ADD TO THAT ENTRY rule (JD with JD: allowed), the page's merge, then `applyDownEntryToFleet`, and reads the name off the saved record:
+  - The record is completed and credited to **JD**. On 201's code the same test reads **MK**, so it reproduces what Codex found.
+  - A FIXED BY typed on the entry (PB) outranks both. A vendor job credits nobody. Handing the entry to PB and saving again leaves JD's finished repair as JD's. So does MARK FIXED closing the entry under PB, while the brake repair finished at that moment is PB's. A vendor repair finished with no name stays unnamed when the entry is later closed under PB. The other direction (finished under MK, into JD's entry) is refused before any save.
+- **Questions:** 103 question phrasings propose no change, each run with no context, with a remembered bus, and with a remembered group, and 81 commands still move. Most of both lists came from six cold reads.
+  - Every reviewer's case file was run against release 200's engine and this one: 534 commands and 570 questions.
+  - Every command that prepared a move on 200 still does, except "Do I move …" and "How do I move …", which are meant to be questions now.
+  - No question prepares a move that did not on 200, and no question about when, where or whether buses move prepares one in any context. The 33 that still prepare a proposal are permission and advice questions ("Should I …", "Is it ok / safe / time to …"), each needing APPLY CHANGE as in 200.
+  - The sixth cold read's findings were answered by re-running its own case files, which are among those above. No fresh reviewer read this final version.
+  - On 201's engine, with a group remembered, "When do these buses move to CNG West?" and "Will these buses move to CNG West?" each gave a bulkMove of both buses, and "Can 17563 move to CNG West?" a move. Now none does.
+  - The 41-case comparison against 200's engine from 201's review, re-run: every difference is a question or a "don't move", and every command behaves as in 200.
+- **Not verified:** on a phone, and not re-run in the browser. Both changes are below the screen: the save's choice of name, and the operator's reading of a sentence. No screen changes in 202.
+
+### What to check once it is live
+
+1. On the Down Sheet, pick a bus with an open defect in the Defect Log, and put it on the sheet assigned to a mechanic. Add a card for that same defect, tick it FINISHED and save. On Fixed Repairs, the repair should show the entry's mechanic (or its FIXED BY), not anybody else.
+2. In the AI Operator, ask something that lists buses, then "When do these buses move to CNG West?" It should not propose a move. "Move these buses to CNG West" should; do not apply it unless they belong there.
+3. The checks for 201 and earlier below.
+
+### Rollback
+
+Sites 194 / release 197 at `12822f60c7e5d76d3702108b33711cc116ca4f61`, while nothing after 197 is live.
 
 ## 201 — the two holds on 200: a question is not a move, and one FIXED BY per entry
 
