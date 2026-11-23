@@ -1,18 +1,111 @@
 # Publish next
 
-**STATUS: FIVE RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; 200, from `24752d3`; 201, from `c96635a`; and 202, from `759f591`. NOT PUBLISHED.** Each sits on top of the one before; **publish `759f591` (release 202), which carries all five.** 202 fixes the two checks 201 failed in Codex's release check: a finished repair linked to a Defect Log record credited to the wrong mechanic after save, and "When do these buses move?" questions preparing a move. Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
+**STATUS: SIX RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; 200, from `24752d3`; 201, from `c96635a`; 202, from `759f591`; and 203, from `076f7ae`. NOT PUBLISHED.** Each sits on top of the one before; **publish `076f7ae` (release 203), which carries all six.** 203 fixes what Codex's check of 202 found: reopening and saving a Down Sheet repair linked to the Defect Log duplicated it (3 hours read as 6), and questions about past moves ("Was 17563 put in CNG West?") were read as orders. Curtis, 2026-11-22: *"Get this matter handled, and I want Codex to push this live."* Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
 
 **What is live:** Sites Version 194 / application release 197, deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Rollback for 198: Sites 194 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
 
-5 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
+6 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
 
 | Release | What it is | State |
 | --- | --- | --- |
-| 202 | The two checks 201 failed: the right mechanic is credited AFTER the save, and "When do these buses move?" prepares no move | On `main`, pending publication — **publish this; it includes 198 to 201** |
+| 203 | A repeat save updates the same repair (no duplicate, no doubled hours); a question about a past move is not an order | On `main`, pending publication — **publish this; it includes 198 to 202** |
+| 202 | The two checks 201 failed: the right mechanic is credited AFTER the save, and "When do these buses move?" prepares no move | On `main`, pending publication; failed Codex's repeat-save check, fixed in 203 |
 | 201 | The two things Codex held 200 back for: "Who moves this bus?" no longer brings up a move, and ADD TO THAT ENTRY will not carry a FINISHED repair into an entry signed off by somebody else | On `main`, pending publication; failed two of Codex's checks, fixed in 202 |
 | 200 | ADD TO THAT ENTRY keeps the repairs already typed into a new entry | On `main`, pending publication |
 | 199 | The AI Operator moves buses when told "Moves buses … to CNG West" or "Buses … to CNG West", instead of asking which status to apply | On `main`, pending publication |
 | 198 | Reopening the last page at real phone speeds; the log-a-defect pickers without the keyboard; one BUS box; the symptom list opening itself; the Down Sheet ticks moved up; leaving a bus out of a shared Defects Logged list; ADD TO THAT ENTRY fixed; a Shop Cloud pull that did not finish is asked for again | On `main`, pending publication |
+
+## 203 — a repeat save updates the same repair, and a past move is not an order
+
+### Source
+
+Release source: `076f7ae`. Previous: `a853111`, the commit that queued 202. Run at `076f7ae`:
+
+```
+$ git log --oneline a853111..076f7ae
+076f7ae Release 203: a repeat save updates the same repair; a past move is not an order
+```
+
+```
+$ git diff --name-only a853111..076f7ae -- app src tests
+src/lib/defects/repair-catalog.ts
+src/lib/down-sheet/down-sheet-sync.ts
+src/lib/operator/operator-engine.ts
+tests/down-sheet.test.mjs
+tests/operator.test.mjs
+```
+
+```
+$ git diff --shortstat a853111..076f7ae
+ 5 files changed, 131 insertions(+), 10 deletions(-)
+```
+
+Proof of no infrastructure change. This returned nothing:
+
+```
+$ git diff --name-only a853111..076f7ae -- supabase package.json package-lock.json .github public worker
+```
+
+### Migrations
+
+None. No storage key is added, renamed or read differently. A defect record gains an optional field, `sheetCard`, written only when a Down Sheet card takes over a record the Defect Log already had. It rides the Shop Cloud in the defect's existing `detail` column, the way every field outside the named columns already does, so there is no schema change. Records already duplicated on a device by the old behaviour are not cleaned up by this release.
+
+### What was wrong
+
+Both found by Codex's check of 202, which kept 202 off the live site.
+
+1. **Reopening and saving a Down Sheet repair linked to the Defect Log duplicated it, and 3 hours read as 6.**
+   - A card that matches a fault already open in the Defect Log takes that record over on its first save. That is deliberate, so the bus does not carry the same fault twice.
+   - But it only takes over an **open** record. Once the card had finished the repair, the record was closed, so the next save no longer recognised it as the card's own and made a second record under the card's id, with the same hours.
+   - Measured on 202's code: finished with 3 hours on the first save, saved again, and the bus carried two completed "Engine / Overheating" records of 3 hours each.
+   - This is older than 198; it was not introduced by ADD TO THAT ENTRY, though carrying finished repairs across makes it easier to hit.
+2. **Questions about past moves read as orders.** "put" is spelled the same in the past, so "Was 17563 put in CNG West?", "17563 got put in CNG West?", "When we put 17563 in CNG West did it go out of service?" and "Yesterday who put 17563 in CNG West?" each prepared a move.
+
+### What changed
+
+1. **A repeat save writes to the same record** (`down-sheet-sync.ts`).
+   - When a card takes over a Defect Log record, the save stamps the record with that card (`sheetCard`). Every later save, from any screen, finds the record by that stamp and writes back to it.
+   - The hours are therefore replaced, never added: a figure corrected from 3 to 3.5 reads 3.5.
+   - **The Defect Log still owns a record the sheet took over.** The record keeps its own name and details: renamed in the Defect Log, the next sheet save does not put the old name back. Once it is fixed in the Defect Log, a sheet save with that card still unticked leaves it fixed, by whoever fixed it, with their hours. A cold read found that the first version of this fix re-opened it.
+   - A record one card holds is never taken by another card on the same entry. A new card put ahead of it becomes its own repair, so the 3 hours are not counted twice that way either.
+   - Mechanic credit is unchanged from 202, and only the repair being saved is touched. A repair finished in a save is credited to what FIXED BY showed. A repair finished earlier keeps its name. Other repairs on the bus are not written at all.
+   - The narrow ADD TO THAT ENTRY safeguard from 201 is kept as it was.
+2. **A move that has already happened is asked about, never ordered** (`asksAboutMove`). Only the shapes that cannot be an order count:
+   - "put" straight after was / were / got / been, or after one of them and the bus: "Was 17563 put …", "17563 got put …", "Were these buses put …".
+   - "we" or "they" straight before "put", after when / after / since / who / why or after "the buses": "When we put 17563 in CNG West did it go out of service?", "The buses we put in CNG West, are they out of service?".
+   - "already put", or a bus, "put", and "already" at the end: "17563 put in CNG West already?".
+   - "Somebody put 17563 in CNG West?", with a question mark on that clause.
+   - "who" / "why" straight before the move word: "Can you tell me who put 17563 …".
+   - **Orders still move.** A cold read found the first version of these rules refusing real orders, and they are all in the test now: "Move 17563 to CNG West, it came in last night", "Just put 17563 in CNG West already", "17563 is fixed so just put it in CNG West", "When you put 17563 in CNG West mark it out of service", "Someone put 17563 in CNG West".
+   - **Left:** "Put 17563 in CNG West yesterday?" still prepares a move, because it reads as an order. It needs APPLY CHANGE like any proposal.
+
+### Verified
+
+- `npm test` on Windows — **480 pass, 0 fail**. `npm run lint` — no error. Type-check 238, as 202.
+- **Repeat saves, run in the test suite** (new test).
+  - A card linked to an open Defect Log record, finished with 3 hours, saved three times, leaves **one** record of **3** hours credited to JD. On 202's code the same test finds two records.
+  - Open on the first save, finished on the second, corrected to 3.5 on the third: one record, 3.5 hours.
+  - Two cards on one entry stay two records, 4 hours between them.
+  - Fixed in the Defect Log by MK with 2 hours, then the sheet saved: it stays fixed, MK, 2 hours.
+  - Renamed in the Defect Log: the name stays.
+  - A new card put ahead of the linked one: two records, 3 hours, not 6.
+- **Repeat saves, run through the real screen** on the dev server, before the last two refinements above (which leave a finished card's path unchanged). Bus 17507 carried an open Defect Log record "Engine / Overheating". Its Down Sheet entry had that repair finished with 3 hours, assigned to JD. The entry was opened from its row and SAVE UPDATE pressed, three times. After each save the stored board held one record, completed, 3 hours, JD.
+- **Questions about past moves:** 27 more phrasings are in the test, each run with no context, a remembered bus and a remembered group, and none prepares a move. Twenty-five orders using "put" or naming a time are in the test, and all move.
+  - Every reviewer's case file from 201 and 202 was re-run against release 200's engine: 534 commands, 570 questions.
+  - Every command that moved on 200 still moves, except "Do I move …" and "How do I move …", which are meant as questions.
+  - No question prepares a move that 200 did not.
+- A cold read of the first version of 203 found the Defect Log and past-tense problems above. Each is fixed and in the test. No fresh reviewer read the final version.
+- **Not verified:** on a phone.
+
+### What to check once it is live
+
+1. Pick a bus with an open defect in the Defect Log and put it on the Down Sheet with the same repair. Tick it FINISHED, put 3 in its hours, and save. Open the entry again and save it again. The Defect Log and Fixed Repairs should show that repair **once**, with 3 hours.
+2. In the AI Operator, ask "Was 17563 put in CNG West?" (any bus number). It should not propose a move. "Put 17563 in CNG West" should; do not apply it unless the bus belongs there.
+3. The checks for 202 and earlier below.
+
+### Rollback
+
+Sites 194 / release 197 at `12822f60c7e5d76d3702108b33711cc116ca4f61`, while nothing after 197 is live.
 
 ## 202 — the two checks 201 failed: credit after the save, and "When do these buses move?"
 

@@ -91,6 +91,9 @@ export type StructuredDefect={
  /* Set by PUT BACK on a scan record, to the stamp PUT BACK gave `updatedAt`.
     scan-batches.ts owns what it means. */
  scanRestoredAt?:string;
+ /* The Down Sheet repair card that writes this record, when the card took
+    over a record the Defect Log already had. down-sheet-sync.ts owns it. */
+ sheetCard?:string;
  completedAt?:string;
  completedBy?:string;
  conditionNotDuplicated?:boolean;
