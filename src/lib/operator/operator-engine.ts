@@ -183,6 +183,62 @@ function busIsAsked(subject:string,objectAfter:boolean){
  const words=objectAfter?subject:subject.replace(/\bthey\b/g,"it");
  return BUS_ASKED.test(words)&&!PERSON_ASKED.test(words);
 }
+/* THE GENERAL RULE (Curtis, after the publisher's check of 204 found "Why did
+   Alex move ...?" and "Does the porter move ...?" still asking to confirm a
+   move): a clause that opens with a question word or a helper verb, followed
+   by who does it and the move word, or that ends in "?", is a question and
+   never a move order. "Did JD move this bus?" was the first of these.
+
+   - The openers: why, who, what, when, how; do, does, did, has, have, is,
+     was, can, could, would, and their "n't" forms.
+   - "Who does it" is a short subject straight before the move word - a name,
+     "the porter", "these buses", "17563", "I", "we" - with at most a helper
+     between it and the opener ("Why DID Alex move", "When DO these buses
+     move"). Words that are not a subject - "Did it get fixed move ...",
+     "Does 17563 have parts move it ...", "When the shift starts move ..." -
+     mean a remark with the order run on after it, and the order stands.
+   - why / when / how ask only with a helper straight after them; without one
+     they open a clause ("When you get a chance move ...").
+   - is / was take no bare verb, so "Is 17563 done move it ..." is a run-on
+     order unless the clause ends in "?".
+   - "have" asks with I / we / you / they ("Have you put ..."); "Have someone
+     move ..." is an order.
+   - ONE EXCEPTION, kept on purpose: can / could / would with "you", "we" or
+     "I" asks the assistant to do it - "Can you move bus 17563 to CNG West?"
+     is how a move has always been requested here, so it is a request and
+     moves. Anyone else asked that way ("Can the porter move ...") asks.
+   - "Do it move it ...", "Do these move them ...": do + a bus + the move with
+     its own bus after it stays "do that, then move these". */
+const QUESTION_OPENER=/^(why|who|what|when|how|do|does|doesn t|did|didn t|has|hasn t|have|haven t|is|isn t|was|wasn t|can|can t|could|couldn t|would|wouldn t)\b/;
+const HELPER_AFTER=/^(?:do|does|doesn t|did|didn t|can|can t|could|couldn t|would|wouldn t|will|won t|should|shouldn t|has|have)\b ?/;
+const NOT_A_SUBJECT=/\b(?:am|is|are|was|were|be|been|get|gets|got|have|has|had|done|ready|fixed|finished|care|cares|take|takes|gonna|going|there|room|time|need|needs|check|checked|matter|matters|parts|start|starts|chance|free|on|in|if|when|and|then|to|for|with|of|at|so|but|because|that|what|which|it s|s|day|plan|go|wait|as|say|said|heck|hell)\b/;
+function isSubject(words:string){
+ const kept=words.replace(/\b(?:still|now|already|actually|also|just|ever|really|even)\b/g," ").trim().replace(/\s+/g," ");
+ if(!kept||NOT_A_SUBJECT.test(kept))return false;
+ return kept.split(" ").length<=4;
+}
+function opensAQuestion(sentence:string,markedAsked:boolean){
+ const opener=QUESTION_OPENER.exec(sentence)?.[1];
+ if(!opener||sentence.search(ASK_VERB)<0)return false;
+ const between=sentence.slice(opener.length,sentence.search(ASK_VERB)).trim();
+ /* the exception: the assistant asked to do it */
+ if(/^(?:can|can t|could|couldn t|would|wouldn t)$/.test(opener)&&/^(?:you|u|ya|ye|we|i|y all|yall|you guys|you all)$/.test(between.replace(/\b(?:please|also|just|go|still|now|quickly|real quick)\b/g," ").trim().replace(/\s+/g," ")))return false;
+ const after=sentence.slice(sentence.search(ASK_VERB));
+ if(/^(?:do|does|did)$/.test(opener)&&OBJECT_AFTER.test(after)&&busIsAsked(between,true))return false;
+ if(markedAsked)return true;
+ if(/^(?:is|isn t|was|wasn t)$/.test(opener))return false;
+ if(/^(?:why|when|how)$/.test(opener)){
+  if(!HELPER_AFTER.test(between)||/^(?:has|have)\b/.test(between))return false;
+  const rest=between.replace(HELPER_AFTER,"").trim();
+  return !rest||isSubject(rest);
+ }
+ if(/^(?:who|what)$/.test(opener)){
+  const rest=between.replace(HELPER_AFTER,"").trim();
+  return !rest||isSubject(rest);
+ }
+ if(/^(?:have|haven t)$/.test(opener))return /^(?:i|we|you|they)$/.test(between);
+ return isSubject(between);
+}
 export function asksAboutMove(command:string){
  /* A clause ends at a full stop, a question mark, a semicolon, a colon, or a
     comma - though not the comma between two bus numbers ("Can 17563, 17534
@@ -203,10 +259,7 @@ export function asksAboutMove(command:string){
     move ..." and "Don't wait, move ..." are commands */
  if(new RegExp("^(?:don t|dont|do not|never) (?:"+MOVE_WORDS+"|add)\\b").test(sentence))return true;
  if(JOINED_COMMAND.test(sentence))return false;
- /* "Did JD move this bus?" asks whether a person moved it. The run-on reading
-    below took "JD move this" for an order after a remark (the publisher's
-    check of 203). did + who did it + the move word is always a question. */
- if(new RegExp("^(?:did|didn t)(?: (?:the|a|our|my|that|this))? \\S+ (?:"+MOVE_WORDS+"|add)\\b").test(sentence))return true;
+ if(opensAQuestion(sentence,markedAsked))return true;
  const runOn=RUN_ON.exec(sentence);
  if(runOn&&!ASKING_WORD.test(runOn[1]))return false;
  /* A MOVE THAT HAS ALREADY HAPPENED is asked about or told, never ordered

@@ -546,7 +546,15 @@ test("the operator moves buses however the command is phrased, and CNG West mark
      about or told - "put" is spelled the same in the past */
   "When was 17563 put in CNG West?","Was 17563 put in CNG West?","Were these buses put in CNG West?","17563 got put in CNG West?","17563 was put in CNG West yesterday?","Wasn't 17563 put in CNG West?","Weren't these put in CNG West?","Is 17563 already put in CNG West?","Somebody put 17563 in CNG West?","Last night did 17563 move to CNG West?","Yesterday who put 17563 in CNG West?","Can you tell me who put 17563 in CNG West?","Remind me when we put 17563 in CNG West","When we put 17563 in CNG West did it go out of service?","After we put 17563 in CNG West was it marked out?","Since we put 17563 in CNG West has it moved?","Already put 17563 in CNG West?","17563 put in CNG West already?","These buses put in CNG West already?","The buses we put in CNG West, are they out of service?","Who put 17563 in CNG West?","Why was 17563 put in CNG West?","Did they put 17563 in CNG West?","Didn't we already put 17563 in CNG West?","Has 17563 been put in CNG West?","Have we put 17563 in CNG West yet?","Did someone move 17563 to CNG West yesterday?",
   /* the publisher's check of 203: did + a person + the move word */
-  "Did JD move this bus?","Did JD move this bus to CNG West?","Did JD move 17563 to CNG West?","Did the porter move 17563 to CNG West?"]){
+  "Did JD move this bus?","Did JD move this bus to CNG West?","Did JD move 17563 to CNG West?","Did the porter move 17563 to CNG West?",
+  /* THE GENERAL RULE (Curtis, after the publisher's check of 204): a clause
+     that opens with a question word or helper verb, then who does it and the
+     move word, or that ends in "?", is a question. Each runs with no context,
+     a remembered bus and a remembered group. */
+  "Why did Alex move 17563 to CNG West?","Why did Alex move this bus?","Why did Alex move it to CNG West","Does the porter move 17563 to CNG West?","Does the porter move this bus?","Does the porter move buses to CNG West","Do the porters move 17563 to CNG West?","Didn't JD move 17563 to CNG West?","Has JD put 17563 in CNG West?","Have you put 17563 in CNG West?","When does the porter move 17563 to CNG West?","How does Alex move 17563 to CNG West?","Who can move 17563 to CNG West?","Could Alex move this bus to CNG West?","Would the night shift move 17563 to CNG West?","Is 17563 done move it to CNG West?","Was JD supposed to move 17563 to CNG West?",
+  /* can / could + anyone but "you", "we" or "I" asks, under the same rule -
+     these were orders before it */
+"Can someone move 17563 to CNG West","Could somebody move bus 17563 to CNG West","Hey can someone move 17563 to cng west","Can anybody put 17563 in CNG West","Can they move 17563 to CNG West","Could they move bus 17563 to CNG West","Can he move bus 17563 to CNG West","Could she put 17563 in CNG West","Hey can they put 17563 in CNG West","Can JD move 17563 to CNG West","Can the porter move 17563 to CNG West","Can dispatch move 17563 to CNG West","Can the crew move 17563 to CNG West","Can the night shift move 17563 to CNG West","Can second shift put 17563 in CNG West","Can a servicer move 17563 to CNG West"]){
   assert.ok(!isWrite(planOperatorCommand(text,fleet,wider)),"not a change: "+text);
   assert.ok(!isWrite(planOperatorCommand(text,fleet,wider,remembered)),"not a change, with a bus remembered: "+text);
   assert.ok(!isWrite(planOperatorCommand(text,fleet,wider,group)),"not a change, with a group remembered: "+text);
@@ -568,14 +576,14 @@ test("the operator moves buses however the command is phrased, and CNG West mark
   /* and the requests and run-ons the first 202 refused (cold read): a person
      asked to do it, and dictation with no punctuation between a question and
      the command after it */
-  "Can someone move 17563 to CNG West","Could somebody move bus 17563 to CNG West","Hey can someone move 17563 to cng west","Will someone move 17563 to CNG West","Can anybody put 17563 in CNG West","Is someone able to move 17563 to CNG West","Is bus 17563 ready move it to CNG West","Is 17563 done move it to cng west","When is a good time move 17563 to CNG West","Where is 17563 move it to CNG West","Have someone put 17563 in CNG West","Is there any way to move 17563 to CNG West",
+  "Will someone move 17563 to CNG West","Is someone able to move 17563 to CNG West","Is bus 17563 ready move it to CNG West","Is 17563 done move it to cng west","When is a good time move 17563 to CNG West","Where is 17563 move it to CNG West","Have someone put 17563 in CNG West","Is there any way to move 17563 to CNG West",
   /* the third cold read: a person asked by name or pronoun, a polite
      request, and more run-on dictation */
-  "Can they move 17563 to CNG West","Could they move bus 17563 to CNG West","Will they move 17563 and 18507 to CNG West","Can he move bus 17563 to CNG West","Could she put 17563 in CNG West","Hey can they put 17563 in CNG West","Is there any chance you can move 17563 to CNG West","Is there room in CNG West move 17563 to CNG West","How long is it gonna take move 17563 to CNG West","Can you guys move 17563 to CNG West","When you get a chance can you move 17563 to CNG West",
+  "Will they move 17563 and 18507 to CNG West","Is there any chance you can move 17563 to CNG West","Is there room in CNG West move 17563 to CNG West","How long is it gonna take move 17563 to CNG West","Can you guys move 17563 to CNG West","When you get a chance can you move 17563 to CNG West",
   /* "do" for emphasis and as part of a favour, and "will do" / "can do" */
   "Do move 17563 to CNG West","Do put 17563 in CNG West","Do us a favor move 17563 to CNG West","Will do move 17563 to CNG West","Can do move 17563 to CNG West",
   /* the fourth cold read: a person asked by name or job, and no subject */
-  "Can JD move 17563 to CNG West","Can the porter move 17563 to CNG West","Can dispatch move 17563 to CNG West","Can the crew move 17563 to CNG West","Can the night shift move 17563 to CNG West","Will the hostler move 17563 to CNG West","Can second shift put 17563 in CNG West","Can a servicer move 17563 to CNG West","Can whoever is free move 17563 to CNG West","Should move 17563 to CNG West","When 17563 is done move it to CNG West",
+  "Will the hostler move 17563 to CNG West","Can whoever is free move 17563 to CNG West","Should move 17563 to CNG West","When 17563 is done move it to CNG West",
   /* the fifth cold read, every one a command on release 200: "don't" and
      "never" that do not refuse the move, and a command run on after a
      question with no full stop between */
@@ -585,7 +593,10 @@ test("the operator moves buses however the command is phrased, and CNG West mark
   /* and "put" as an order, beside the past-tense words that must not catch it */
   "Put 17563 in CNG West","Put 17563 in CNG West already","Someone put 17563 in CNG West","Was told to put 17563 in CNG West","Is 17563 done put it in CNG West","Bus 17563 is ready put it in CNG West","When you get a chance put 17563 in CNG West","Put 17563 in CNG West, it was supposed to go yesterday",
   /* and the orders the first past-tense rules refused (cold read of 203) */
-  "Just put 17563 in CNG West already","Ok just put 17563 in CNG West already","Can you put 17563 in CNG West already","Somebody put 17563 in CNG West already","Someone put 17563 in CNG West. Is 17534 done?","Move 17563 to CNG West this morning","Move 17563 to CNG West like I told you yesterday","Move 17563 to CNG West it came in last night","Move 17563 to CNG West it got fixed an hour ago","17563 is fixed so just put it in CNG West","Bus 17563 is done now put it in CNG West","17563 and 17534 are done just put them in CNG West","The plan is we put 17563 in CNG West","When you put 17563 in CNG West mark it out of service","After you put 17563 in CNG West, put 17534 in CNG West","Move 17563 the one we put in bay 3 to CNG West","I don't care why move 17563 to CNG West"]){
+  "Just put 17563 in CNG West already","Ok just put 17563 in CNG West already","Can you put 17563 in CNG West already","Somebody put 17563 in CNG West already","Someone put 17563 in CNG West. Is 17534 done?","Move 17563 to CNG West this morning","Move 17563 to CNG West like I told you yesterday","Move 17563 to CNG West it came in last night","Move 17563 to CNG West it got fixed an hour ago","17563 is fixed so just put it in CNG West","Bus 17563 is done now put it in CNG West","17563 and 17534 are done just put them in CNG West","The plan is we put 17563 in CNG West","When you put 17563 in CNG West mark it out of service","After you put 17563 in CNG West, put 17534 in CNG West","Move 17563 the one we put in bay 3 to CNG West","I don't care why move 17563 to CNG West",
+  /* still orders under the general question rule: the assistant asked, with
+     "please" / "also" / "go" in the way, and idioms that ask nobody */
+  "Can you please move 17563 to CNG West","Can you also move 17563 to CNG West","Could you go move 17563 to CNG West","Can't wait move 17563 to CNG West","What the heck move 17563 to CNG West","Do as I say move 17563 to CNG West"]){
   assert.ok(isMove(planOperatorCommand(text,fleet,wider)),"a move: "+text);
  }
 
