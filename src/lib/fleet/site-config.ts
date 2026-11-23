@@ -56,6 +56,11 @@ export type SiteArea={
  name:string;
  /* What a person is told a bus at this location is. */
  label:string;
+ /* THE NAME WHERE THERE IS ONLY ROOM FOR A FEW LETTERS: the location button
+    inside the Log Defect form's bus box, beside the bus number. Omitted means
+    `label` is short enough. Curtis, on "Trouble Bay 12" there: "just put B12.
+    The trouble part is not necessary." */
+ short?:string;
  /* What the AI operator will accept for it. OFF PROPERTY has none today. */
  aliases:string[];
  /* WHERE THIS AREA SITS IN THE ALIAS LIST, and it is behaviour rather than
@@ -164,9 +169,9 @@ export const SITE_SECTIONS:SiteSection[]=[
   areas:[
    {name:"MAIN GARAGE (BAYS 1-10)",label:"Main Garage",aliases:["main garage","garage"],aliasOrder:6,
     slots:slots=>garageColumn(slots,column=>column<GARAGE_TROUBLE_BAY_FIRST_COLUMN)},
-   {name:"TROUBLE BAY 11",label:"Trouble Bay 11",aliases:["trouble bay 11","bay 11"],aliasOrder:1,
+   {name:"TROUBLE BAY 11",label:"Trouble Bay 11",short:"B11",aliases:["trouble bay 11","bay 11"],aliasOrder:1,
     slots:slots=>garageColumn(slots,column=>column===GARAGE_TROUBLE_BAY_FIRST_COLUMN)},
-   {name:"TROUBLE BAY 12",label:"Trouble Bay 12",aliases:["trouble bay 12","bay 12"],aliasOrder:2,
+   {name:"TROUBLE BAY 12",label:"Trouble Bay 12",short:"B12",aliases:["trouble bay 12","bay 12"],aliasOrder:2,
     slots:slots=>garageColumn(slots,column=>column===GARAGE_TROUBLE_BAY_FIRST_COLUMN+1)},
   ]},
  {name:"CNG WEST LOT",plan:{kind:"range",prefix:"west",count:WEST_CAPACITY},
@@ -226,6 +231,10 @@ export function siteRelocationAreas():Record<string,string[]>{
 }
 export function siteAreaLabels():Record<string,string>{
  return Object.fromEntries(SITE_SECTIONS.flatMap(section=>section.areas.map(area=>[area.name,area.label])));
+}
+/* Each area's short name, or its label where it has none. */
+export function siteAreaShortLabels():Record<string,string>{
+ return Object.fromEntries(SITE_SECTIONS.flatMap(section=>section.areas.map(area=>[area.name,area.short||area.label])));
 }
 export function siteThemeKeys():[string,string][]{
  /* Sorted by the theme's own order, not by section order: the two differ, and

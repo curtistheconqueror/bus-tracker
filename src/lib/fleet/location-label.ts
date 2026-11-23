@@ -1,5 +1,5 @@
 import {RELOCATION_AREAS} from "./facility-areas.ts";
-import {siteAreaLabels,sitePrefixLabels} from "./site-config.ts";
+import {siteAreaLabels,siteAreaShortLabels,sitePrefixLabels} from "./site-config.ts";
 
 /* WHERE A BUS IS, in the words a person uses out loud. One copy, because there
    were five — and they had already drifted: the Fixed Repairs copy had no
@@ -34,10 +34,14 @@ import {siteAreaLabels,sitePrefixLabels} from "./site-config.ts";
    one level up. */
 const AREA_LABELS:Record<string,string>=siteAreaLabels();
 
+const AREA_SHORT_LABELS:Record<string,string>=siteAreaShortLabels();
+
 const SLOT_LABELS=new Map<string,string>();
+const SLOT_SHORT_LABELS=new Map<string,string>();
 for(const [area,slots] of Object.entries(RELOCATION_AREAS)){
- const label=AREA_LABELS[area];
+ const label=AREA_LABELS[area],short=AREA_SHORT_LABELS[area];
  if(label)for(const slot of slots)SLOT_LABELS.set(slot,label);
+ if(short)for(const slot of slots)SLOT_SHORT_LABELS.set(slot,short);
 }
 
 /* THE PREFIX TABLE STAYS, as the fallback it always should have been. Not
@@ -68,4 +72,13 @@ export function knownLocationLabel(location:string|undefined){
 export function locationLabel(location:string|undefined,fallback="Location not set"){
  const at=String(location??"").trim();
  return knownLocationLabel(at)||at||fallback;
+}
+
+/* The same place in as few letters as the site config gives it — "B12" for
+   Trouble Bay 12 — for a spot with room for a word or two. Resolved through
+   the same slot table, so the short name and the long one cannot disagree
+   about which bay a bus is in. Every other place falls back to its label. */
+export function shortLocationLabel(location:string|undefined,fallback="Location not set"){
+ const at=String(location??"").trim();
+ return SLOT_SHORT_LABELS.get(at)||locationLabel(at,fallback);
 }

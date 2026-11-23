@@ -1,14 +1,15 @@
 # Publish next
 
-**STATUS: EIGHT RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; 200, from `24752d3`; 201, from `c96635a`; 202, from `759f591`; 203, from `076f7ae`; 204, from `be6ddd4`; and 205, from `55812e1`. NOT PUBLISHED.** Each sits on top of the one before; **publish `55812e1` (release 205), which carries all eight.** 205 is the one AI Operator blocker Dots held 204 for, and nothing else; no Down Sheet change. Curtis, 2026-11-22: *"Fix it as the general rule, not two more special cases … commit as the next release, update the handoff for Dots, push main and the mirror as before, and stop. Nothing else."* Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
+**STATUS: NINE RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; 200, from `24752d3`; 201, from `c96635a`; 202, from `759f591`; 203, from `076f7ae`; 204, from `be6ddd4`; 205, from `55812e1`; and 206, from `e649c64`. NOT PUBLISHED.** Each sits on top of the one before; **publish `e649c64` (release 206), which carries all nine.** 206 adds two things Curtis asked for on 2026-11-23 on the Log Defect form's BUS box, and touches neither the Down Sheet sync nor the AI Operator: the empty box says "Tap twice to type bus#", the place beside a picked bus is a button that moves the bus, and UNDO LAST takes back such a move. If 205 has already been checked, 206 needs only its own checks below. Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
 
 **What is live:** Sites Version 194 / application release 197, deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Rollback for 198: Sites 194 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
 
-8 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
+9 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
 
 | Release | What it is | State |
 | --- | --- | --- |
-| 205 | The general question rule: "Why did Alex move …?", "Does the porter move …?" and their kind are questions, not move orders | On `main`, pending publication — **publish this; it includes 198 to 204** |
+| 206 | The Log Defect BUS box: "Tap twice to type bus#" when empty, and the place beside a picked bus ("CNG East", "B12") is a button that opens the Move Bus window | On `main`, pending publication — **publish this; it includes 198 to 205** |
+| 205 | The general question rule: "Why did Alex move …?", "Does the porter move …?" and their kind are questions, not move orders | On `main`, pending publication |
 | 204 | Exactly the two failures on `076f7ae`: a second matching card placed first cannot take the original repair; "Did JD move this bus?" is a question | On `main`, pending publication; Down Sheet passed Dots's check, one AI Operator blocker fixed in 205 |
 | 203 | A repeat save updates the same repair (no duplicate, no doubled hours); a question about a past move is not an order | On `main`, pending publication; two failures in Codex's check, fixed in 204 |
 | 202 | The two checks 201 failed: the right mechanic is credited AFTER the save, and "When do these buses move?" prepares no move | On `main`, pending publication; failed Codex's repeat-save check, fixed in 203 |
@@ -16,6 +17,87 @@
 | 200 | ADD TO THAT ENTRY keeps the repairs already typed into a new entry | On `main`, pending publication |
 | 199 | The AI Operator moves buses when told "Moves buses … to CNG West" or "Buses … to CNG West", instead of asking which status to apply | On `main`, pending publication |
 | 198 | Reopening the last page at real phone speeds; the log-a-defect pickers without the keyboard; one BUS box; the symptom list opening itself; the Down Sheet ticks moved up; leaving a bus out of a shared Defects Logged list; ADD TO THAT ENTRY fixed; a Shop Cloud pull that did not finish is asked for again | On `main`, pending publication |
+
+## 206 — the Log Defect BUS box: its wording, and moving the bus from it
+
+### Source
+
+Release source: `e649c64`. Previous: `edc4349`, the commit that queued 205. Run at `e649c64`:
+
+```
+$ git log --oneline edc4349..e649c64
+e649c64 Release 206: the Log Defect BUS box - its wording, and moving the bus from it
+```
+
+```
+$ git diff --name-only edc4349..e649c64 -- app src tests
+app/defect-log/page.tsx
+src/components/down-sheet/mystery-board.tsx
+src/components/shared/bus-selector.css
+src/components/shared/bus-selector.tsx
+src/components/shared/combo-field.css
+src/components/shared/combo-field.tsx
+src/lib/fleet/location-label.ts
+src/lib/fleet/site-config.ts
+tests/fleet.test.mjs
+tests/shared.test.mjs
+```
+
+```
+$ git diff --shortstat edc4349..e649c64
+10 files changed, 179 insertions(+), 22 deletions(-)
+```
+
+Proof of no infrastructure change. This returned nothing:
+
+```
+$ git diff --name-only edc4349..e649c64 -- supabase package.json package-lock.json .github public worker
+```
+
+### Migrations
+
+None. No storage key added or renamed.
+
+### What changed
+
+Both are UI changes Curtis asked for and approved, on the Defect Log's LOG DEFECT form only:
+
+1. **The empty BUS box says "Tap twice to type bus#"** (was "Tap to pick a bus"). His words. Measured: it fits from 390 wide; at 360 its last letter is cut. He chose it knowing that.
+2. **The place beside a picked bus is its own button.** The box read "Bus 17565 · CNG East"; on this form it now reads "Bus 17565" with the place in a pill at the right, before the ×. Tapping the pill opens the Move Bus window the Defect Log already has (the one its bus cards open), headed BUS LOCATION instead of MYSTERY BUS.
+   - The move happens on **MOVE BUS**, not on SAVE, so a wrong location can be put right without logging a defect.
+   - It moves the bus to the first open space in the chosen area, through the same `moveBusToArea` every other move uses, so the old place is kept in LAST MOVED FROM (the Facility Map's bus editor) and status follows the location as it does everywhere else.
+   - **Trouble Bay 11 and 12 show as B11 and B12 in the pill.** Curtis: *"just put B12. The trouble part is not necessary."* The short names live in `site-config.ts` (a new optional `short` on an area) and are read through `location-label.ts`; every other label in the app is unchanged.
+   - Why: a bus the board had in CNG East was found in bay 12, put back in service by an operator.
+
+3. **UNDO LAST takes back a move made from the Move Bus window** (from the BUS box or from a bus card). It used to keep the snapshot from the last save, so UNDO LAST after a move put the moved bus back with nothing on screen saying so. Its label reads "Moved Bus N to PLACE". Found by the cold read.
+
+**The Down Sheet's bus box is unchanged**: it still says "Tap to pick a bus" and reads "Bus 17565 · CNG East"; its form already has MOVE BUS TO.
+
+### Verified
+
+- `npm test` on Windows — **482 pass, 0 fail** (one new test). `npm run lint` — no error. Type-check 238, unchanged.
+- **In the dev build, measured at 360, 430 and 1180 wide:** "Bus 15502" beside the longest place, Foreman Office, with nothing cut off (4px spare at 360), and beside Service Detail and Tow / Staging. The move window opens over the form; MOVE BUS to Trouble Bay 12 moved the bus (`east-1` to `garage-11`, `lastMovedFrom` `east-1`), the pill read B12, the form stayed open, and SAVE DEFECT afterwards kept the bus in `garage-11`.
+- After a move, UNDO LAST put the bus back (`garage-10` to `office-1`). Re-measured after clearing the dev service worker, which had been serving an older copy.
+- **Cold read, one subagent, before the push.** Nothing serious. Answered:
+  - the new wording had reached the Down Sheet's box too: fixed, it is the Log Defect form's only;
+  - UNDO LAST could silently undo a move: fixed (item 3);
+  - the pill was out of the Tab order: fixed;
+  - long names were cut mid-letter: fixed, they end in "…";
+  - the tests read source text rather than tapping: declined, nothing in the suite mounts a component; the taps were driven in the browser instead;
+  - the Defect Log's bus cards still head the window MYSTERY BUS for any bus: left, it predates this; the comment now says so;
+  - a stale comment about the page not re-rendering under the editor: corrected.
+  - Not fixed: after the window closes, focus is not put back in the form.
+- **Not done:** no phone. A tap in the middle of the box at 360 can land on the pill rather than the bus number, because the pill takes that part of the box.
+
+### What to check once it is live
+
+1. On a phone, + LOG DEFECT: the empty box says "Tap twice to type bus#".
+2. Pick a bus: the box shows "Bus N" and its place in a pill. Tap the pill: Move Bus opens with BUS LOCATION over it. Cancel it. Only move a bus that is really somewhere else.
+3. On the Down Sheet, + ADD: the bus box still reads "Bus N · Place".
+
+### Rollback
+
+Sites 194 / release 197 at `12822f60c7e5d76d3702108b33711cc116ca4f61`, while nothing after 197 is live.
 
 ## 205 — the general question rule, and nothing else
 

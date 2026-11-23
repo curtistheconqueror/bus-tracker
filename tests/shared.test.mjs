@@ -1057,8 +1057,12 @@ test("a form redrawing around a text field does not drag the picker with it",asy
     value every render and would make the memo a comparison that can never
     pass, so the pattern admits the former and refuses the latter. A boolean
     literal — `autoFocus={false}` — is as stable as a string and is admitted. */
- assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\}(?: [a-zA-Z]+=(?:"[^"]*"|\{(?:true|false)\}))*\/>/,
+ assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\}(?: [a-zA-Z]+=(?:"[^"]*"|\{(?:true|false)\}))* onLocation=\{moveBus\}\/>/,
   "and the held callback is the one passed, with nothing but literals beside it");
+ /* onLocation is the page's move-window opener, passed straight through: a
+    useCallback with no dependencies, so it holds as still as pickBus. */
+ assert.match(log,/const moveFromEditor=useCallback\(\(busId:string\)=>\{setMovingFromEditor\(true\);setMovingMysteryBusId\(busId\)\},\[\]\)/);
+ assert.match(log,/ moveBus=\{moveFromEditor\}\/>\}/);
  assert.doesNotMatch(log,/select=\{busId=>\{onBusPicked/,
   "no inline arrow remains on that prop");
 
@@ -1215,7 +1219,7 @@ test("on the Defect Log a picker opens its list without the keyboard, and typing
 
  /* NO KEYBOARD AS THE FORM OPENS, AND NO GREY CARD. The grey card is iOS's
     drawing of a <datalist> suggestion offering back the number in the box. */
- assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\} coach="bus"\/>/);
+ assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\} coach="bus" placeholder="Tap twice to type bus#" onLocation=\{moveBus\}\/>/);
  assert.match(sheet,/<BusSelector fleet=\{fleet\} busId=\{draft\.busId\}\n/);
  const pickerCode=picker.replace(/\/\*[\s\S]*?\*\//g,"");
  assert.doesNotMatch(pickerCode,/autoFocus|<datalist|list=\{/,"no focus taken, and no suggestion list for iOS to draw");
