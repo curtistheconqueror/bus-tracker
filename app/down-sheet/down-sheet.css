@@ -757,6 +757,9 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .repair-existing-entry>button{min-height:38px;height:auto;margin-left:auto;border:0;border-radius:6px;background:#f97316;color:#231205;padding:0 14px;font-size:10px;font-weight:900;letter-spacing:.05em;cursor:pointer;white-space:nowrap}
 .repair-existing-entry>button:focus-visible{outline:2px solid var(--log-text,#172b4d);outline-offset:2px}
 @media(max-width:620px){.repair-existing-entry>button{margin-left:0;width:100%}}
+/* Why ADD TO THAT ENTRY added nothing: one FIXED BY per entry. Its own line,
+   in the page's text colour, under an orange rule so it reads as the notice's. */
+.repair-existing-entry>.repair-transfer-blocked{flex-basis:100%;margin:0;padding-top:6px;border-top:1px solid color-mix(in srgb,#f97316 45%,transparent);font-size:11px;font-weight:800;line-height:1.4;color:var(--log-text,#172b4d)}
 .status-report-modal{width:min(760px,96vw);max-height:92vh;overflow:auto;border-radius:10px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);padding:0 0 14px;display:grid;gap:12px;box-shadow:0 12px 40px #0b1a3a55}
 /* STICKY, AND height:auto, AND BOTH ARE LOAD-BEARING.
 

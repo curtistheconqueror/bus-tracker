@@ -105,6 +105,34 @@ const MOVE_WORDS="moves?|relocates?|places?|sends?|puts?|transfers?|shifts?|brin
    17563 34 18507 to cng west", "17563 and 18507 into the waiting area". */
 const BARE_MOVE=/^(?:the |bus |buses )*\d+(?:(?: |, | and )+\d+)*(?: and)? (?:to|into) (?:the )?[a-z]+(?: [a-z0-9]+){0,3}$/;
 const MOVE_VERB=new RegExp("\\b(?:"+MOVE_WORDS+")\\b");
+/* A MOVE WORD IN A QUESTION IS NOT A MOVE. "Who moves this bus?" brought up a
+   move proposal (the publisher's check).
+
+   Two cold reads shaped this. The first fix caught only "-s" verbs after a
+   question word at the very start, and missed "So who moves ...", "Who can
+   move ...", "Did anyone move ..." and two questions joined by ";". The
+   second, broader fix took ANY question word before the verb, and refused
+   ordinary dictated commands: "When you get a chance move 17563 to CNG West",
+   "Is it possible to move ...", "Where is 17563? Move it to CNG West". A
+   refused command costs the person holding the phone more than a question
+   turned into a proposal they can still decline, so the rule is narrow.
+
+   It reads the SENTENCE that holds the move word, from the raw command (the
+   normalised text has lost its full stops and question marks). That sentence
+   asks when it opens - after a filler like "so", "ok" or "tell me" - on who,
+   what, which or why, or on did or does (didn't, doesn't). when / where / how
+   open clauses as often as questions, and do / is / have / can open requests,
+   so none of them asks. A move told NOT to happen ("Don't move ...") is not a
+   move either. The question mark decides nothing: dictation adds one to
+   "Moves buses ... to CNG West?", which is a command. */
+const ASK_VERB=new RegExp("\\b(?:"+MOVE_WORDS+"|add)\\b");
+const SENTENCE_FILLER="(?:(?:so|ok|okay|well|hey|and|um|uh|please|quick question|tell me|i need to know|i want to know|do you know)\\s+)*";
+const ASKING_SENTENCE=new RegExp("^"+SENTENCE_FILLER+"(?:who|whom|whose|what|which|why|(?:did|does)(?:n t)?)\\b");
+const REFUSED_SENTENCE=new RegExp("^"+SENTENCE_FILLER+"(?:don t|dont|do not|never)\\b");
+export function asksAboutMove(command:string){
+ const sentence=String(command??"").split(/[.?!;:]+/).map(normalized).find(part=>ASK_VERB.test(part));
+ return Boolean(sentence)&&(ASKING_SENTENCE.test(sentence!)||REFUSED_SENTENCE.test(sentence!));
+}
 const MOVE_CLAUSE_START=new RegExp(";|,(?=\\s*(?:"+MOVE_WORDS+"|add)\\b)","i");
 const MOVE_CLAUSE=new RegExp("\\b(?:"+MOVE_WORDS+"|add)\\b","i");
 function statusLabel(status:FleetStatus){return STATUS_LABELS[status]||status}
@@ -370,7 +398,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
  }
 
 
- const areaMentions=findOperatorAreaMentions(command,areas),baseMoveAction=MOVE_VERB.test(text),explicitQueries=busQueries(command),
+ const areaMentions=findOperatorAreaMentions(command,areas),asking=asksAboutMove(command),baseMoveAction=MOVE_VERB.test(text)&&!asking,explicitQueries=busQueries(command),
   /* NO VERB AT ALL: "Buses 17563 34 18507 to CNG West". Only when that is
      ALL the command says - bus numbers, then "to" or "into", then the one
      place, and nothing else. The first version took any bus number, any "to"
@@ -379,7 +407,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
      yesterday") and defect notes ("horn defect, waiting on parts to come in",
      which names the WAITING AREA) into moves. */
   impliedMove=!baseMoveAction&&explicitQueries.length>0&&areaMentions.length===1&&!isQuestion(command)&&BARE_MOVE.test(text),
-  moveAction=baseMoveAction||impliedMove||(/\badd\b/.test(text)&&areaMentions.length>0),statusAction=/\b(mark|set|update|change)\b/.test(text)&&/\b(status|blue|green|yellow|red|in service|out of service|work in progress|wip|decommissioned|mystery|unknown)\b/.test(text),desiredStatus=statusFromCommand(command);
+  moveAction=baseMoveAction||impliedMove||(!asking&&/\badd\b/.test(text)&&areaMentions.length>0),statusAction=!asking&&/\b(mark|set|update|change)\b/.test(text)&&/\b(status|blue|green|yellow|red|in service|out of service|work in progress|wip|decommissioned|mystery|unknown)\b/.test(text),desiredStatus=asking?undefined:statusFromCommand(command);
  const splitFleet=/\b(everything else|all other buses|all others|the rest|remaining buses|everyone else)\b/.test(text);
  /* Before the move and status paths: "put the last sweep back" contains a move
     word and "remove the most recent 24" contains something that looks like a
@@ -394,7 +422,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
   }
   return {kind:"message",message:"Tell me which buses should be set to "+statusLabel(desiredStatus)+".",context:{busIds:[],busNumbers:[],label:"Status: "+statusLabel(desiredStatus),pendingStatus:desiredStatus,pendingIntent:"status"}};
  }
- if(explicitQueries.length&&context?.pendingStatus&&!moveAction&&!desiredStatus){
+ if(explicitQueries.length&&context?.pendingStatus&&!moveAction&&!desiredStatus&&!asking){
   const resolved=resolveMany(fleet,explicitQueries);
   if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every bus in that status update.",context:clarificationContext(command,resolved,context)||context};
   return {kind:"plan",plan:{kind:"batch",requiresConfirmation:true,items:resolved.buses.map(bus=>({busId:bus.id,busNumber:bus.n,status:context.pendingStatus})),summary:"Update "+resolved.buses.map(bus=>bus.n).join(", ")+" to "+statusLabel(context.pendingStatus)}};
@@ -428,7 +456,9 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
  }
  if(moveAction&&!explicitQueries.length&&/\b(all|every)\b/.test(text)&&areaMentions.length===1)return {kind:"message",message:"I found the destination "+areaMentions[0].area.name+", but I need the source area too. Try: Move all buses from CNG West to the Waiting Area."};
  const repeatedClauses=command.split(MOVE_CLAUSE_START).map(clause=>clause.trim()).filter(Boolean);
- if(repeatedClauses.length>1&&repeatedClauses.every(clause=>MOVE_CLAUSE.test(clause))){
+ /* The clauses of a question are not moves either: "Who moves 17563 to CNG
+    West; who moves 18507 ..." was a two-move batch (cold read). */
+ if(!asking&&repeatedClauses.length>1&&repeatedClauses.every(clause=>MOVE_CLAUSE.test(clause))){
   const items:OperatorBatchItem[]=[];
   for(const clause of repeatedClauses){
    const queries=busQueries(clause),resolved=resolveMany(fleet,queries),area=areaFromCommand(clause,areas),clauseStatus=statusFromCommand(clause);
@@ -448,6 +478,9 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
   if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every bus in that command.",context:clarificationContext(command,resolved)};
   const area=moveAction?areaFromCommand(command,areas):undefined;
   if(moveAction&&!area)return {kind:"message",message:"I found the buses, but I could not identify the destination area. Try On Road, Main Garage, CNG East, CNG West, or Waiting Area."};
+  /* A question about moving them is not a status update waiting for its
+     status ("Who sends 17563 and 18507 to CNG West", cold read). */
+  if(!moveAction&&!desiredStatus&&asking)return {kind:"message",message:"That reads as a question, so nothing was prepared. To move "+resolved.buses.map(bus=>bus.n).join(", ")+", say it as an instruction, such as “Move "+resolved.buses.map(bus=>bus.n).join(", ")+" to "+(areaFromCommand(command,areas)?.name||"CNG WEST LOT")+".”"};
   if(!moveAction&&!desiredStatus)return {kind:"message",message:"Tell me which status to apply to those buses.",context:{busIds:resolved.buses.map(bus=>bus.id),busNumbers:resolved.buses.map(bus=>bus.n),label:"Buses "+resolved.buses.map(bus=>bus.n).join(", "),pendingIntent:"status"}};
   if(area){
    const already=resolved.buses.filter(bus=>area.slots.includes(bus.l)).length,needed=resolved.buses.length-already,open=area.slots.filter(slot=>!fleet.some(bus=>bus.l===slot)).length;
