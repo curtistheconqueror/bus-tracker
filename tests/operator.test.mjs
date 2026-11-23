@@ -513,6 +513,34 @@ test("the operator moves buses however the command is phrased, and CNG West mark
   const result=planOperatorCommand(text,fleet,wider);
   assert.ok(!(result.kind==="plan"&&(result.plan.kind==="move"||(result.plan.kind==="batch"&&result.plan.items.some(item=>item.areaName)))),"not a move: "+text);
  }
+ /* The publisher's check: "Who moves this bus?" brought up a move proposal -
+    with a bus remembered from the last turn, which is how it was asked. A
+    move word in a question is not a move, in any form, and the cold read of
+    the first fix supplied most of these. */
+ const isMove=result=>result.kind==="plan"&&(result.plan.kind==="move"||result.plan.kind==="bulkMove"||(result.plan.kind==="batch"&&result.plan.items.some(item=>item.areaName)));
+ /* a question proposes no change at all - no move, and no status either */
+ const isWrite=result=>result.kind==="plan"&&["move","bulkMove","batch"].includes(result.plan.kind);
+ const remembered={busIds:[fleet[0].id],busNumbers:["17563"],label:"17563",lastBusId:fleet[0].id};
+ for(const text of ["Who moves this bus?","Who moves it to CNG West?","so who moves it to cng west","Who can move it to CNG West?","Who moves bus 17563?","who moves bus 17563 to CNG West","What moves 17563 to CNG West","Which crew moves 17563 to CNG West?","So who moves bus 17563 to CNG West","OK who moves bus 17563 to CNG West","Tell me who moves bus 17563 to CNG West","I need to know who moves bus 17563 to CNG West","Who can move bus 17563 to CNG West?","Who should move bus 17563 to CNG West","Why did you move bus 17563 to CNG West?","Did anyone move bus 17563 to CNG West?","What shift moved bus 17563 to CNG West","Who moves 17563 to CNG West; who moves 18507 to CNG West","Which crew moves 17563 to CNG West, moves 18507 to CNG West",
+  /* the second cold read: a status named in the question, "add", contractions,
+     and a move told not to happen */
+  "Who sends 17563 and 18507 to CNG West out of service","Who moves it to CNG West out of service","Who can add 17563 to CNG West","Why add 17563 to CNG West","Didn't you move 17563 to CNG West","Doesn't someone move 17563 to CNG West","Don't move 17563 to CNG West","Do not move 17563 to CNG West"]){
+  assert.ok(!isWrite(planOperatorCommand(text,fleet,wider)),"not a change: "+text);
+  assert.ok(!isWrite(planOperatorCommand(text,fleet,wider,remembered)),"not a change, with a bus remembered: "+text);
+ }
+ /* and a question naming several buses is told so, not asked for a status */
+ assert.match(planOperatorCommand("Who sends 17563 and 18507 to CNG West",fleet,wider).message,/reads as a question, so nothing was prepared\. To move 17563, 18507, say it as an instruction, such as “Move 17563, 18507 to CNG WEST LOT\.”/);
+ assert.match(planOperatorCommand("Who sends 17563 and 18507 to the waiting area",fleet,wider).message,/to WAITING AREA\.”/);
+ /* while a request is still a request, as it always was - and a question
+    mark that dictation adds to a command does not make it a question. */
+ for(const text of ["Can you move bus 17563 to CNG West?","Could you move bus 17563 to CNG West","Move bus 17563 to CNG West?","Moves bus 17563 to CNG West?","So move bus 17563 to CNG West","Please move bus 17563 to CNG West",
+  /* and the dictated commands the second cold read found a broader rule
+     refusing: a question word opening a clause of time or place, a question
+     in its own sentence first, and the polite openings */
+  "When you get a chance move 17563 to CNG West","When you can, move 17563 and 18507 to CNG West","Where is 17563? Move it to CNG West","How about you move 17563 to CNG West","Ok so what I need: move 17563 to CNG West","Is it possible to move 17563 to CNG West","Are you able to move 17563 to CNG West","Do me a favor and move 17563 to CNG West","Have someone move 17563 to CNG West"]){
+  assert.ok(isMove(planOperatorCommand(text,fleet,wider)),"a move: "+text);
+ }
+
  /* And ", shifting the rest later" no longer splits a working move in two. */
  assert.equal(planOperatorCommand("Move 17563 and 18507 to CNG West, shifting the rest later",fleet,areas).kind,"plan");
 });

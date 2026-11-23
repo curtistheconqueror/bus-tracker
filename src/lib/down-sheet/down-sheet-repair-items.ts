@@ -138,3 +138,29 @@ export function repairItemsProgress(items: DownSheetRepairItem[]) {
   const done = real.filter(item => item.done).length;
   return {done, total: real.length, complete: real.length > 0 && done === real.length};
 }
+
+/* ONE FIXED BY PER ENTRY. An entry signs off every finished repair on it with
+   one name - FIXED BY, or the assigned mechanic when FIXED BY is empty - and
+   a save credits each finished repair to that name. So ADD TO THAT ENTRY may
+   not carry a repair FINISHED under one sign-off into an entry signed by
+   another: it would be credited to the wrong person (the publisher's check
+   found it). Only that transfer is refused; unfinished repairs carry as they
+   always did. Both sides are compared trimmed and in capitals, the way the
+   form writes them, and an empty sign-off is a sign-off like any other.
+
+   Returns the two sign-offs when the transfer must be refused, else null. */
+export type SignoffSide = {
+  completedBy?: string;
+  assignmentType?: string;
+  assignedTo?: string;
+};
+export function entrySignoff(entry: SignoffSide) {
+  const signoff = (value: string | undefined) => String(value || "").trim().toUpperCase();
+  return signoff(entry.completedBy) || (entry.assignmentType === "Mechanic" ? signoff(entry.assignedTo) : "");
+}
+export function finishedSignoffConflict(carried: DownSheetRepairItem[], from: SignoffSide, into: SignoffSide) {
+  if (!carried.some(item => item.done)) return null;
+  const ours = entrySignoff(from);
+  const theirs = entrySignoff(into);
+  return ours === theirs ? null : {ours, theirs};
+}

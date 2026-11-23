@@ -2435,13 +2435,54 @@ test("the Down Sheet uses the Defect Log's bus picker, and adds to a bus already
  assert.match(editorCode,/\{existingEntry&&<p className="repair-existing-entry">/,
   "the notice renders when the bus is already on the sheet");
  assert.match(editorCode,/is already on the sheet\./);
- assert.match(editorCode,/\{onOpenExisting&&<button type="button" onClick=\{\(\)=>onOpenExisting\(existingEntry\.id,initials\.trim\(\),isNew\?draft\.repairItems\.filter\(item=>item\.category\|\|item\.repair\|\|item\.details\|\|item\.estimateEnabled\):\[\]\)\}>ADD TO THAT ENTRY<\/button>\}/,
+ assert.match(editorCode,/\{onOpenExisting&&<button type="button" onClick=\{\(\)=>addToThatEntry\(existingEntry\)\}>ADD TO THAT ENTRY<\/button>\}/,
   "and the way through is wired to that entry");
 
  /* And "add to it" means exactly that: the existing entry opens with the
     repairs typed into the new entry on the end - or a fresh blank card when
     none were - so the new work goes into the row that is already there. */
  assert.match(page,/onOpenExisting=\{\(entryId,typedInitials,typedRepairs\)=>/);
+ /* Only a new entry's typed repairs carry, by the same test a save uses. */
+ assert.match(editor,/const carriedRepairs=\(\)=>isNew\?draft\.repairItems\.filter\(item=>item\.category\|\|item\.repair\|\|item\.details\|\|item\.estimateEnabled\):\[\];/);
+ /* ONE FIXED BY PER ENTRY: a FINISHED repair is not carried into an entry
+    signed off by somebody else - it would be credited to the wrong person.
+    The press is refused with the reason and the new entry is untouched; the
+    rule itself is run below, in the module. */
+ assert.match(editor,/const conflict=finishedSignoffConflict\(carriedRepairs\(\),draft,target\);/);
+ assert.match(editor,/if\(transferRefusal\(target\)\)\{setRefusedFor\(target\.id\);return\}\s*setRefusedFor\(""\);\s*onOpenExisting\(target\.id,initials\.trim\(\),carriedRepairs\(\)\);/);
+ assert.match(editor,/const refusalShown=existingEntry&&refusedFor===existingEntry\.id\?transferRefusal\(existingEntry\):"";/);
+ assert.match(editor,/\{refusalShown&&<small className="repair-transfer-blocked" role="alert">\{refusalShown\}<\/small>\}/);
+ assert.match(editor,/if\(refusedFor&&!refusalShown\)setRefusedFor\(""\);/);
+ /* The advice is a way out that does not misattribute: a new entry whose every
+    repair is FINISHED saves as Completed, which the duplicate check allows,
+    under its own FIXED BY. "Finish it on that entry" would have meant
+    changing that entry's one FIXED BY, which re-credits every repair on it. */
+ assert.match(editor,/Untick FINISHED to add the repair to that entry, or finish every repair here and save this as its own entry\./);
+ assert.doesNotMatch(editor,/finish it on that entry/);
+ assert.match(page,/const saveEntry=\(next:DownEntry\)=>\{if\(next\.workflow!=="Completed"&&entries\.some\(/);
+ {
+  const {finishedSignoffConflict,entrySignoff,blankRepairItem}=await import("../src/lib/down-sheet/down-sheet-repair-items.ts");
+  const open={...blankRepairItem(),category:"Engine",repair:"Overheating"};
+  const finished={...open,done:true};
+  const jd={assignmentType:"Mechanic",assignedTo:"jd "};
+  /* the case the publisher found: finished under MK, into JD's entry */
+  assert.deepEqual(finishedSignoffConflict([finished],{completedBy:"mk"},jd),{ours:"MK",theirs:"JD"});
+  /* nothing finished carries freely, whoever signed what */
+  assert.equal(finishedSignoffConflict([open],{completedBy:"MK"},jd),null);
+  assert.equal(finishedSignoffConflict([],{completedBy:"MK"},jd),null);
+  /* the same person, however it was typed and whichever field says it */
+  assert.equal(finishedSignoffConflict([finished],{completedBy:" JD"},jd),null);
+  assert.equal(finishedSignoffConflict([finished],{assignmentType:"Mechanic",assignedTo:"Jd"},{completedBy:"JD"}),null);
+  /* FIXED BY outranks the assigned mechanic on both sides, as a save reads it */
+  assert.equal(entrySignoff({completedBy:"MK",assignmentType:"Mechanic",assignedTo:"JD"}),"MK");
+  assert.equal(finishedSignoffConflict([finished],{completedBy:"MK"},{completedBy:"MK",assignmentType:"Mechanic",assignedTo:"JD"}),null);
+  /* a vendor's name is not a sign-off */
+  assert.equal(entrySignoff({assignmentType:"Vendor",assignedTo:"ACME"}),"");
+  /* unsigned on one side and signed on the other is still two answers */
+  assert.deepEqual(finishedSignoffConflict([finished],{},jd),{ours:"",theirs:"JD"});
+  assert.deepEqual(finishedSignoffConflict([finished],{completedBy:"MK"},{}),{ours:"MK",theirs:""});
+  assert.equal(finishedSignoffConflict([finished],{},{}),null);
+ }
  /* Repairs typed before ADD TO THAT ENTRY come across, after the entry's own;
     the blank card only when nothing was typed. */
  assert.match(page,/\.\.\.\(typedRepairs\.length\?typedRepairs:\[blankRepairItem\(\)\]\)\]/);
