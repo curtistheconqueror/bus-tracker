@@ -4038,3 +4038,64 @@ test("a repair finished through ADD TO THAT ENTRY is credited, after the save, t
  const [vendorClosed]=applyDownEntryToFleet([vendorDone],{...merged,assignmentType:"Mechanic",assignedTo:"PB",completedBy:"PB",workflow:"Completed"},"2026-11-22T22:00:00.000Z");
  assert.equal(vendorClosed.defects.find(defect=>defect.issue==="Overheating").completedBy,"");
 });
+
+/* SAVING AGAIN UPDATES THE SAME REPAIR - the publisher's check of 202. A card
+   that matches a fault already open in the Defect Log takes that record over
+   on its first save. Adoption only takes an UNRESOLVED record, so once the
+   card had finished it, the next save could not find it and minted a second
+   record under the card's own id: the same repair twice, and 3 logged hours
+   reading as 6. Every later save now writes back to the record the card took
+   over, which the save stamps with the card. */
+test("reopening and saving a Down Sheet repair linked to the Defect Log updates that one repair, hours and all",async()=>{
+ const {sumWorkHours}=await import("../src/lib/reports/work-time.ts").catch(()=>({}));
+ const logged={id:"log-overheat",category:"Engine",issue:"Overheating",details:"runs hot on hills",state:"open",operability:"service",createdAt:"2026-11-20T10:00:00.000Z",updatedAt:"2026-11-21T10:00:00.000Z"};
+ const bus={id:"a",n:"17507",l:"bay-3",s:"defect",defects:[logged],pendingRepair:""};
+ const entry={id:"e1",busId:"a",busNumber:"17507",category:"Engine",repair:"Overheating",customReason:"",assignmentType:"Mechanic",assignedTo:"JD",workflow:"In Progress",operationalStatus:"out",
+  repairItems:[{id:"c1",category:"Engine",repair:"Overheating",details:"runs hot on hills",done:true,repairHours:3}]};
+ const hours=fleet=>fleet.defects.filter(defect=>defect.issue==="Overheating").reduce((sum,defect)=>sum+(defect.repairHours||0),0);
+ /* finished on the first save, then reopened and saved twice more */
+ let [saved]=applyDownEntryToFleet([bus],entry,"2026-11-22T20:00:00.000Z");
+ for(const at of ["2026-11-22T21:00:00.000Z","2026-11-22T22:00:00.000Z"])[saved]=applyDownEntryToFleet([saved],entry,at);
+ assert.deepEqual(saved.defects.map(defect=>defect.id),["log-overheat"],"one repair, the one the Defect Log already had");
+ assert.equal(hours(saved),3,"3 logged hours stay 3");
+ assert.equal(saved.defects[0].state,"completed");
+ assert.equal(saved.defects[0].completedBy,"JD");
+ assert.equal(saved.defects[0].details,"runs hot on hills","the record keeps its own details");
+ assert.equal(saved.defects[0].sheetCard,"downsheet-e1-c1");
+ /* open on the first save, finished on the second, saved a third time */
+ const open={...entry,repairItems:[{...entry.repairItems[0],done:false,repairHours:undefined}]};
+ let [later]=applyDownEntryToFleet([bus],open,"2026-11-22T20:00:00.000Z");
+ [later]=applyDownEntryToFleet([later],entry,"2026-11-22T21:00:00.000Z");
+ [later]=applyDownEntryToFleet([later],{...entry,repairItems:[{...entry.repairItems[0],repairHours:3.5}]},"2026-11-22T22:00:00.000Z");
+ assert.deepEqual(later.defects.map(defect=>defect.id),["log-overheat"]);
+ assert.equal(hours(later),3.5,"a corrected figure replaces the old one rather than adding to it");
+ /* a second card on the same entry is its own repair and stays its own */
+ const two={...entry,repairItems:[...entry.repairItems,{id:"c2",category:"Brakes",repair:"Brake chamber leak",details:"",done:true,repairHours:1}]};
+ let [both]=applyDownEntryToFleet([bus],two,"2026-11-22T20:00:00.000Z");
+ [both]=applyDownEntryToFleet([both],two,"2026-11-22T21:00:00.000Z");
+ assert.equal(both.defects.length,2);
+ assert.equal(both.defects.reduce((sum,defect)=>sum+(defect.repairHours||0),0),4);
+ /* and the credit on each is what FIXED BY showed, on every save */
+ assert.ok(both.defects.every(defect=>defect.completedBy==="JD"));
+ /* THE DEFECT LOG STILL OWNS A RECORD THE SHEET TOOK OVER (cold read).
+    Fixed there by MK with 2 hours while the sheet's card is still unticked,
+    then the sheet row saved: the record stays fixed, MK's, 2 hours. */
+ const unticked={...entry,repairItems:[{...entry.repairItems[0],done:false,repairHours:undefined}]};
+ let [owned]=applyDownEntryToFleet([bus],unticked,"2026-11-22T20:00:00.000Z");
+ owned={...owned,defects:owned.defects.map(defect=>defect.id==="log-overheat"?{...defect,state:"completed",completedAt:"2026-11-22T20:30:00.000Z",completedBy:"MK",repairHours:2}:defect)};
+ [owned]=applyDownEntryToFleet([owned],{...unticked,assignedTo:"PB"},"2026-11-22T21:00:00.000Z");
+ assert.deepEqual(owned.defects.map(defect=>[defect.id,defect.state,defect.completedBy,defect.repairHours]),[["log-overheat","completed","MK",2]]);
+ /* renamed there, the next sheet save does not put the old name back */
+ let [renamed]=applyDownEntryToFleet([bus],unticked,"2026-11-22T20:00:00.000Z");
+ renamed={...renamed,defects:renamed.defects.map(defect=>({...defect,issue:"Coolant leak"}))};
+ [renamed]=applyDownEntryToFleet([renamed],unticked,"2026-11-22T21:00:00.000Z");
+ assert.deepEqual(renamed.defects.map(defect=>[defect.id,defect.issue]),[["log-overheat","Coolant leak"]]);
+ /* and a record one card holds is not taken by another: the entry names the
+    record, its card finishes it with 3 hours, then a new card goes ahead */
+ const named={...entry,defectId:"log-overheat"};
+ let [held]=applyDownEntryToFleet([bus],named,"2026-11-22T20:00:00.000Z");
+ [held]=applyDownEntryToFleet([held],{...named,repairItems:[{id:"c0",category:"Brakes",repair:"Brake chamber leak",details:"",done:false},...named.repairItems]},"2026-11-22T21:00:00.000Z");
+ assert.deepEqual(held.defects.map(defect=>[defect.issue,defect.state,defect.repairHours??0]),[["Overheating","completed",3],["Brake chamber leak","in-progress",0]]);
+ void sumWorkHours;
+});
+

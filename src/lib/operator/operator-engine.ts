@@ -154,7 +154,7 @@ const ASK_VERB=new RegExp("\\b(?:"+MOVE_WORDS+"|add)\\b");
    Any of these is a command after all when the move word follows "and" or
    "then": "Do me a favor and move 17563 to CNG West". The question mark
    decides nothing: dictation adds one to "Moves buses ... to CNG West?". */
-const SENTENCE_START=/^(?:(?:so|ok|okay|well|hey|and|um|uh|please|wait|question|alright|all right|right|listen|yo|hmm|at|by|around|quick question|tell me|any idea|i need to know|i want to know|do you know|not sure|i m wondering|im wondering|wondering|never mind(?: that)?|why not|why don t (?:you|we)|why dont (?:you|we)|do you mind|would (?:you|ya) mind|will do|can do|do (?:me|us) a favou?r(?: and)?|do(?= (?:move|put|send|place|bring|transfer|shift|relocate|return|add)\b))\s+)*/;
+const SENTENCE_START=/^(?:(?:so|ok|okay|well|hey|and|um|uh|please|wait|question|alright|all right|right|listen|yo|hmm|at|by|around|yesterday|last night|this morning|earlier|remind me|quick question|tell me|any idea|i need to know|i want to know|do you know|not sure|i m wondering|im wondering|wondering|never mind(?: that)?|why not|why don t (?:you|we)|why dont (?:you|we)|do you mind|would (?:you|ya) mind|will do|can do|do (?:me|us) a favou?r(?: and)?|do(?= (?:move|put|send|place|bring|transfer|shift|relocate|return|add)\b))\s+)*/;
 /* What a can / will / should question is ABOUT. It asks about the BUS when a
    bus is named between the helping verb and the move word - a number, "bus",
    "these", "this one", "it" - and nobody is: "Can 17563 now move", "Can the
@@ -189,8 +189,12 @@ export function asksAboutMove(command:string){
     move ..."). "Do it, move them to CNG West" is a command after a remark;
     "Wait, when do these buses move?" is a question after one (sixth cold
     read: commas were not breaks, and both went wrong). */
- const found=String(command??"").split(/[.?!;:]+|,(?!\s*\d)/).map(normalized).find(part=>ASK_VERB.test(part));
- if(!found)return false;
+ const clauses=String(command??"").split(/(?<=[.?!;:])|,(?!\s*\d)/);
+ const rawClause=clauses.find(part=>ASK_VERB.test(normalized(part)));
+ if(!rawClause)return false;
+ const found=normalized(rawClause);
+ /* the clause holding the move word ends in a question mark */
+ const markedAsked=/\?\s*$/.test(rawClause);
  /* "Whens 17563 move", typed without the apostrophe, is "when s" */
  const sentence=found.replace(SENTENCE_START,"").replace(/^(when|where|how)s\b/,"$1 s");
  /* "When is the move for these buses ..." - "move" as a noun, asked about */
@@ -201,6 +205,30 @@ export function asksAboutMove(command:string){
  if(JOINED_COMMAND.test(sentence))return false;
  const runOn=RUN_ON.exec(sentence);
  if(runOn&&!ASKING_WORD.test(runOn[1]))return false;
+ /* A MOVE THAT HAS ALREADY HAPPENED is asked about or told, never ordered
+    (the publisher's check of 202). "put" is spelled the same in the past, so
+    "Was 17563 put in CNG West?", "17563 got put ...", "When we put 17563 in
+    CNG West did it go out of service?" and "17563 put in CNG West already?"
+    all read as orders. Only the shapes that cannot be an order count - the
+    first, broader version refused real ones ("Move 17563 to CNG West, it came
+    in last night", "Just put 17563 in CNG West already", "17563 is fixed so
+    just put it in CNG West", "When you put 17563 in CNG West mark it out"),
+    which a cold read measured:
+    - "put" straight after was / were / got / been, or after one of them and
+      the bus: "Was 17563 put ...", "17563 got put ...", "Were these buses
+      put ...", "has been put".
+    - "we" or "they" straight before "put", after when / after / since / who
+      / why or after "the bus(es)": "When we put 17563 ...", "The buses we put
+      in CNG West ...". "you" is left out: "When you put 17563 in CNG West
+      mark it out" is an instruction.
+    - "already put", or a bus, "put", and "already" at the end: "17563 put in
+      CNG West already?". An order says "Put 17563 in CNG West already".
+    - "Somebody put 17563 in CNG West?" - with the question mark on that
+      clause. Without it, it is an order to somebody. */
+ if(/\b(?:was|were|got|gotten|been|wasn t|weren t)(?: (?:\d+(?: and \d+)*|it|they|these|those|both|bus \d+|(?:the |these |those )?bus(?:es)?))? put\b/.test(sentence))return true;
+ if(/\b(?:when|after|since|who|why|bus|buses)\b (?:we|they) put\b/.test(sentence))return true;
+ if(/\balready put\b/.test(sentence)||/^(?:\d+|these|those|the bus(?:es)?|bus(?:es)?)\b.*\bput\b.*\balready$/.test(sentence))return true;
+ if(markedAsked&&/^(?:someone|somebody|anyone|anybody) put\b/.test(sentence))return true;
  const verbAt=sentence.search(ASK_VERB),before=sentence.slice(0,verbAt),after=sentence.slice(verbAt),objectAfter=OBJECT_AFTER.test(after);
  /* "These buses move to CNG West when?" */
  if(/\b(?:when|where|what time)$/.test(sentence))return true;
@@ -210,6 +238,9 @@ export function asksAboutMove(command:string){
     if / whether name a BUS and nobody else. "When you get a chance move
     17563 ..." names a person, and "When the shift starts move 17563 ..." no
     bus, so both stay commands (sixth cold read). */
+ /* "Can you tell me who put 17563 in CNG West?" - who / why straight before
+    the move word, wherever the clause began */
+ if(/(?<!\bcare )\b(?:who|why)(?: (?:did|didn t|would|d))? $/.test(before))return true;
  const embedded=/\b(?:when|where|whether|if)\b(?!.*\b(?:when|where|whether|if)\b)(.*)$/.exec(before);
  /* "Where is 17563 move it ..." is a command run on after a question: the
     is / are reading below decides those, not this */
