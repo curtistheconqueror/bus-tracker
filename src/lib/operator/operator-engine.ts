@@ -203,6 +203,10 @@ export function asksAboutMove(command:string){
     move ..." and "Don't wait, move ..." are commands */
  if(new RegExp("^(?:don t|dont|do not|never) (?:"+MOVE_WORDS+"|add)\\b").test(sentence))return true;
  if(JOINED_COMMAND.test(sentence))return false;
+ /* "Did JD move this bus?" asks whether a person moved it. The run-on reading
+    below took "JD move this" for an order after a remark (the publisher's
+    check of 203). did + who did it + the move word is always a question. */
+ if(new RegExp("^(?:did|didn t)(?: (?:the|a|our|my|that|this))? \\S+ (?:"+MOVE_WORDS+"|add)\\b").test(sentence))return true;
  const runOn=RUN_ON.exec(sentence);
  if(runOn&&!ASKING_WORD.test(runOn[1]))return false;
  /* A MOVE THAT HAS ALREADY HAPPENED is asked about or told, never ordered

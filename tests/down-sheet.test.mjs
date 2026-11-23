@@ -4099,3 +4099,35 @@ test("reopening and saving a Down Sheet repair linked to the Defect Log updates 
  void sumWorkHours;
 });
 
+/* A SECOND MATCHING CARD PLACED FIRST DOES NOT TAKE THE ORIGINAL REPAIR - the
+   publisher's check of 203. The original card took over the Defect Log's
+   record; a second card for the same repair, put ahead of it on the entry,
+   adopted that record on the next save, so the original repair changed
+   owner and was credited to whoever signed the new card. */
+test("a second matching card placed first does not take over the original repair or its credit",async()=>{
+ const logged={id:"log-overheat",category:"Engine",issue:"Overheating",details:"",state:"open",operability:"service",createdAt:"2026-11-20T10:00:00.000Z"};
+ const bus={id:"a",n:"17507",l:"bay-3",s:"defect",defects:[logged],pendingRepair:""};
+ const original={id:"c1",category:"Engine",repair:"Overheating",details:"",done:true,repairHours:3};
+ const entry={id:"e1",busId:"a",busNumber:"17507",category:"Engine",repair:"Overheating",customReason:"",assignmentType:"Mechanic",assignedTo:"JD",workflow:"In Progress",operationalStatus:"out",repairItems:[original]};
+ /* the original card finishes the logged repair under JD, 3 hours */
+ const [first]=applyDownEntryToFleet([bus],entry,"2026-11-22T20:00:00.000Z");
+ /* a second matching card goes in FIRST, finished, and the entry is signed by MK */
+ const second={id:"c0",category:"Engine",repair:"Overheating",details:"",done:true,repairHours:2};
+ const [after]=applyDownEntryToFleet([first],{...entry,completedBy:"MK",repairItems:[second,original]},"2026-11-22T21:00:00.000Z");
+ const kept=after.defects.find(defect=>defect.id==="log-overheat");
+ assert.equal(kept.sheetCard,"downsheet-e1-c1","the original repair keeps its owner");
+ assert.equal(kept.completedBy,"JD","and its credit");
+ assert.equal(kept.repairHours,3,"and its hours");
+ const added=after.defects.find(defect=>defect.id==="downsheet-e1-c0");
+ assert.ok(added,"the second card is its own repair");
+ assert.equal(added.repairHours,2);
+ assert.equal(after.defects.length,2);
+ /* and while the original is still open, the second card cannot take it either */
+ const [open]=applyDownEntryToFleet([bus],{...entry,repairItems:[{...original,done:false,repairHours:undefined}]},"2026-11-22T20:00:00.000Z");
+ const [still]=applyDownEntryToFleet([open],{...entry,completedBy:"MK",repairItems:[second,{...original,done:false,repairHours:undefined}]},"2026-11-22T21:00:00.000Z");
+ const owned=still.defects.find(defect=>defect.id==="log-overheat");
+ assert.equal(owned.sheetCard,"downsheet-e1-c1");
+ assert.notEqual(owned.state,"completed","the second card's FINISHED does not close the original");
+ assert.equal(owned.completedBy,undefined,"nor credit it to MK");
+});
+

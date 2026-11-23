@@ -136,7 +136,16 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
  const items=carriedItems(entry);
  const legacyIds=legacyDefectIds(entry);
  const legacy=current.find(defect=>legacyIds.includes(defect.id));
- const taken=new Set<string>();
+ /* A record a card on THIS entry has taken over (`sheetCard`) is set aside
+    before any card is matched, so no OTHER card can adopt it - not even one
+    placed ahead of its owner, which used to take it over, owner, credit and
+    all (the publisher's check of 203). Its owner finds it by the stamp. Once
+    the owning card is gone from the entry - removed, or an entry from before
+    repair cards whose card id is made afresh on every read - the record is
+    matched as it always was. */
+ const owners=new Set(items.map(item=>"downsheet-"+entryKey(entry)+"-"+item.id));
+ const heldHere=(defect:StructuredDefect)=>Boolean(defect.sheetCard&&owners.has(defect.sheetCard));
+ const taken=new Set<string>(current.filter(heldHere).map(defect=>defect.id));
  const adopt=(category:string,repair:string,details:string)=>
   adoptableDefect(current,{category,issue:repair,details},taken);
  /* An adopted record keeps its OWN details. It already says what the card says —
@@ -160,9 +169,9 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
      hours counted as 6 (the publisher's check of 202). The save now stamps
      the record it takes over with the card (`sheetCard`), and every later
      save, from any screen, writes back to that record. */
-  const claimed=mine?undefined:current.find(defect=>defect.sheetCard===own&&!taken.has(defect.id));
+  const claimed=mine?undefined:current.find(defect=>defect.sheetCard===own);
   /* a record another card has taken over is that card's, not this one's */
-  const adopts=index===0&&legacy&&!mine&&!claimed&&!taken.has(legacy.id)&&(!legacy.sheetCard||legacy.sheetCard===own);
+  const adopts=index===0&&legacy&&!mine&&!claimed&&!taken.has(legacy.id);
   const adopted=adopts||mine||claimed?undefined:adopt(item.category,item.repair,item.details);
   const id=adopts?legacy.id:mine?own:claimed?.id||adopted?.id||own;
   taken.add(id);

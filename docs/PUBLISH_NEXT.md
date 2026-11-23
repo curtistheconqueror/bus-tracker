@@ -1,19 +1,81 @@
 # Publish next
 
-**STATUS: SIX RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; 200, from `24752d3`; 201, from `c96635a`; 202, from `759f591`; and 203, from `076f7ae`. NOT PUBLISHED.** Each sits on top of the one before; **publish `076f7ae` (release 203), which carries all six.** 203 fixes what Codex's check of 202 found: reopening and saving a Down Sheet repair linked to the Defect Log duplicated it (3 hours read as 6), and questions about past moves ("Was 17563 put in CNG West?") were read as orders. Curtis, 2026-11-22: *"Get this matter handled, and I want Codex to push this live."* Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
+**STATUS: SEVEN RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; 200, from `24752d3`; 201, from `c96635a`; 202, from `759f591`; 203, from `076f7ae`; and 204, from `be6ddd4`. NOT PUBLISHED.** Each sits on top of the one before; **publish `be6ddd4` (release 204), which carries all seven.** 204 patches exactly the two failures Codex found on `076f7ae` and nothing else. Curtis, 2026-11-22: *"Patch exactly these two cases … stop when these two pass so Dots can finish and publish it live. No other changes beyond these two."* Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
 
 **What is live:** Sites Version 194 / application release 197, deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Rollback for 198: Sites 194 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
 
-6 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
+7 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
 
 | Release | What it is | State |
 | --- | --- | --- |
-| 203 | A repeat save updates the same repair (no duplicate, no doubled hours); a question about a past move is not an order | On `main`, pending publication — **publish this; it includes 198 to 202** |
+| 204 | Exactly the two failures on `076f7ae`: a second matching card placed first cannot take the original repair; "Did JD move this bus?" is a question | On `main`, pending publication — **publish this; it includes 198 to 203** |
+| 203 | A repeat save updates the same repair (no duplicate, no doubled hours); a question about a past move is not an order | On `main`, pending publication; two failures in Codex's check, fixed in 204 |
 | 202 | The two checks 201 failed: the right mechanic is credited AFTER the save, and "When do these buses move?" prepares no move | On `main`, pending publication; failed Codex's repeat-save check, fixed in 203 |
 | 201 | The two things Codex held 200 back for: "Who moves this bus?" no longer brings up a move, and ADD TO THAT ENTRY will not carry a FINISHED repair into an entry signed off by somebody else | On `main`, pending publication; failed two of Codex's checks, fixed in 202 |
 | 200 | ADD TO THAT ENTRY keeps the repairs already typed into a new entry | On `main`, pending publication |
 | 199 | The AI Operator moves buses when told "Moves buses … to CNG West" or "Buses … to CNG West", instead of asking which status to apply | On `main`, pending publication |
 | 198 | Reopening the last page at real phone speeds; the log-a-defect pickers without the keyboard; one BUS box; the symptom list opening itself; the Down Sheet ticks moved up; leaving a bus out of a shared Defects Logged list; ADD TO THAT ENTRY fixed; a Shop Cloud pull that did not finish is asked for again | On `main`, pending publication |
+
+## 204 — the two failures on 076f7ae, and nothing else
+
+### Source
+
+Release source: `be6ddd4`. Previous: `b957ceb`, the commit that queued 203. Run at `be6ddd4`:
+
+```
+$ git log --oneline b957ceb..be6ddd4
+be6ddd4 Release 204: the two failures on 076f7ae, and nothing else
+```
+
+```
+$ git diff --name-only b957ceb..be6ddd4 -- app src tests
+src/lib/down-sheet/down-sheet-sync.ts
+src/lib/operator/operator-engine.ts
+tests/down-sheet.test.mjs
+tests/operator.test.mjs
+```
+
+```
+$ git diff --shortstat b957ceb..be6ddd4
+ 4 files changed, 51 insertions(+), 4 deletions(-)
+```
+
+Proof of no infrastructure change. This returned nothing:
+
+```
+$ git diff --name-only b957ceb..be6ddd4 -- supabase package.json package-lock.json .github public worker
+```
+
+### Migrations
+
+None.
+
+### What was wrong, and what changed
+
+1. **A second matching card placed first took over the original repair.**
+   - **What happened:** a card had taken over a Defect Log record. A second card for the same repair was then put ahead of it on the entry, and the next save handed the record to the new card. The record changed owner and was credited to whoever signed the new card.
+   - **Change** (`down-sheet-sync.ts`, `defectTargets`): a record a card on the entry has taken over is set aside before any card is matched, so no other card can adopt it. Its owner finds it by its stamp. The second card becomes its own repair.
+   - Once the owning card is no longer on the entry, the record is matched as it always was. That includes an entry from before repair cards, whose card id is made afresh on every read; the first draft of this fix duplicated those, and the existing test caught it.
+2. **"Did JD move this bus?" prepared a move for confirmation.**
+   - **What happened:** the run-on reading took "JD move this" for an order after a remark.
+   - **Change** (`asksAboutMove`): "did" (or "didn't"), then who did it, then the move word, is always a question. It is checked before the run-on reading. "Did it get fixed move 17563 to CNG West" and "Did you check it, move 17563 …" are still orders.
+
+### Verified
+
+- `npm test` on Windows — **481 pass, 0 fail**. `npm run lint` — no error. Type-check 238, as 203.
+- **Two new tests, each failing on `076f7ae` and passing on `be6ddd4`:**
+  - `tests/down-sheet.test.mjs`, "a second matching card placed first does not take over the original repair or its credit". The original card finishes the logged repair under JD with 3 hours. A second matching card is put first, finished, and the entry is signed MK. The original record keeps its owner, JD and 3 hours; the second card is its own repair with 2 hours. With the original still open, the second card's FINISHED neither closes it nor credits MK.
+  - `tests/operator.test.mjs`: "Did JD move this bus?", "Did JD move this bus to CNG West?", "Did JD move 17563 to CNG West?" and "Did the porter move 17563 to CNG West?" prepare nothing, each with no context, a remembered bus and a remembered group.
+- Every reviewer case file was re-run against release 200's engine, and the result is unchanged from 203. Every order that moved on 200 still moves, except "Do I / How do I move …", which are meant as questions. No question prepares a move 200 did not.
+- **Not done:** no cold read of 204 and no phone. Curtis asked to stop when these two pass.
+
+### What to check once it is live
+
+1. The two checks above, in the app. Then the checks for 203 and earlier below.
+
+### Rollback
+
+Sites 194 / release 197 at `12822f60c7e5d76d3702108b33711cc116ca4f61`, while nothing after 197 is live.
 
 ## 203 — a repeat save updates the same repair, and a past move is not an order
 
