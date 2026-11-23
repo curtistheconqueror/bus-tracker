@@ -1,20 +1,93 @@
 # Publish next
 
-**STATUS: SEVEN RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; 200, from `24752d3`; 201, from `c96635a`; 202, from `759f591`; 203, from `076f7ae`; and 204, from `be6ddd4`. NOT PUBLISHED.** Each sits on top of the one before; **publish `be6ddd4` (release 204), which carries all seven.** 204 patches exactly the two failures Codex found on `076f7ae` and nothing else. Curtis, 2026-11-22: *"Patch exactly these two cases … stop when these two pass so Dots can finish and publish it live. No other changes beyond these two."* Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
+**STATUS: EIGHT RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; 200, from `24752d3`; 201, from `c96635a`; 202, from `759f591`; 203, from `076f7ae`; 204, from `be6ddd4`; and 205, from `55812e1`. NOT PUBLISHED.** Each sits on top of the one before; **publish `55812e1` (release 205), which carries all eight.** 205 is the one AI Operator blocker Dots held 204 for, and nothing else; no Down Sheet change. Curtis, 2026-11-22: *"Fix it as the general rule, not two more special cases … commit as the next release, update the handoff for Dots, push main and the mirror as before, and stop. Nothing else."* Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
 
 **What is live:** Sites Version 194 / application release 197, deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Rollback for 198: Sites 194 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
 
-7 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
+8 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
 
 | Release | What it is | State |
 | --- | --- | --- |
-| 204 | Exactly the two failures on `076f7ae`: a second matching card placed first cannot take the original repair; "Did JD move this bus?" is a question | On `main`, pending publication — **publish this; it includes 198 to 203** |
+| 205 | The general question rule: "Why did Alex move …?", "Does the porter move …?" and their kind are questions, not move orders | On `main`, pending publication — **publish this; it includes 198 to 204** |
+| 204 | Exactly the two failures on `076f7ae`: a second matching card placed first cannot take the original repair; "Did JD move this bus?" is a question | On `main`, pending publication; Down Sheet passed Dots's check, one AI Operator blocker fixed in 205 |
 | 203 | A repeat save updates the same repair (no duplicate, no doubled hours); a question about a past move is not an order | On `main`, pending publication; two failures in Codex's check, fixed in 204 |
 | 202 | The two checks 201 failed: the right mechanic is credited AFTER the save, and "When do these buses move?" prepares no move | On `main`, pending publication; failed Codex's repeat-save check, fixed in 203 |
 | 201 | The two things Codex held 200 back for: "Who moves this bus?" no longer brings up a move, and ADD TO THAT ENTRY will not carry a FINISHED repair into an entry signed off by somebody else | On `main`, pending publication; failed two of Codex's checks, fixed in 202 |
 | 200 | ADD TO THAT ENTRY keeps the repairs already typed into a new entry | On `main`, pending publication |
 | 199 | The AI Operator moves buses when told "Moves buses … to CNG West" or "Buses … to CNG West", instead of asking which status to apply | On `main`, pending publication |
 | 198 | Reopening the last page at real phone speeds; the log-a-defect pickers without the keyboard; one BUS box; the symptom list opening itself; the Down Sheet ticks moved up; leaving a bus out of a shared Defects Logged list; ADD TO THAT ENTRY fixed; a Shop Cloud pull that did not finish is asked for again | On `main`, pending publication |
+
+## 205 — the general question rule, and nothing else
+
+### Source
+
+Release source: `55812e1`. Previous: `76b80db`, the commit that queued 204. Run at `55812e1`:
+
+```
+$ git log --oneline 76b80db..55812e1
+55812e1 Release 205: the general question rule in the AI Operator
+```
+
+```
+$ git diff --name-only 76b80db..55812e1 -- app src tests
+src/lib/operator/operator-engine.ts
+tests/operator.test.mjs
+```
+
+```
+$ git diff --shortstat 76b80db..55812e1
+ 2 files changed, 73 insertions(+), 9 deletions(-)
+```
+
+Proof of no infrastructure change. This returned nothing:
+
+```
+$ git diff --name-only 76b80db..55812e1 -- supabase package.json package-lock.json .github public worker
+```
+
+### Migrations
+
+None. Only `src/lib/operator/operator-engine.ts` and its test changed. No Down Sheet code changed.
+
+### What was wrong
+
+Dots's check of 204: "Did JD move …?" was fixed, but "Why did Alex move …?" and "Does the porter move …?" still asked to confirm a move. No bus moved; nothing moves without confirmation.
+
+### What changed
+
+**The general rule Curtis set** (`opensAQuestion`, run before the run-on reading). A clause that opens with a question word or helper verb, followed by who does it and the move word, or that ends in "?", is a question and never a move order.
+- **The openers:** why, who, what, when, how, do, does, did, has, have, is, was, can, could, would, and their "n't" forms.
+- **"Who does it"** is a short subject straight before the move word: a name, "the porter", "these buses", "17563", "I", "we". It may have one helper between it and the opener ("Why **did** Alex move", "When **does** the porter move").
+- **Words that are not a subject mean a remark with an order run on after it, and the order stands:** "Did it get fixed move 17563 …", "Does 17563 have parts move it …", "When the shift starts move …", "Can't wait move …", "What the heck move …".
+- **is / was** take no bare verb, so "Is 17563 done move it to CNG West" is still an order. With a "?" at the end it is a question.
+- **"Have someone move …"** is still an order. "Have you put …" asks.
+
+**The one exception, kept on purpose.** Can / could / would with "you", "we" or "I" is a request to the assistant, and it still moves:
+- "Can you move bus 17563 to CNG West?" is how a move has always been asked for here.
+- Read literally, the rule would make it a question, and it is very likely among Dots's 24 valid commands.
+- "please", "also" and "go" in between do not change it ("Can you please move …").
+
+**What the rule changes, and Dots should know.** Can / could with anyone **else** now asks rather than orders. These prepared a move on 204 and now prepare nothing:
+- "Can the porter move 17563 to CNG West", "Can JD move …", "Can they move …", "Can someone move …", "Can the night shift move …".
+- 16 of them were orders in the test and are now in its questions list.
+- If any of these is among Dots's 24 valid commands, that is this rule working as Curtis wrote it, not a regression. The fix would be to narrow the rule to "you / we / I / someone".
+
+### Verified
+
+- `npm test` on Windows — **481 pass, 0 fail**. `npm run lint` — no error. Type-check 238.
+- **The test fails on `be6ddd4` and passes on `55812e1`.** On 204 it first fails at "Why did Alex move 17563 to CNG West?".
+- **New question cases**, each run with no context, a remembered bus and a remembered group, all preparing nothing: "Why did Alex move 17563 to CNG West?", "Why did Alex move this bus?", "Does the porter move 17563 to CNG West?", "Does the porter move this bus?", "Didn't JD move …?", "Has JD put …?", "When does the porter move …?", "How does Alex move …?", "Who can move …?", "Could Alex move …?", "Would the night shift move …?", "Is 17563 done move it to CNG West?".
+- **Orders that still move:** "Move 17563 to CNG West", "Can you move bus 17563 to CNG West?", "Could you / Would you / Can we move …", "Moves buses … to CNG West?", "Send 17563 to the waiting area", "Put 17563 in CNG West", and every other order in the test.
+- **Every reviewer case file re-run against release 200's engine:** the only orders that no longer prepare a move are the can / could + someone-else group above, plus "Do I / How do I move …", which are meant as questions. No question prepares a move 200 did not.
+- **Not done:** no cold read and no phone. Curtis asked to stop here.
+
+### What to check once it is live
+
+1. In the AI Operator, ask "Why did Alex move 17563 to CNG West?" and "Does the porter move 17563 to CNG West?", before and after asking about a bus. Neither should offer a move. "Move 17563 to CNG West" and "Can you move bus 17563 to CNG West?" should; do not apply them unless the bus belongs there.
+
+### Rollback
+
+Sites 194 / release 197 at `12822f60c7e5d76d3702108b33711cc116ca4f61`, while nothing after 197 is live.
 
 ## 204 — the two failures on 076f7ae, and nothing else
 
