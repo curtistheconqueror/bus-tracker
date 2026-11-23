@@ -1,16 +1,101 @@
 # Publish next
 
-**STATUS: THREE RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; and 200, from `24752d3`. NOT PUBLISHED.** Each sits on top of the one before; **publish `24752d3` (release 200), which carries all three.** It keeps the AI Operator fix and the typed repairs Codex asked for. Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
+**STATUS: FOUR RELEASES PENDING ON `main` — application release 198, from `2ee1bb5`; 199, from `a3b8158`; 200, from `24752d3`; and 201, from `c96635a`. NOT PUBLISHED.** Each sits on top of the one before; **publish `c96635a` (release 201), which carries all four.** 201 fixes the two things Codex held 200 back for: "Who moves this bus?" and the FIXED BY conflict. Curtis approved merging PRs 51, 52, 53, 54 and 55 on 2026-11-20 ("Yes, merge all five"); they are merged into `main`. Codex publishes when Curtis points it at this file.
 
 **What is live:** Sites Version 194 / application release 197, deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Rollback for 198: Sites 194 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
 
-3 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
+4 releases are pending. PR39 MCP remains separately held and unmerged, excluded from this release. The 197 queue as published: `docs/archive/PUBLISH_RELEASE_197.md`.
 
 | Release | What it is | State |
 | --- | --- | --- |
-| 200 | ADD TO THAT ENTRY keeps the repairs already typed into a new entry | On `main`, pending publication — **publish this; it includes 198 and 199** |
+| 201 | The two things Codex held 200 back for: "Who moves this bus?" no longer brings up a move, and ADD TO THAT ENTRY will not carry a FINISHED repair into an entry signed off by somebody else | On `main`, pending publication — **publish this; it includes 198, 199 and 200** |
+| 200 | ADD TO THAT ENTRY keeps the repairs already typed into a new entry | On `main`, pending publication |
 | 199 | The AI Operator moves buses when told "Moves buses … to CNG West" or "Buses … to CNG West", instead of asking which status to apply | On `main`, pending publication |
 | 198 | Reopening the last page at real phone speeds; the log-a-defect pickers without the keyboard; one BUS box; the symptom list opening itself; the Down Sheet ticks moved up; leaving a bus out of a shared Defects Logged list; ADD TO THAT ENTRY fixed; a Shop Cloud pull that did not finish is asked for again | On `main`, pending publication |
+
+## 201 — the two holds on 200: a question is not a move, and one FIXED BY per entry
+
+### Source
+
+Release source: `c96635a`. Previous: `1c7e539`, the commit that queued 200. Run at `c96635a`:
+
+```
+$ git log --oneline 1c7e539..c96635a
+c96635a Release 201: a question is not a move, and one FIXED BY per entry
+```
+
+```
+$ git diff --name-only 1c7e539..c96635a -- app src tests
+app/down-sheet/_components/down-sheet-editor.tsx
+app/down-sheet/down-sheet.css
+src/lib/down-sheet/down-sheet-repair-items.ts
+src/lib/operator/operator-engine.ts
+tests/down-sheet.test.mjs
+tests/operator.test.mjs
+```
+
+```
+$ git diff --shortstat 1c7e539..c96635a
+ 6 files changed, 170 insertions(+), 6 deletions(-)
+```
+
+Proof of no infrastructure change. This returned nothing:
+
+```
+$ git diff --name-only 1c7e539..c96635a -- supabase package.json package-lock.json .github public worker
+```
+
+### Migrations
+
+None. No storage key is added, renamed or read differently. `completedBy` was already written on every Down Sheet entry that has a FIXED BY; the editor's type now says so.
+
+### What was wrong
+
+Both found by Codex while verifying 200, which it held off the live site.
+
+1. **"Who moves this bus?" brought up a move proposal.** 199 taught the AI Operator that dictation writes "Move" as "Moves", so "Moves buses 17563 and 17564 to CNG West" is a command. It read every "moves" that way, questions included.
+2. **A FINISHED repair could be credited to the wrong mechanic.** A Down Sheet entry has one FIXED BY (or, when that is empty, its assigned mechanic), and saving credits every finished repair on the entry to that name. Since 200, ADD TO THAT ENTRY carries the repairs typed into a new entry across. A repair ticked FINISHED under MK, carried into an entry signed off by JD, would be saved as fixed by JD.
+
+### What changed
+
+1. **A move word in a question is not a move, in any form** (`asksAboutMove`). The engine reads the sentence that holds the move word.
+   - That sentence asks when it opens on who, what, which or why, or on did / does / didn't / doesn't. It still asks when a filler like "so", "ok", "quick question" or "tell me" comes first.
+   - A move told not to happen ("Don't move …", "Do not move …") is not a move either.
+   - Such a sentence proposes nothing: no move, no "add", no status, and no batch of moves across ";" or ",".
+   - **What still moves:**
+     - Requests: "Can you move bus 17563 to CNG West?", "Is it possible to move …", "Do me a favor and move …".
+     - Commands with a clause opened by when / where / how: "When you get a chance move 17563 to CNG West".
+     - A command after a question in its own sentence: "Where is 17563? Move it to CNG West".
+     - The question mark alone decides nothing, because dictation adds one to "Moves buses … to CNG West?", which is a command.
+   - **How the rule was narrowed.** Two cold reads shaped it. The first version caught too little ("So who moves …", "Who can move …", "Did anyone move …"). The second, broader version caught any question word before the verb and refused ordinary dictated commands like the ones above. A refused command costs more than a question turned into a proposal, which can still be declined, so the rule is narrow.
+   - A question that names several buses is now told *"That reads as a question, so nothing was prepared. To move 17563, 18507, say it as an instruction …"*, naming the place it asked about. Before, it was asked for a status.
+2. **ADD TO THAT ENTRY refuses only the conflicting case** (`finishedSignoffConflict`). It refuses when a repair carried across is FINISHED and the two entries' sign-offs differ. The new entry stays exactly as typed, and a line under the orange notice says why. It offers two ways out that credit the right person: untick FINISHED to add the repair to that entry, or finish every repair here and save it as its own entry. A fully finished entry saves as Completed, which the one-active-entry-per-bus check allows. The line goes as soon as the conflict does and does not come back without a press. Unfinished repairs carry as before.
+   - **This is a new on-screen message, so it is a UI change.** Codex proposed it; Curtis was told before it was built.
+   - The second cold read noted the save also falls back to the device's default initials, which the check does not. So an unsigned new entry can be refused against an entry signed with those same initials. That errs toward refusing, never toward the wrong name; left.
+   - A different mechanic on each repair would be a larger change and is not attempted. The cold read noted one case this does not touch: changing an existing entry's FIXED BY still re-credits every repair already finished on it. That is the one-sign-off design as it was before this release.
+
+### Verified
+
+- `npm test` on Windows — **478 pass, 0 fail**, including new cases:
+  - Twenty-seven question phrasings propose no change, each run with and without a bus remembered from the last turn, while fifteen commands still move. Most of both lists came from the two cold reads.
+  - The second reviewer's 41-case comparison against 200's engine, re-run on the final rule: every command behaves as in 200. Every difference is a question or a "don't move" that used to produce a proposal and now does not.
+  - Run against the engine as it stood in 200, "Who moves it to CNG West?" with a remembered bus gives a move plan, so the test reproduces what Codex saw.
+  - The sign-off rule (`finishedSignoffConflict`) is **run** across eleven cases, not matched as text. `npm run lint` — no error. Type-check 238, two fewer than 200: the two it no longer reports were the editor's FIXED BY box reading a field the type did not declare.
+- Dev server, one entry seeded: 17507, Brakes, assigned to mechanic JD. ADD DOWN BUS, Engine / Overheating ticked FINISHED, FIXED BY MK, bus 17507, ADD TO THAT ENTRY:
+  - The press was refused with the line *"A repair here is marked FINISHED by MK, and Bus 17507's entry is signed off by JD …"*, and the form was unchanged.
+  - Unticking FINISHED and pressing again carried it across as Defect 2.
+  - On a second run, changing FIXED BY to JD cleared the line, and the press carried it with FIXED BY JD.
+- **Not verified:** on a phone. Also not re-run in the browser: the message's final wording and its staying gone after FINISHED is ticked again. Both came after the browser run and are held by tests.
+
+### What to check once it is live
+
+1. In the AI Operator, "Locate bus <n>", then "Who moves it to CNG West?" It should not propose a move. Then "Moves bus <n> to CNG West" should still propose one; do not apply it unless the bus belongs there.
+2. On the Down Sheet, ADD DOWN BUS. Type a repair, tick it FINISHED, and put your initials in FIXED BY. Pick a bus already on the sheet that is assigned to somebody else. Tap ADD TO THAT ENTRY: it should refuse, saying why, and leave your entry as it was. Untick FINISHED and tap again: it should carry across.
+3. The checks for 200 and 199 below.
+
+### Rollback
+
+Release 200 at `1c7e539`, if 200 is live. Otherwise release 199 at `be290af`, if live. Otherwise Sites 194 / release 197 at `12822f60c7e5d76d3702108b33711cc116ca4f61`.
 
 ## 200 — ADD TO THAT ENTRY keeps the repairs already typed
 
