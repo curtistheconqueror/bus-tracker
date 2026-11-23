@@ -136,7 +136,16 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
  const items=carriedItems(entry);
  const legacyIds=legacyDefectIds(entry);
  const legacy=current.find(defect=>legacyIds.includes(defect.id));
- const taken=new Set<string>();
+ /* A record a card on THIS entry has taken over (`sheetCard`) is set aside
+    before any card is matched, so no OTHER card can adopt it - not even one
+    placed ahead of its owner, which used to take it over, owner, credit and
+    all (the publisher's check of 203). Its owner finds it by the stamp. Once
+    the owning card is gone from the entry - removed, or an entry from before
+    repair cards whose card id is made afresh on every read - the record is
+    matched as it always was. */
+ const owners=new Set(items.map(item=>"downsheet-"+entryKey(entry)+"-"+item.id));
+ const heldHere=(defect:StructuredDefect)=>Boolean(defect.sheetCard&&owners.has(defect.sheetCard));
+ const taken=new Set<string>(current.filter(heldHere).map(defect=>defect.id));
  const adopt=(category:string,repair:string,details:string)=>
   adoptableDefect(current,{category,issue:repair,details},taken);
  /* An adopted record keeps its OWN details. It already says what the card says —
@@ -153,11 +162,23 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
  return items.map((item,index)=>{
   const own="downsheet-"+entryKey(entry)+"-"+item.id;
   const mine=current.some(defect=>defect.id===own);
-  const adopts=index===0&&legacy&&!mine&&!taken.has(legacy.id);
-  const adopted=adopts||mine?undefined:adopt(item.category,item.repair,item.details);
-  const id=adopts?legacy.id:mine?own:adopted?.id||own;
+  /* A RECORD THIS CARD TOOK OVER IS STILL THIS CARD'S. Adoption only takes an
+     UNRESOLVED record, so once the card finished the record it had taken over
+     from the Defect Log, the next save could not find it again and minted a
+     second record under the card's own id - the same repair twice, and its 3
+     hours counted as 6 (the publisher's check of 202). The save now stamps
+     the record it takes over with the card (`sheetCard`), and every later
+     save, from any screen, writes back to that record. */
+  const claimed=mine?undefined:current.find(defect=>defect.sheetCard===own);
+  /* a record another card has taken over is that card's, not this one's */
+  const adopts=index===0&&legacy&&!mine&&!claimed&&!taken.has(legacy.id);
+  const adopted=adopts||mine||claimed?undefined:adopt(item.category,item.repair,item.details);
+  const id=adopts?legacy.id:mine?own:claimed?.id||adopted?.id||own;
   taken.add(id);
-  return {id,category:item.category,repair:item.repair,details:adopted?adopted.details:item.details,done:item.done===true,
+  /* A record taken over from the Defect Log keeps the Defect Log's name for
+     it: renamed there ("Overheating" to "Coolant leak"), the next sheet save
+     must not put the old name back (cold read). */
+  return {id,card:own,claimed:Boolean(claimed),category:claimed?claimed.category:item.category,repair:claimed?claimed.issue:item.repair,details:claimed?claimed.details:adopted?adopted.details:item.details,done:item.done===true,
    actionTaken:item.actionTaken,finding:item.finding,quantity:item.quantity,repairHours:item.repairHours,diagnosticHours:item.diagnosticHours};
  });
 }
@@ -200,6 +221,11 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
   for(const target of targets){
    const linked=defects.find(defect=>defect.id===target.id);
    const completed=target.done||entryCompleted;
+   /* A record taken over from the Defect Log and FIXED THERE is not reopened
+      by a sheet save whose card is still unticked: MARK FIXED in the Defect
+      Log was erased by the next save of the row (cold read). The sheet's
+      card is the stale side; the record is left exactly as it is. */
+   if("claimed" in target&&target.claimed&&linked?.state==="completed"&&!completed)continue;
    const state:StructuredDefect["state"]=completed?"completed":openState;
    const nextDefect:StructuredDefect={...linked,
     id:target.id,
@@ -215,7 +241,23 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
        Falling back to the assigned mechanic is the important half: the sheet
        already knew who had the bus and used to drop it, so every completed
        entry arrived unattributed. */
-    completedBy:completed?(clean(entry.completedBy)||linked?.completedBy||assignedMechanic(entry)):linked?.completedBy,
+    /* WHO FIXED IT IS WHAT THE FORM'S FIXED BY SAID, WHEN IT WAS FIXED.
+       A repair finished in THIS save is credited to the entry's FIXED BY,
+       else its mechanic - exactly the name the form showed - and to nobody
+       when the form showed nobody (a vendor job). It read the record's own
+       name ahead of the mechanic, and a card that adopts an OPEN record from
+       the Defect Log carries whatever name that record held: a repair
+       finished under JD was saved as fixed by MK (the publisher's check of
+       201, after ADD TO THAT ENTRY had compared JD with JD and let it
+       through). A name on an open record is not a completion.
+       A record that was ALREADY completed keeps the name it was completed
+       under, ahead of the entry's FIXED BY: MARK FIXED stamps a FIXED BY on
+       the entry, and re-saving would otherwise re-credit every repair JD
+       finished earlier to whoever closed the entry (cold read). That holds
+       for a repair finished with NO name too: it stays unnamed rather than
+       taking the next name the entry is given. A wrong or missing name on a
+       finished repair is corrected on that repair in Fixed Repairs. */
+    completedBy:completed?(linked?.state==="completed"?clean(linked.completedBy):clean(entry.completedBy)||assignedMechanic(entry)):linked?.completedBy,
     /* A FINISHED CARD HAS AN OPINION ABOUT WHAT WAS DONE. AN UNFINISHED ONE
        DOES NOT, and that distinction is the fix.
 
@@ -293,7 +335,9 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
        and the sheet's boxes own the sheet's. The one-way seeding stands — a
        card BUILT from an estimated defect starts from that number rather than
        the catalog's — because a new card has nothing to resurrect. */
-    source:linked?.source||"down-sheet"};
+    source:linked?.source||"down-sheet",
+    /* the card that took this record over - see `claimed` in defectTargets */
+    ...("card" in target&&target.card&&target.card!==target.id?{sheetCard:target.card}:{})};
    const at=defects.findIndex(defect=>defect.id===target.id);
    if(at>=0)defects[at]=nextDefect;else defects.push(nextDefect);
   }

@@ -4,7 +4,9 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 194 / application release 197 | Live | 12822f60c7e5d76d3702108b33711cc116ca4f61 | Safe installed-app last-page restoration and Doors group display mark. |
+| 196 / application release 206 | Live | e649c644c28b66f4bc7d4494726a79834a80164b | Log Defect BUS wording, location pill and move undo; includes 198–205 already shipped in Sites 195. |
+| 195 / application releases 198–205 | Previous live; rollback | 55812e1829f4a9469e901fb092980f3f86c5e536 | Prior cloud publication, including the general AI Operator question rule; recovered actual baseline. |
+| 194 / application release 197 | Previous live | 12822f60c7e5d76d3702108b33711cc116ca4f61 | Safe installed-app last-page restoration and Doors group display mark. |
 | 192, 193 | Saved only; never deployed | Superseded review candidates | Do not deploy; use reviewed194. |
 | 191 / application release 196 | Previous live; rollback | a9f610d42123cd6cfaaf32b61d8c78048d585c82 | Defect Log starts Advanced Actions collapsed; Detailed card view is default and appears before Compact. Explicit saved card choices remain. |
 | 190 / application releases 194 and 195 | Previous live; rollback | a1d90e85a6489ab9c6ff636e50ed813d98363978 | Preserves queued maintenance/scanner work; adds shared compact mobile navigation, grouped map controls, visible shifts and remembered Compact / Detailed defect cards. |
@@ -283,3 +285,26 @@ Live verification: home, Defect Log and Down Sheet returned HTTP 200; Defect Log
 Sites Version 194 / application release 197 deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Installed copies reopen the remembered page after safe document/hydration readiness; Doors picker receives its display-only emoji. PR50 CodeRabbit final review covered this exact SHA with no actionable comments; CI451 (44229747699) passed. Production build and 470 tests passed; ESLint zero errors and one preexisting warning. Browser loopback regression proved delayed-script/stalled-destination recovery; live HTTP200 and exact corrected inline script verified on Map, Defect Log, Down Sheet and Settings. Live Defect Log rendering checked. Physical iOS/Home Screen and real garage network behavior remain unverified. The initial service-worker document request remains unbounded; readiness taking more than the 2.5-second script budget falls back to map for that run. Sites192 and193 were saved candidates, never deployed. Rollback: Sites191 at a9f610d42123cd6cfaaf32b61d8c78048d585c82.
 
 Deployment: `appgdep_6afd1b66b3288191956117ec62aff973`. Rollback tag for new release: `sites-v194`.
+
+
+## Sites 195 / applications 198–205 — recovered publication record
+
+- Source: `55812e1829f4a9469e901fb092980f3f86c5e536`. Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_12ff577f153081918db0ea71ee24759d`.
+- Deployment `appgdep_6b03c244e16c819191e44012e05a7c4c` succeeded at 2026-11-23 04:34:18.238897 UTC. Existing public URL and audience unchanged. This is the actual preceding live publication; the older queue and handoff had not recorded it.
+- This historical record uses authoritative Sites provenance and the earlier verified release-205 publication. It does not claim a new 205 test run or new physical-device verification in the 206 session.
+
+## Sites 196 / application 206 — 2026-11-23
+
+Sites Version 196 / application release 206 deployed 2026-11-23 at 23:36:15.204248 UTC from `e649c644c28b66f4bc7d4494726a79834a80164b`. The Log Defect BUS box says "Tap twice to type bus#" and gives a selected bus a location pill opening the existing BUS LOCATION move window; successful moves replace UNDO LAST. B11/B12 are short labels in that pill. Down Sheet retains its existing bus selector. Releases 198–205 were already live in Sites 195 from `55812e1829f4a9469e901fb092980f3f86c5e536`; this publication retains them and adds 206. The prior queued handoff's Sites 194 / release 197 live baseline was stale.
+
+Fresh exact-source production build, all 482 regression tests (zero failures/skips), ESLint (zero errors/warnings) and whitespace checks passed. An independent source review found no confirmed release blocker; no exact-source GitHub Actions run is claimed. Managed preview served the unchanged production build after the Vite development preview failed on its network-interface API. In cloud Chromium, the new placeholder, Bus 17533 plus CNG East pill, BUS LOCATION modal open/cancel and unchanged `Bus 17533 · CNG East` Down Sheet label passed. No move, save or undo was performed.
+
+Native deployment `appgdep_6b04cdea6f6081919542269fc5b8fbc7` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_5a0ebd9dfc8c8191b3981192f36f6f0e`. Runtime environment revision 2 and public audience revision 2 are unchanged. All eight live routes returned HTTP 200 with FLEETSTEP; all 63 public browser/static assets matched the tested build bytes. The live placeholder was checked in Chromium. That fresh live browser had no device-local fleet; selected-bus live modal and populated Down Sheet checks were not performed, and no fleet was seeded. Physical phone/Safari/Home Screen, touch keyboard and offline checks remain unverified. The accepted 360px placeholder clipping and missing focus return after modal close remain as documented. No production fleet records, cloud configuration, schema or credentials were changed.
+
+Previous-live rollback: Sites 195 / application release 205 at `55812e1829f4a9469e901fb092980f3f86c5e536`. Its saved version is `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_12ff577f153081918db0ea71ee24759d`. The full former queue is in `docs/archive/PUBLISH_RELEASE_198_206.md`; `docs/PUBLISH_NEXT.md` is reset to NONE PENDING. PR39 remains held and excluded.
+
+- Gzip archive SHA256: `e41e2d0b32eff8839df60090cb4a651eb835a51c02234193c65e45c2e1005830`. Native saved tar hash: `sha256:73aa17d9ad077fa3b0320a115f8f3162c54caf9c37d17fca4635e211774f9cf6` (5,806,080 bytes, 128 files). These hashes describe different encodings, not identical files.
+- Live Defect Log bundle `assets/page-B5HqIEpn.js` SHA256: `6119f528a7687a57594db1c4d8fd72ce384a7e3af0d10953f564f7246f509f70`; contains `Tap twice to type bus#`, `BUS LOCATION`, and `Moved Bus `. Shared bundle contains B11/B12. Asset smoke excludes nonpublic deployment metadata `.assetsignore`, `.vite/manifest.json`, `_headers`.
+- Release-record work starts from GitHub main `53bb7d0cd888fab4ea9358b1585e12c62b729418`, preserving its queued handoff verbatim in the archive. Source publication stays pinned to `e649c644c28b66f4bc7d4494726a79834a80164b`; these later records are documentation only.
+
+- Rollback tags `sites-v195` (`55812e1`), `sites-v196` and `sites-release206` (`e649c64`) are prepared in the isolated local checkout. Their GitHub push remains pending: command-line Git has no GitHub credential, the connected GitHub tools expose branch updates but no tag creation, and the browser is signed out. No remote tag is claimed. Saved Sites 195 remains available as the exact rollback independently of these tag aliases.

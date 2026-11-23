@@ -11,6 +11,7 @@ import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 import {
   aggregateRepairItemEstimates,
   blankRepairItem,
+  finishedSignoffConflict,
   normalizeRepairItems,
   repairItemsProgress,
   repairItemsReason,
@@ -35,6 +36,9 @@ export type DownSheetRecord={
   workflow:Workflow;operationalStatus:FleetStatus;priority:"Routine"|"High"|"Critical";
   timeEstimate:RepairTimeEstimate;
   createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;history:RepairHistory[];
+  /* FIXED BY: the one sign-off for every finished repair on this entry. The
+     form has always written it; the type had not said so. */
+  completedBy?:string;
   /* Which area to park the bus in when this is saved, by name. Absent means
      leave it where it is, which is what every entry written before this said. */
   location?:string;
@@ -55,7 +59,7 @@ const ESTIMATE_FIELDS:{key:Exclude<keyof RepairTimeEstimate,"notes">;label:strin
 
 function hoursValue(minutes:number){return Number((minutes/60).toFixed(2))}
 
-export default function DownSheetEditor({entry,fleet,entries,defaultInitials,carriedInitials="",reopened=false,onClose,onSave,onOpenExisting}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void;carriedInitials?:string;reopened?:boolean;onOpenExisting?:(entryId:string,typedInitials:string)=>void}){
+export default function DownSheetEditor({entry,fleet,entries,defaultInitials,carriedInitials="",reopened=false,onClose,onSave,onOpenExisting}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void;carriedInitials?:string;reopened?:boolean;onOpenExisting?:(entryId:string,typedInitials:string,typedRepairs:DownSheetRepairItem[])=>void}){
   const [draft,setDraft]=useState(()=>({...entry,repairItems:normalizeRepairItems(entry.repairItems,{category:entry.category,repair:entry.repair,details:entry.customReason,timeEstimate:entry.timeEstimate})}));
   /* Initials typed before ADD TO THAT ENTRY come across with it. That button
      opens a fresh editor on the existing entry, and seeding from that entry
@@ -66,8 +70,8 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
      on the existing entry, and the button that had focus goes with the old
      one, so focus fell to the page and the next Tab landed on the header's X:
      Tab then Enter closed the form and the new blank card with it (SDET
-     review, BT55-F1). Reopened that way, focus goes to the FIELDS of the blank
-     card the new work is typed into - the box around them, not a field in it.
+     review, BT55-F1). Reopened that way, focus goes to the FIELDS of the last
+     card - the blank one, or the last repair carried across from a new entry - the box around them, not a field in it.
      A box raises no keyboard on any device, so this needs no guess about
      which screens have one (a cold read caught a pointer test here that an
      iPad with a trackpad would fail), and the next Tab is the card's CATEGORY
@@ -120,6 +124,35 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
   updateEstimateHours(item.id,"repairMinutes",String(Math.max(0,(Number(value)||0)*60-otherEstimateMinutes(item.timeEstimate))/60));
  const findingsMemory=useMemo(()=>readFindingsMemory(typeof localStorage==="undefined"?null:localStorage),[]);
  const assignedMechanic=draft.assignmentType==="Mechanic"?draft.assignedTo.trim().toUpperCase():"";
+ /* ONE FIXED BY PER ENTRY - the rule is `finishedSignoffConflict`. A repair
+    FINISHED here under one sign-off is not carried into an entry signed by
+    another; the press is refused, with the reason, and this entry stays
+    exactly as it was typed. Unfinished repairs carry as before. */
+ const carriedRepairs=()=>isNew?draft.repairItems.filter(item=>item.category||item.repair||item.details||item.estimateEnabled):[];
+ /* The reason, or "" when there is none. Read again on every draw, so the
+    line goes as soon as the conflict does - FINISHED unticked, or FIXED BY
+    changed to match - instead of describing a form that has moved on. */
+ const transferRefusal=(target:DownSheetRecord)=>{
+  const conflict=finishedSignoffConflict(carriedRepairs(),draft,target);
+  if(!conflict)return "";
+  const {ours,theirs}=conflict;
+  return "A repair here is marked FINISHED"+(ours?" by "+ours:"")+", and Bus "+target.busNumber+"'s entry is signed off "+(theirs?"by "+theirs:"by nobody yet")+". An entry has one FIXED BY, so nothing was added. Untick FINISHED to add the repair to that entry, or finish every repair here and save this as its own entry.";
+ };
+ /* Which entry the last press was refused for, so changing the bus to another
+    one that is on the sheet does not show the reason under the wrong entry. */
+ const [refusedFor,setRefusedFor]=useState("");
+ const addToThatEntry=(target:DownSheetRecord)=>{
+  if(!onOpenExisting)return;
+  if(transferRefusal(target)){setRefusedFor(target.id);return}
+  setRefusedFor("");
+  onOpenExisting(target.id,initials.trim(),carriedRepairs());
+ };
+ const refusalShown=existingEntry&&refusedFor===existingEntry.id?transferRefusal(existingEntry):"";
+ /* Once the conflict has gone the refusal is forgotten, so ticking FINISHED
+    again, or picking that bus again, does not bring back "nothing was added"
+    for a press that never happened (cold read). Set during the draw, which
+    React supports for a component's own state: it draws again at once. */
+ if(refusedFor&&!refusalShown)setRefusedFor("");
 
  /* The entry's workflow and the cards under it have to agree, and it is the
     cards that know. Ticking the last repair closes the entry, because a bus
@@ -185,7 +218,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,car
            it opens: the bus box opens its list on a tap, without the keyboard. */}
           <BusSelector fleet={fleet} busId={draft.busId}
            select={busId=>{const bus=fleet.find(item=>item.id===busId);setDraft(current=>({...current,busId,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}/>
-          {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={()=>onOpenExisting(existingEntry.id,initials.trim())}>ADD TO THAT ENTRY</button>}</p>}
+          {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={()=>addToThatEntry(existingEntry)}>ADD TO THAT ENTRY</button>}{refusalShown&&<small className="repair-transfer-blocked" role="alert">{refusalShown}</small>}</p>}
         <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
 
         <fieldset className="repair-items wide">
