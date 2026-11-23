@@ -163,7 +163,7 @@ function PartNumberPrompt({busNumber,suggestion,initial,confirm,close}:{
  </div>;
 }
 
-function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,shopHours,save,saveFixed,showExisting,countReturn,close,onBusPicked}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;coachOn:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;shopHours:RepairHoursLedger;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;countReturn:(busId:string,defect:StructuredDefect)=>ReportReturnResult;close:()=>void;onBusPicked:(busId:string)=>void}){
+function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,shopHours,save,saveFixed,showExisting,countReturn,close,onBusPicked,moveBus}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;coachOn:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;shopHours:RepairHoursLedger;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;countReturn:(busId:string,defect:StructuredDefect)=>ReportReturnResult;close:()=>void;onBusPicked:(busId:string)=>void;moveBus:(busId:string)=>void}){
  const [value,setValue]=useState(draft);
  /* WHAT THE LAST PRESS DID. Both banner buttons used to change nothing a
     person could see: OPEN IT swapped a draft under a component that ignored
@@ -185,8 +185,10 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
  /* HELD STILL SO THE PICKER CAN BE MEMOISED. Inline, this was a new function
     on every render, which is every character typed anywhere in this form — and
     a changed prop is a re-render, so the picker rebuilt its two option lists
-    for a keystroke in DETAILS. `onBusPicked` comes from the page, which does
-    not re-render while the editor is open. */
+    for a keystroke in DETAILS. `onBusPicked` comes from the page, which
+    re-renders while the editor is open only when something else changes the
+    board - a move from the BUS box's place button - and that costs the picker
+    one redraw, not one per keystroke. */
  const pickBus=useCallback((busId:string)=>{onBusPicked(busId);setValue(current=>({...current,busId}))},[onBusPicked]);
  const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined||draft.defect.finding));
  useEffect(()=>lockPageScroll("defect-editor-open"),[]);
@@ -517,7 +519,16 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
     {/* ONE BUS BOX, opened like the category: nothing takes the cursor when
         the form opens, and there is no suggestion list for iOS to draw as the
         grey card Curtis saw repeating the number. */}
-    <BusSelector fleet={fleet} busId={value.busId} select={pickBus} coach="bus"/>
+    {/* THE PLACE IS A BUTTON IN THE BUS BOX, and it opens the move window this
+        page already has: Curtis found a bus in bay 12 that the board still had
+        in CNG East. The move happens on MOVE BUS, not on SAVE, so a location
+        can be put right without logging anything; the move records where the
+        bus came from (LAST MOVED FROM on the map's bus editor). */}
+    {/* Curtis chose these words. A second tap on the box, with the list open,
+        brings up the keyboard - see SECOND TAP in combo-field.tsx. 225px at
+        18px: fits from 390 wide, and loses its last letter at 360. On the shop
+        computer one click already types. */}
+    <BusSelector fleet={fleet} busId={value.busId} select={pickBus} coach="bus" placeholder="Tap twice to type bus#" onLocation={moveBus}/>
     {/* TWO FIELDS, NOT FOUR. Curtis asked for a search beside each picker and
         named the risk in the same breath — "just try to make it look clean".
         One control per picker does both jobs: tap it and the whole list opens
@@ -1015,6 +1026,10 @@ export default function DefectLog(){
  // Start each visit collapsed; keep the opener visible and leave legacy storage untouched.
  const [advancedOpen,setAdvancedOpen]=useState(false);
  const [movingMysteryBusId,setMovingMysteryBusId]=useState("");
+ /* Whether the move window was opened from the Log Defect form's bus box
+    rather than a mystery card, so it does not call the bus a mystery bus. */
+ const [movingFromEditor,setMovingFromEditor]=useState(false);
+ const moveFromEditor=useCallback((busId:string)=>{setMovingFromEditor(true);setMovingMysteryBusId(busId)},[]);
  /* Open from any HOLD badge on the page — Curtis: "pressing it on one bus, I
     wanted to show all the buses that are being held, and a time." */
  const [holdBoardOpen,setHoldBoardOpen]=useState(false);
@@ -1810,7 +1825,7 @@ export default function DefectLog(){
   setUndoSnapshot({fleet,downEntries,label:(on?"Put Bus ":"Took Bus ")+bus.n+(on?" on hold":" off hold")});
  };
  const movingMysteryBus=fleet.find(bus=>bus.id===movingMysteryBusId)||null;
- const moveMysteryBus=(area:string)=>{if(!movingMysteryBus)return false;const result=moveBusToArea(fleet,movingMysteryBus.id,area);if(result.error==="insufficient-space"){alert(area+" is full. No bus was moved.");return false}if(result.error){alert("That bus or facility area is no longer available. Refresh and try again.");return false}if(result.unchanged)return true;if(!writeFleetStorage(localStorage,result.fleet))return false;setFleet(result.fleet);return true};
+ const moveMysteryBus=(area:string)=>{if(!movingMysteryBus)return false;const result=moveBusToArea(fleet,movingMysteryBus.id,area);if(result.error==="insufficient-space"){alert(area+" is full. No bus was moved.");return false}if(result.error){alert("That bus or facility area is no longer available. Refresh and try again.");return false}if(result.unchanged)return true;if(!writeFleetStorage(localStorage,result.fleet))return false;/* A MOVE IS THE LAST CHANGE, SO UNDO LAST TAKES IT BACK. UNDO LAST restores a whole saved board; left holding the snapshot from an earlier save, it would have put this bus back where it was with nothing on screen saying so (cold read of 206). */setUndoSnapshot({fleet,downEntries,label:"Moved Bus "+movingMysteryBus.n+" to "+locationLabel(result.target)});setFleet(result.fleet);return true};
 
  /* Opening the record the duplicate banner is pointing at, and putting it back
     in the log on the way. A record can be out of sight for two reasons - it was
@@ -2513,12 +2528,12 @@ export default function DefectLog(){
     </div>
    </section>
   </div>}
-  {editing&&<DefectEditor key={editing.busId+":"+editing.defect.id} draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} coachOn={coachOn} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} shopHours={repairHours} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside}/>}
+  {editing&&<DefectEditor key={editing.busId+":"+editing.defect.id} draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} coachOn={coachOn} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} shopHours={repairHours} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside} moveBus={moveFromEditor}/>}
   {/* Rendered here rather than inside ADVANCED ACTIONS: closing that section
       must not tear down a scanner somebody is part-way through. */}
   {sweepOpen&&<SweepScanner fleet={fleet} handed={handed} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{heatOpen&&<HeatScanner fleet={fleet} handed={handed} onClose={()=>setHeatOpen(false)} onFile={fileHeat}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}
   {holdBoardOpen&&<HoldBoard fleet={fleet} close={()=>setHoldBoardOpen(false)} onRelease={busId=>setHold(busId,false)}/>}
-  {movingMysteryBus&&<MysteryMoveModal bus={movingMysteryBus} fleet={fleet} move={moveMysteryBus} close={()=>setMovingMysteryBusId("")}/>}
+  {movingMysteryBus&&<MysteryMoveModal bus={movingMysteryBus} fleet={fleet} move={moveMysteryBus} kicker={movingFromEditor?"BUS LOCATION":undefined} close={()=>{setMovingMysteryBusId("");setMovingFromEditor(false)}}/>}
   
  </main>;
 }

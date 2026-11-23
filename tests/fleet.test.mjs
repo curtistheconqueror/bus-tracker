@@ -2202,6 +2202,56 @@ test("a trouble bay is not the main garage",async()=>{
  assert.equal(knownLocationLabel("garage-11"),"Trouble Bay 12");
 });
 
+test("the Log Defect bus box names the place in a few letters, and the place moves the bus",async()=>{
+ /* Curtis, on a bus found in bay 12 that the board still had in CNG East:
+    tap the place in the bus box to move it. On "Trouble Bay 12" there: "just
+    put B12. The trouble part is not necessary." */
+ const {shortLocationLabel,locationLabel}=await import("../src/lib/fleet/location-label.ts");
+ const {RELOCATION_AREAS}=await import("../src/lib/fleet/facility-areas.ts");
+ for(const slot of RELOCATION_AREAS["TROUBLE BAY 11"])assert.equal(shortLocationLabel(slot),"B11");
+ for(const slot of RELOCATION_AREAS["TROUBLE BAY 12"])assert.equal(shortLocationLabel(slot),"B12");
+ /* Every other place keeps its own words, the prefix fallback included. */
+ for(const [area,slots] of Object.entries(RELOCATION_AREAS)){
+  if(area.startsWith("TROUBLE BAY"))continue;
+  for(const slot of slots)assert.equal(shortLocationLabel(slot),locationLabel(slot),slot);
+ }
+ assert.equal(shortLocationLabel("west-overflow-2"),"CNG West");
+ assert.equal(shortLocationLabel("nonsense-9"),"nonsense-9");
+ assert.equal(shortLocationLabel("","Set location"),"Set location");
+ /* The long label is untouched everywhere else. */
+ assert.equal(locationLabel(RELOCATION_AREAS["TROUBLE BAY 12"][0]),"Trouble Bay 12");
+
+ /* The words come from the site config, not a list of their own. */
+ const labelSource=(await readFile("src/lib/fleet/location-label.ts","utf8")).replace(/\/\*[\s\S]*?\*\//g,"");
+ assert.doesNotMatch(labelSource,/"B1[12]"/);
+ assert.match(await readFile("src/lib/fleet/site-config.ts","utf8"),/label:"Trouble Bay 12",short:"B12"/);
+
+ /* The box: on the Log Defect form only, the place is its own button that
+    opens the page's one move window, which says BUS LOCATION rather than
+    MYSTERY BUS when opened from there. The Down Sheet's box is unchanged. */
+ const picker=await readFile("src/components/shared/bus-selector.tsx","utf8");
+ const sheet=await readFile("app/down-sheet/_components/down-sheet-editor.tsx","utf8");
+ assert.match(picker,/display=\{selected\?\(onLocation\?"Bus "\+selected\.n:busPickerDisplay\(selected\)\):""\}/);
+ assert.match(picker,/onClick=\{\(\)=>onLocation\(selected\.id\)\}>\{place\}<\/button>/);
+ /* The words Curtis chose are the Log Defect form's; the Down Sheet keeps its own. */
+ assert.match(picker,/placeholder="Tap to pick a bus"\}/);
+ assert.match(picker,/ placeholder=\{placeholder\}\n/);
+ /* The whole element, which spans two lines and has arrows inside it, up to
+    the `}}/>` that closes it. */
+ const sheetBox=sheet.match(/<BusSelector [\s\S]*?\}\}\/>/)?.[0]||"";
+ assert.ok(sheetBox,"the Down Sheet draws the bus box");
+ assert.doesNotMatch(sheetBox,/placeholder=|onLocation/);
+ const log=await readFile("app/defect-log/page.tsx","utf8");
+ assert.match(log,/kicker=\{movingFromEditor\?"BUS LOCATION":undefined\}/);
+ assert.match(log,/ placeholder="Tap twice to type bus#" onLocation=\{moveBus\}\/>/);
+ /* A move is the last change, so UNDO LAST takes the move back rather than
+    restoring a board saved before it (cold read of 206). */
+ assert.match(log,/setUndoSnapshot\(\{fleet,downEntries,label:"Moved Bus "\+movingMysteryBus\.n\+" to "\+locationLabel\(result\.target\)\}\);setFleet\(result\.fleet\)/);
+ const board=await readFile("src/components/down-sheet/mystery-board.tsx","utf8");
+ assert.match(board,/kicker="MYSTERY BUS"\}/);
+ assert.match(board,/<small>\{kicker\}<\/small><h2>Move Bus \{bus\.n\}<\/h2>/);
+});
+
 test("a hold is a fact about the bus, and only time or a person lifts it",async()=>{
  /* Curtis: "somebody just asked me about two buses that are gonna probably come
     in to B12, and if they do, they want me to hold those buses." */

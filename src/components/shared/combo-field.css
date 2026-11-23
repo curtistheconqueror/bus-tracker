@@ -47,6 +47,10 @@
 .combo-caret:disabled{opacity:.45;cursor:default}
 .combo-clear{position:absolute;top:0;right:38px;width:28px;height:38px;display:flex;align-items:center;justify-content:center;border:0;background:none;color:#6b7f9c;font-size:15px;font-weight:900;line-height:1;padding:0;cursor:pointer}
 .combo-clear:hover,.combo-clear:focus-visible{color:#c02b2b}
+/* The caller's control inside the box, just inside the ×. Its width is
+   measured into --combo-addon-w and the input's padding grows by it. */
+.combo-addon{position:absolute;top:0;right:66px;height:38px;display:flex;align-items:center}
+.combo-box.with-addon .combo-input{padding-right:calc(72px + var(--combo-addon-w,0px))!important}
 
 .combo-list{margin:4px 0 0;padding:0;list-style:none;max-height:246px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;border:1px solid #b7c3d5;border-radius:6px;background:#fff;box-shadow:0 8px 22px #0a1f3d1f}
 /* THE LIST READS AT THE SIZE OF THE FIELD THAT OPENED IT. A native <select>
@@ -99,6 +103,8 @@
  .combo-caret{width:44px;right:2px;font-size:17px}
  .combo-clear{width:32px;right:46px}
  .combo-input{padding-right:80px!important}
+ .combo-addon{height:44px;right:78px}
+ .combo-box.with-addon .combo-input{padding-right:calc(81px + var(--combo-addon-w,0px))!important}
  /* Taller than the desktop list because the phone keyboard is the thing being
     worked around: enough rows to be worth scrolling, short enough that the
     field that opened it stays on screen above it. */

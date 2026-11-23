@@ -26,7 +26,7 @@
    is a way to REACH a catalog string, never a way to spell a new one, because a
    defect log whose wording drifts is a defect log nobody can count. */
 
-import {Fragment,useEffect,useId,useRef,useState} from "react";
+import {Fragment,useEffect,useId,useLayoutEffect,useRef,useState,type ReactNode} from "react";
 import "./combo-field.css";
 
 export type ComboOption={
@@ -84,7 +84,7 @@ export type ComboOption={
    pages that draw this today ask for it: the Defect Log, and the Down Sheet's
    editor on Curtis's word, "make downsheet operate similarly". Without the
    flag every line below behaves exactly as it did. */
-export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen="",typeAs,exactPick,onType,onCancel}:{
+export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach,browseFirst=false,openWhen="",typeAs,exactPick,onType,onCancel,addon}:{
  label:string;
  value:string;
  /* What the closed field shows. Passed in rather than looked up here, because
@@ -133,8 +133,18 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     digit, then Escape, no longer leaves an old defect with no bus (SDET
     review, BT54-F7). */
  onCancel?:()=>void;
+ /* A CONTROL OF THE CALLER'S, INSIDE THE BOX, at the right-hand end beside the
+    ×: the bus box's location button. Shown only on a shut box holding an
+    answer - the × rule - so it never sits over a list or a typed number. The
+    input's right padding grows by its measured width, so a long answer
+    ellipsizes before it rather than running under it. A tap on it is the
+    caller's and never opens this list: it is outside the input, which is the
+    only thing here that opens it on a tap. */
+ addon?:ReactNode;
 }){
  const [open,setOpen]=useState(false);
+ const addonRef=useRef<HTMLSpanElement|null>(null);
+ const [addonWidth,setAddonWidth]=useState(0);
  /* Only ever true with `browseFirst`. Mirrored in a ref because the focus and
     key handlers run inside the same event that changed it, before any render. */
  const [typing,setTyping]=useState(false);
@@ -215,6 +225,20 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     opens the list, and the answer gets the field's full width to be read in.
     Measured at 360 wide, both at once left 158px for "Engine runs hot (207F+)". */
  const showMode=browseFirst&&(open||!value);
+ const showAddon=Boolean(addon)&&Boolean(value)&&!open&&!disabled;
+ /* Measured, not guessed: the button holds a place name, and "B12" and
+    "Foreman Office" are not the same width. Before paint, so the answer never
+    draws once under the button and then jumps. */
+ useLayoutEffect(()=>{
+  const node=addonRef.current;
+  if(!showAddon||!node){setAddonWidth(0);return}
+  const measure=()=>setAddonWidth(Math.ceil(node.getBoundingClientRect().width));
+  measure();
+  if(typeof ResizeObserver!=="function")return;
+  const observer=new ResizeObserver(measure);
+  observer.observe(node);
+  return ()=>observer.disconnect();
+ },[showAddon]);
  const onlyGroup=browseFirst&&browsing&&!browseGroup&&groupCounts.size===1&&options.every(option=>option.section)?[...groupCounts.keys()][0]:"";
  const openGroup=browseGroup||onlyGroup;
  type Row=
@@ -460,7 +484,8 @@ export default function ComboField({label,value,display,search,onPick,placeholde
      input as a tap of its own, and with the list open that tap means TYPE. */
   onClick={event=>{if(browseFirst&&event.target!==inputRef.current)event.preventDefault();}}>
   {label}
-  <div className={"combo-box"+(open?" open":"")+(showMode?" with-mode":"")} ref={boxRef}>
+  <div className={"combo-box"+(open?" open":"")+(showMode?" with-mode":"")+(showAddon?" with-addon":"")} ref={boxRef}
+   style={showAddon?{"--combo-addon-w":addonWidth+"px"} as React.CSSProperties:undefined}>
    <input
     ref={inputRef}
     type="text"
@@ -573,6 +598,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
    {/* Out of the Tab order on a browse-first field, like the arrow and TYPE:
        the next Tab after picking a bus landed here, and Enter cleared the bus
        somebody had just typed. Typing over an answer replaces it anyway. */}
+   {showAddon&&<span className="combo-addon" ref={addonRef}>{addon}</span>}
    {value&&!open&&!disabled&&<button type="button" className="combo-clear" aria-label={"Clear "+label} tabIndex={browseFirst?-1:undefined}
     onClick={event=>{event.preventDefault();onPick("",null);}}>×</button>}
    {open&&<ul className={grouped?"combo-list grouped":"combo-list"} id={id+"-list"} role="listbox" ref={listRef}>

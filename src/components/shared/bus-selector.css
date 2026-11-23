@@ -11,3 +11,15 @@
 .combo-field.bus-combo .combo-input{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
 .combo-field.bus-combo .combo-input::placeholder{font-weight:400}
 .combo-field.bus-combo .combo-option>b{font-variant-numeric:tabular-nums}
+/* THE PLACE, A BUTTON OF ITS OWN inside the box (the Log Defect form only).
+   A filled pill rather than plain words, so it reads as a second thing to
+   press and not as the end of the bus number. One line, never wrapped.
+   A block, not a flex box: text-overflow does nothing on a flex container,
+   so a name too long for it was cut mid-letter rather than ending in "…". */
+.combo-field.bus-combo .bus-place{display:block;max-width:150px;height:30px;line-height:28px;padding:0 10px;border:1px solid #9fc0ea;border-radius:15px;background:#eaf3ff;color:#0b4f9e;font:inherit;font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.combo-field.bus-combo .bus-place:hover,.combo-field.bus-combo .bus-place:focus-visible{background:#d8e9ff;border-color:#0d76d6}
+@media(max-width:760px){
+ /* 14px, not the box's 18: at 360 wide the longest place, Foreman Office,
+    has to sit beside "Bus 17565" without either one being cut off. */
+ .combo-field.bus-combo .bus-place{height:34px;line-height:32px;max-width:140px;padding:0 9px;border-radius:17px;font-size:14px}
+}
