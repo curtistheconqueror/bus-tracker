@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-11-18
+Updated: 2026-11-23
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 194 (application release 197)
-Live feature checkpoint: commit 12822f60c7e5d76d3702108b33711cc116ca4f61
+Live release: Sites Version 196 (application release 206)
+Live feature checkpoint: commit e649c644c28b66f4bc7d4494726a79834a80164b
 
 ## Read this first
 
@@ -23,6 +23,20 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 196 / application release 206 deployed 2026-11-23 at 23:36:15.204248 UTC from `e649c644c28b66f4bc7d4494726a79834a80164b`. The Log Defect BUS box says "Tap twice to type bus#" and gives a selected bus a location pill opening the existing BUS LOCATION move window; successful moves replace UNDO LAST. B11/B12 are short labels in that pill. Down Sheet retains its existing bus selector. Releases 198–205 were already live in Sites 195 from `55812e1829f4a9469e901fb092980f3f86c5e536`; this publication retains them and adds 206. The prior queued handoff's Sites 194 / release 197 live baseline was stale.
+
+Fresh exact-source production build, all 482 regression tests (zero failures/skips), ESLint (zero errors/warnings) and whitespace checks passed. An independent source review found no confirmed release blocker; no exact-source GitHub Actions run is claimed. Managed preview served the unchanged production build after the Vite development preview failed on its network-interface API. In cloud Chromium, the new placeholder, Bus 17533 plus CNG East pill, BUS LOCATION modal open/cancel and unchanged `Bus 17533 · CNG East` Down Sheet label passed. No move, save or undo was performed.
+
+Native deployment `appgdep_6b04cdea6f6081919542269fc5b8fbc7` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_5a0ebd9dfc8c8191b3981192f36f6f0e`. Runtime environment revision 2 and public audience revision 2 are unchanged. All eight live routes returned HTTP 200 with FLEETSTEP; all 63 public browser/static assets matched the tested build bytes. The live placeholder was checked in Chromium. That fresh live browser had no device-local fleet; selected-bus live modal and populated Down Sheet checks were not performed, and no fleet was seeded. Physical phone/Safari/Home Screen, touch keyboard and offline checks remain unverified. The accepted 360px placeholder clipping and missing focus return after modal close remain as documented. No production fleet records, cloud configuration, schema or credentials were changed.
+
+Previous-live rollback: Sites 195 / application release 205 at `55812e1829f4a9469e901fb092980f3f86c5e536`. Its saved version is `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_12ff577f153081918db0ea71ee24759d`. The full former queue is in `docs/archive/PUBLISH_RELEASE_198_206.md`; `docs/PUBLISH_NEXT.md` is reset to NONE PENDING. PR39 remains held and excluded.
+
+### Previous publication — Sites 195 / application 205
+
+Sites 195 deployed `55812e1829f4a9469e901fb092980f3f86c5e536` on 2026-11-23 at 04:34:18.238897 UTC, carrying releases 198–205. Successful deployment: `appgdep_6b03c244e16c819191e44012e05a7c4c`. This recovered record is grounded in authoritative Sites version/deployment state and the earlier verified publication; the checks for 205 were not rerun as part of 206. It is the actual previous-live rollback, superseding the stale queue's Sites 194 / release 197 baseline.
+
+### Previous publication — Sites 194 / application 197
 
 Sites Version 194 / application release 197 deployed 2026-11-18 at 03:28:47.647741 UTC from `12822f60c7e5d76d3702108b33711cc116ca4f61`. Installed copies reopen the remembered page after safe document/hydration readiness; Doors picker receives its display-only emoji. PR50 CodeRabbit final review covered this exact SHA with no actionable comments; CI451 (44229747699) passed. Production build and 470 tests passed; ESLint zero errors and one preexisting warning. Browser loopback regression proved delayed-script/stalled-destination recovery; live HTTP200 and exact corrected inline script verified on Map, Defect Log, Down Sheet and Settings. Live Defect Log rendering checked. Physical iOS/Home Screen and real garage network behavior remain unverified. The initial service-worker document request remains unbounded; readiness taking more than the 2.5-second script budget falls back to map for that run. Sites192 and193 were saved candidates, never deployed. Rollback: Sites191 at a9f610d42123cd6cfaaf32b61d8c78048d585c82.
 
@@ -111,7 +125,7 @@ Preserve these rules through refactors and backend migration:
 - A reviewed photo import is authoritative for the Down Sheet only: it replaces every prior Down Sheet row, reconciles every DS badge, lists buses coming off before approval, and remains undoable. It must never delete or complete Defect Log records.
 - Export and import remain the durable recovery path while Shop Cloud is introduced, configured, and verified across devices.
 
-## Current release state
+## Historical release state — application 191
 
 Application release 191 is live as Sites platform Version 187 from b33775685b61acafdf4325807c82e92281c9fc2c, deployed 2026-10-20 at 19:35:00.450217 UTC. PR38 adds COPY, SHARE and SHARE PAGE under the Defect Log FOCUS heading. Exports include all the selected bus's non-hidden Defect Log records despite board filters; a scope notice explains any difference from the filtered view. HTML is escaped and self-contained, filenames use the local date, prior-year records identify their year, and a polite live region announces copy/share/download outcomes. No stored data, schema, dependency, public asset, permission or hosting configuration changed.
 
