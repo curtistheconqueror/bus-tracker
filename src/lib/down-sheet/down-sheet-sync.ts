@@ -215,7 +215,23 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
        Falling back to the assigned mechanic is the important half: the sheet
        already knew who had the bus and used to drop it, so every completed
        entry arrived unattributed. */
-    completedBy:completed?(clean(entry.completedBy)||linked?.completedBy||assignedMechanic(entry)):linked?.completedBy,
+    /* WHO FIXED IT IS WHAT THE FORM'S FIXED BY SAID, WHEN IT WAS FIXED.
+       A repair finished in THIS save is credited to the entry's FIXED BY,
+       else its mechanic - exactly the name the form showed - and to nobody
+       when the form showed nobody (a vendor job). It read the record's own
+       name ahead of the mechanic, and a card that adopts an OPEN record from
+       the Defect Log carries whatever name that record held: a repair
+       finished under JD was saved as fixed by MK (the publisher's check of
+       201, after ADD TO THAT ENTRY had compared JD with JD and let it
+       through). A name on an open record is not a completion.
+       A record that was ALREADY completed keeps the name it was completed
+       under, ahead of the entry's FIXED BY: MARK FIXED stamps a FIXED BY on
+       the entry, and re-saving would otherwise re-credit every repair JD
+       finished earlier to whoever closed the entry (cold read). That holds
+       for a repair finished with NO name too: it stays unnamed rather than
+       taking the next name the entry is given. A wrong or missing name on a
+       finished repair is corrected on that repair in Fixed Repairs. */
+    completedBy:completed?(linked?.state==="completed"?clean(linked.completedBy):clean(entry.completedBy)||assignedMechanic(entry)):linked?.completedBy,
     /* A FINISHED CARD HAS AN OPINION ABOUT WHAT WAS DONE. AN UNFINISHED ONE
        DOES NOT, and that distinction is the fix.
 

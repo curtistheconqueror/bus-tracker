@@ -3977,3 +3977,64 @@ test("ADD TO THAT ENTRY opens the entry it names, not a heading over the blank d
  /* And what it is handed is the existing entry plus one blank card to add to. */
  assert.match(page,/if\(found\)setEditing\(\{\.\.\.found,repairItems:\[\.\.\.normalizeRepairItems\(found\.repairItems[^)]*\),\.\.\.\(typedRepairs\.length\?typedRepairs:\[blankRepairItem\(\)\]\)\]\}\)/);
 });
+
+/* WHO GETS CREDIT IS PROVED AFTER THE SAVE, NOT BEFORE IT. The publisher's
+   check of 201: a FINISHED repair carried by ADD TO THAT ENTRY onto an entry
+   signed off by JD was still saved as fixed by MK, because the card adopted an
+   OPEN record from the Defect Log that already held MK, and the save read the
+   record's name ahead of the entry's mechanic. ADD TO THAT ENTRY had compared
+   JD with JD and let it through; the FIXED BY box showed JD. This walks the
+   whole path the page takes - the refusal rule, the merge onOpenExisting does,
+   then the save - and reads the name off the saved record. */
+test("a repair finished through ADD TO THAT ENTRY is credited, after the save, to the FIXED BY the form showed",async()=>{
+ const {finishedSignoffConflict,normalizeRepairItems}=await import("../src/lib/down-sheet/down-sheet-repair-items.ts");
+ const at="2026-11-22T20:00:00.000Z";
+ /* The bus already carries the overheating fault, open, logged in the Defect
+    Log, and that record holds a name from earlier work on it. */
+ const logged={id:"log-overheat",category:"Engine",issue:"Overheating",details:"",state:"open",operability:"service",createdAt:"2026-11-20T10:00:00.000Z",updatedAt:"2026-11-21T10:00:00.000Z",completedAt:"",completedBy:"MK"};
+ const bus={id:"a",n:"17507",l:"bay-3",s:"defect",defects:[logged],pendingRepair:""};
+ /* JD's entry is on the sheet with one repair of its own. */
+ const existing={id:"e-jd",busId:"a",busNumber:"17507",category:"Brakes",repair:"Brake chamber leak",customReason:"",
+  assignmentType:"Mechanic",assignedTo:"jd",workflow:"In Progress",operationalStatus:"out",
+  repairItems:[{id:"c1",category:"Brakes",repair:"Brake chamber leak",details:"",done:false}]};
+ /* A new entry for the same bus, the overheating repair ticked FINISHED,
+    signed by JD too, so ADD TO THAT ENTRY lets it through. */
+ const carried=[{id:"n1",category:"Engine",repair:"Overheating",details:"",done:true,estimateEnabled:false}];
+ assert.equal(finishedSignoffConflict(carried,{assignmentType:"Mechanic",assignedTo:"JD"},existing),null);
+ /* the page's onOpenExisting: the entry's own repairs, then the ones carried */
+ const merged={...existing,repairItems:[...normalizeRepairItems(existing.repairItems,{category:existing.category,repair:existing.repair,details:existing.customReason}),...carried]};
+ const [saved]=applyDownEntryToFleet([bus],merged,at);
+ const overheat=saved.defects.find(defect=>defect.issue==="Overheating");
+ assert.equal(saved.defects.filter(defect=>defect.issue==="Overheating").length,1,"the card adopts the logged record rather than adding a second");
+ assert.equal(overheat.id,"log-overheat");
+ assert.equal(overheat.state,"completed");
+ assert.equal(overheat.completedBy,"JD","credited to the mechanic FIXED BY showed, not the name the open record held");
+ /* A FIXED BY typed on the entry outranks both. */
+ const [signed]=applyDownEntryToFleet([bus],{...merged,completedBy:"PB"},at);
+ assert.equal(signed.defects.find(defect=>defect.issue==="Overheating").completedBy,"PB");
+ /* With neither a FIXED BY nor a mechanic - a vendor job - FIXED BY showed
+    nobody, and nobody is credited: a name on an OPEN record is not a
+    completion (cold read). */
+ const [vendor]=applyDownEntryToFleet([bus],{...merged,assignmentType:"Vendor",assignedTo:"Cummins"},at);
+ assert.equal(vendor.defects.find(defect=>defect.issue==="Overheating").completedBy,"");
+ /* The other way round is refused before anything is saved: finished under
+    MK, into JD's entry. */
+ assert.deepEqual(finishedSignoffConflict(carried,{completedBy:"MK"},existing),{ours:"MK",theirs:"JD"});
+ /* And work ALREADY finished keeps its credit. Saved once under JD, then the
+    entry handed to another mechanic and saved again: the repair JD finished is
+    still JD's. */
+ const [reassigned]=applyDownEntryToFleet([saved],{...merged,assignedTo:"PB"},"2026-11-22T21:00:00.000Z");
+ assert.equal(reassigned.defects.find(defect=>defect.issue==="Overheating").completedBy,"JD");
+ /* MARK FIXED on the row then closes the entry, stamping PB as its FIXED BY:
+    the brake repair finished now is PB's, the overheating JD finished earlier
+    is still JD's (cold read: it was re-credited to PB). */
+ const [closed]=applyDownEntryToFleet([reassigned],{...merged,assignedTo:"PB",completedBy:"PB",workflow:"Completed"},"2026-11-22T22:00:00.000Z");
+ assert.equal(closed.defects.find(defect=>defect.issue==="Overheating").completedBy,"JD");
+ assert.equal(closed.defects.find(defect=>defect.issue==="Brake chamber leak").completedBy,"PB");
+ /* And a repair finished with NO name stays unnamed: a vendor job finished,
+    then the entry handed to PB and closed - the vendor's repair is not PB's
+    (third cold read). */
+ const [vendorDone]=applyDownEntryToFleet([bus],{...merged,assignmentType:"Vendor",assignedTo:"Cummins"},at);
+ const [vendorClosed]=applyDownEntryToFleet([vendorDone],{...merged,assignmentType:"Mechanic",assignedTo:"PB",completedBy:"PB",workflow:"Completed"},"2026-11-22T22:00:00.000Z");
+ assert.equal(vendorClosed.defects.find(defect=>defect.issue==="Overheating").completedBy,"");
+});
