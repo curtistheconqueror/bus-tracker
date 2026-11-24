@@ -253,7 +253,10 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
     scan sweep out — so it is the merge itself that must stay gone. */
  assert.equal(/merge-duplicates|mergeDuplicateDefects/.test(logPage),false,"the button and the merge left the Defect Log");
  assert.equal(/merge-duplicates/.test(logCss),false,"and its styling with it");
- assert.match(logPage,/<button className="cleanup-log"[^>]*>CLEAN UP<\/button><button className="sweep-scan-button"/,"CLEAN UP and SCAN SWEEP are now neighbours");
+ /* CLEAN UP moved again in release 210, to Settings beside SCAN BATCHES; it
+    still runs on the Defect Log, which holds the board. */
+ assert.match(page,/onClick=\{\(\)=>window\.location\.assign\(logToolHref\("clean-up"\)\)\}>CLEAN UP<\/button>/);
+ assert.match(logPage,/if\(tool==="scan-batches"\)setBatchesOpen\(true\);else cleanUpLog\(\);/);
 
  /* The section transfers came with their panels. An import that the device
     refuses says so instead of claiming a merge. */

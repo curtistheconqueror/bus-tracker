@@ -247,7 +247,7 @@ test("the LOG DEFECT box holds the button and the search, and the feed holds ALL
  assert.equal(/>\s*CARD\s+VIEW\s*</.test(page),false,"the CARD VIEW label is gone");
 
  // The row sits in the feed's own bar, after the count line.
- const bar=page.slice(page.indexOf('<div className="feed-title">'),page.indexOf("</div>\n   {visibleGroups.length?"));
+ const bar=page.slice(page.indexOf('<div className={"feed-title"'),page.indexOf("</div>\n   {visibleGroups.length?"));
  assert.ok(bar.indexOf("feed-estimate")<bar.indexOf('"feed-view-row"'),"the row comes after the count line");
  assert.ok(bar.indexOf('"feed-view-row"')<bar.indexOf("feed-status-color"));
  assert.match(bar,/<label className="feed-window-pick">/);
@@ -529,8 +529,10 @@ test("SCAN BATCHES on the Defect Log, and the operator on the map, remove a swee
   readFile(new URL("../app/defect-log/_components/scan-batches-panel.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
  ]);
- // The door is beside SCAN SWEEP, which is where the mistake was made.
- assert.match(logPage,/className="sweep-scan-button"[\s\S]{0,400}className="scan-batches-button"[^>]*onClick=\{\(\)=>setBatchesOpen\(true\)\}[^>]*>↶ SCAN BATCHES</);
+ /* Since release 210 the door is in Settings (SCANS AND CLEANUP), which opens
+    the Defect Log with `?tool=scan-batches`; the page opens the panel once the
+    board is read. */
+ assert.match(logPage,/if\(tool==="scan-batches"\)setBatchesOpen\(true\);else cleanUpLog\(\);/);
  assert.match(logPage,/<ScanBatchesPanel batches=\{batches\} undo=\{batchUndo\} onRemove=\{removeBatch\} onRestore=\{restoreBatch\}/);
  assert.match(panel,/REMOVE \{batch\.removableIds\.length\}/);
  assert.match(panel,/disabled=\{!batch\.removableIds\.length\}/,"a sweep every record of which has been worked on cannot be removed");

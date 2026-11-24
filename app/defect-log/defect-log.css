@@ -1786,3 +1786,58 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .feed-title .feed-view-row .feed-window-pick:focus-within{outline:3px solid #16834e;outline-offset:-3px}
 @media(max-width:760px){.feed-title .feed-view-row .feed-window-pick{font-size:13px}}
 @media(max-width:460px){.feed-title .feed-view-row.with-saved-view .feed-window-pick{padding:0 3px;font-size:11px;letter-spacing:0}}
+
+/* ── SCAN A SHEET (release 210; the drawer was ADVANCED ACTIONS) ─────────────
+   Three tiles side by side, one per sheet, drawn the same: a white face, one
+   grey edge, a blue camera, the sheet's name. Curtis picked this look off the
+   mockup: "I do like this look. This is very good." The drawer keeps the
+   header's colour - a white drawer under the navy once read, in Curtis's
+   words, "like it's unrelated" - and the tiles sit straight on it, with no
+   white group box between. */
+.log-advanced.log-scan-drawer{padding:10px}
+.log-scan-drawer .log-scan-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.log-scan-drawer .log-scan-tiles .log-scan-tile{min-width:0;min-height:76px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;margin:0;padding:12px 6px 10px;border:1px solid var(--log-border,#c9d3e1);border-radius:10px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.5px;line-height:1.2;text-align:center;overflow-wrap:anywhere;box-shadow:none;cursor:pointer;touch-action:manipulation}
+.log-scan-drawer .log-scan-tile svg{flex:none;width:22px;height:22px;stroke:var(--log-accent,#0b64bd);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.log-scan-drawer .log-scan-tiles .log-scan-tile:disabled{opacity:.45;cursor:not-allowed}
+.log-scan-drawer .log-scan-tiles .log-scan-tile:focus-visible{outline:3px solid var(--log-accent,#0b64bd);outline-offset:2px}
+
+/* ── The feed row's filter icon, and UNDO LAST (release 210) ─────────────────
+   QUICK FILTERS is a 44px square at the end of ALL ▾, DETAILED and COMPACT,
+   which share what is left. The row was a grid of equal columns; it is a flex
+   row now so one of its members can be square. (The share is SHARE in the
+   header.) */
+.feed-title .feed-view-row{display:flex}
+.feed-title .feed-view-row>*{flex:1 1 0;min-width:0}
+.feed-title .feed-view-row>.quick-filter-control{flex:0 0 44px;display:flex}
+.feed-title .feed-view-row>.quick-filter-control>button.quick-filter-trigger{width:100%;padding:0;justify-content:center}
+.feed-title .feed-icon{flex:none;width:20px;height:20px;stroke:var(--log-accent,#0b64bd);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.feed-title .quick-filter-trigger.active .feed-icon{stroke:currentColor}
+/* UNDO LAST. Wider than a phone the title row has room: it sits left of SHOW
+   STATUS COLOR. In the phone's column layout it takes the title's corner, so
+   appearing after a save moves nothing below it, and the title keeps clear of
+   it - a title is a setting and can be long. Absolute everywhere was the first
+   cut, and above 760 it landed on SHOW STATUS COLOR - measured in review. On a
+   phone it sits 4px from the top so its 34px end above the count line, which
+   starts under the title's 26px; at 10px it covered the ESTIMATED badge. */
+.feed-title{position:relative}
+.feed-title button.feed-undo{position:static;order:1;flex:none;width:auto;height:34px;min-height:34px;display:inline-flex;align-items:center;gap:5px;margin:0 12px 0 auto;padding:0 10px;border:1px solid var(--log-accent,#0b64bd);border-radius:7px;background:var(--log-surface,#fff);color:var(--log-accent,#0b64bd);font-size:11px;font-weight:900;letter-spacing:.4px;box-shadow:none}
+.feed-title button.feed-undo .feed-icon{width:16px;height:16px}
+@media(max-width:760px){.feed-title button.feed-undo{position:absolute;top:4px;right:12px;margin:0}.feed-title.with-undo>span>b:first-child{max-width:calc(100% - 128px)}}
+@media(max-width:460px){.feed-title .feed-view-row button,.feed-title .feed-view-row .feed-window-pick{font-size:11px;letter-spacing:0}}
+/* Narrow phones: the worded buttons' side padding comes down to 2px. With two
+   icons in the row DETAILED overran its edge by 2px at 360 - measured - and
+   the room it buys still matters when a saved view adds a fourth label. */
+@media(max-width:400px){.feed-title .feed-view-row>button,.feed-title .feed-view-row .feed-window-pick{padding:0 2px}}
+
+/* SCAN and SHARE in the header (release 210), beside REFRESH. Two equal
+   buttons drawn as the toggle was: the header's own ink, no fill. */
+.log-header-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}
+.log-header-pair>.header-advanced-toggle{justify-content:center;gap:7px;padding:0 10px}
+.log-header-pair>.header-advanced-toggle>i{border:0;padding:0;font-size:12px;font-style:normal}
+.log-header-pair .header-icon{flex:none;width:18px;height:18px;stroke:var(--app-header-text,var(--log-header-text,#fff));fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+/* With a saved view lit there are four worded buttons beside the filter icon.
+   At 360 each is 60px and IN PROGRESS overran its box by 11px, DETAILED and
+   COMPACT by 4 - measured. One size down, the two-word label may wrap, and
+   the buttons size to their words rather than sharing the row equally: PROGRESS
+   alone is wider than an equal share. */
+@media(max-width:400px){.feed-title .feed-view-row.with-saved-view>.feed-window-pick{flex:1 1 auto;min-width:52px}.feed-title .feed-view-row.with-saved-view>button{flex:1 1 auto;min-width:min-content;font-size:10px;white-space:normal;line-height:1.1}}

@@ -175,7 +175,7 @@ test("LITE stands the right things down on every surface", async () => {
  // Both sheets: ADVANCED ACTIONS, and the drawer as well as its button — a
  // device that had it open when Lite went on must not keep it open.
  for (const [source, label] of [[down, "down sheet"], [log, "defect log"]]) {
-  assert.match(source, /!hiddenInLite\(appMode,"advancedActions"\)&&<button/, label + " keeps its advanced toggle in lite");
+  assert.match(source, /!hiddenInLite\(appMode,"advancedActions"\)&&<(button|div className="log-header-pair">)/, label + " keeps its advanced toggle in lite");
   assert.match(source, /advancedOpen&&!hiddenInLite\(appMode,"advancedActions"\)/, label + " would keep an open drawer open");
  }
  // DEFERRED, everywhere it shows: the board, the badge, the evening prompt, the

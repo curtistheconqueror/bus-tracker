@@ -386,7 +386,7 @@ test("the photos go from SCAN SHEET to a scanner once, in memory, whole or not a
   assert.equal(paperSentWrongWords(handed, "sweep"), "");
   assert.equal(paperSentWrongWords(null, "heat"), "");
   assert.equal(paperSentWrongWords({ kind: "heat", files: [], expected: 2, leftOut: 0 }, "heat"), "", "lost photos were never refused");
-  for (const [file, last] of [["../app/defect-log/_components/heat-scanner.tsx", "through SCAN SWEEP."], ["../app/defect-log/_components/sweep-scanner.tsx", "on the Down Sheet page."]]) {
+  for (const [file, last] of [["../app/defect-log/_components/heat-scanner.tsx", "through SCAN, then FAREBOX / VENTRA SWEEP."], ["../app/defect-log/_components/sweep-scanner.tsx", "on the Down Sheet page."]]) {
     assert.ok(code(await read(file)).includes(last + '"+(fromPaper&&start.wrong?" "+start.wrong:""));'), file + " adds it to its refusal, while the photos are still the door's");
   }
 
@@ -585,10 +585,13 @@ test("SCAN SHEET on the screen: it identifies, hands on, and files nothing", asy
   assert.match(logPage, /const PAPER_HERE="\/defect-log";/);
   assert.match(downPage, /const PAPER_HERE="\/down-sheet";/);
   assert.doesNotMatch(code(logPage), /ScanPaper|paperOpen|openPaperHere/);
-  /* ITS OWN TWO SCAN BUTTONS ARE WHERE THEY WERE, and open their scanner
-     directly, as they did before any of this. */
-  assert.match(logPage, /<div className="feed-actions"><button className="cleanup-log" onClick=\{cleanUpLog\}>CLEAN UP<\/button><button className="sweep-scan-button" type="button" onClick=\{\(\)=>setSweepOpen\(true\)\}/, "the row still starts where it did");
-  assert.match(logPage, /className="sweep-scan-button"[\s\S]{0,400}className="scan-batches-button"[\s\S]{0,1500}className="heat-scan-button" type="button" onClick=\{\(\)=>setHeatOpen\(true\)\}[\s\S]{0,300}>📷 SCAN HEAT SHEET<\/button><\/div>/, "and SCAN HEAT SHEET closes it again");
+  /* ITS SHEETS STILL OPEN THEIR SCANNER DIRECTLY, with no first look. Since
+     release 210 they are tiles in SCAN A SHEET, one per row of the sheet
+     table; the person pressing one named the sheet, so nothing guesses. The
+     Down Sheet's tile goes to that page's scanner by the hand-off address. */
+  assert.match(logPage, /\{PAPER_KINDS\.map\(sheet=>\{const here=sheet\.route===PAPER_HERE;return <button type="button" className="log-scan-tile"/);
+  assert.match(logPage, /onClick=\{\(\)=>\{if\(here\)openScanner\(sheet\.kind\);else window\.location\.assign\(paperScanHref\(sheet\.kind\)\)\}\}/);
+  assert.doesNotMatch(code(logPage), /scan-identify|identifyPaper/, "no first look on this page");
 
   /* A HAND-OFF IS FOR ONE OPENING. Both pages drop it when the scanner shuts —
      ON THE CHANGE FROM OPEN TO SHUT, not "whenever shut": that is also true as
