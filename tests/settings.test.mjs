@@ -182,8 +182,15 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedPage,/state:"open",completedAt:undefined,completedBy:undefined/);
   assert.match(fixedPage,/filter\(defect=>defect\.id!==record\.defect\.id\)/);
   assert.doesNotMatch(defectPage,/className="log-undo"/);
-  assert.match(defectPage,/className="log-undo-button"[\s\S]*disabled=\{!undoSnapshot\}[\s\S]*UNDO LAST/);
-  assert.match(defectCss,/\.log-undo-button\{[^}]*background:var\(--log-surface[^}]*color:var\(--log-muted/);
+  /* Since release 210 UNDO LAST is drawn only while there is something to
+     undo, in the feed header's corner, rather than faded on every visit. */
+  assert.match(defectPage,/const showFeedUndo=Boolean\(undoSnapshot\)&&!hiddenInLite\(appMode,"undoTools"\);/,"only with something to undo, and LITE's undo rule");
+  assert.match(defectPage,/\{showFeedUndo&&<button className="feed-undo" type="button" onClick=\{undoLastChange\}[\s\S]{0,400}UNDO LAST<\/button>\}/);
+  /* Wider than a phone it sits in the title row, left of SHOW STATUS COLOR -
+     absolute there, it covered that box (review, release 210). On a phone it
+     takes the title's corner and the title keeps clear of it. */
+  assert.match(defectCss,/\.feed-title button\.feed-undo\{position:static;order:1/);
+  assert.match(defectCss,/@media\(max-width:760px\)\{\.feed-title button\.feed-undo\{position:absolute;top:4px;right:12px;margin:0\}\.feed-title\.with-undo>span>b:first-child\{max-width:calc\(100% - 128px\)\}\}/);
   assert.match(defectCss,/@media\(max-width:760px\)\{\.log-controls\{grid-template-columns:minmax\(0,1fr\) 82px 48px/);
   assert.match(fixedCss,/\.fixed-header nav\{[^}]*grid-template-columns:repeat\(auto-fit/,
     "the column count must not encode how many pages exist — repeat(6) hid the gear when an eighth page arrived");

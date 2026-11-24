@@ -31,3 +31,8 @@ nav[data-tracker-nav] .tracker-desktop-links{display:contents}
  main nav[data-tracker-nav] select:focus-visible{outline:3px solid currentColor;outline-offset:2px}
 }
 @media print{.tracker-mobile-shell{display:none}}
+
+/* The AI Operator (release 210): a tool, not a page, so it sits under the
+   pages with a rule above it, and says where it opens. */
+.tracker-more-menu>a.tracker-more-tool{gap:6px;margin-top:8px;border-top:1px solid #e3e9f2;border-radius:0 0 8px 8px;padding-top:14px}
+.tracker-more-menu>a.tracker-more-tool>small{margin-left:auto;color:#60728c;font-size:11px;font-weight:600}

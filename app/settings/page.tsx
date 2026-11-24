@@ -70,6 +70,7 @@ import {SettingsDrawer,SettingsDrawers} from "@/src/components/settings/settings
 import {mergeSheetLedgers,readSheetLedger,writeSheetLedger} from "@/src/lib/down-sheet/sheet-ledger";
 import ShiftSettingsPanel from "./_components/shift-settings";
 import SheetBackfillPanel from "./_components/sheet-backfill";
+import {logToolHref} from "@/src/lib/defects/defect-log-tools";
 
 /* The map's duty-cycle average reads two histories the Defect Log's bus type
    never needed to know about. */
@@ -703,6 +704,19 @@ export default function SettingsPage(){
       <div className="settings-tool-row">
        <button type="button" className="merge-duplicates" onClick={mergeDuplicates} disabled={!duplicateCount} title={duplicateCount?duplicateCount+" open repair"+(duplicateCount===1?" is":"s are")+" recorded more than once":"Every open repair on this board is recorded once"}>MERGE DUPES{duplicateCount?" ("+duplicateCount+")":""}</button>
        {mergeUndo&&<button type="button" className="undo-merge" onClick={undoMerge} title={mergeUndo.label+" — put every record back"}>UNDO MERGE</button>}
+      </div>
+     </section>
+     {/* Moved here from the Defect Log's ADVANCED ACTIONS in release 210, when
+         that drawer became SCAN A SHEET. Both still run on the Defect Log, which
+         holds the board and its undo, so each opens it and does the one thing
+         asked (`defect-log-tools.ts`). Not hidden in LITE: nothing on this page
+         is, because this page is the way out of LITE. */}
+     <section className="log-settings-group settings-tools" aria-labelledby="log-tools-heading">
+      <h3 id="log-tools-heading">SCANS AND CLEANUP</h3>
+      <p>SCAN BATCHES lists every photo scan filed on this device and takes a wrong one back out. CLEAN UP hides fixed, out-of-service and Down Sheet records from the Defect Log's feed; nothing is deleted and no bus changes. Both open the Defect Log.</p>
+      <div className="settings-tool-row">
+       <button type="button" className="log-tool-scan-batches" onClick={()=>window.location.assign(logToolHref("scan-batches"))}>SCAN BATCHES</button>
+       <button type="button" className="log-tool-clean-up" onClick={()=>window.location.assign(logToolHref("clean-up"))}>CLEAN UP</button>
       </div>
      </section>
     </SectionBody>

@@ -132,10 +132,10 @@ test("the Mystery list renders on the Down Sheet, and the Defect Log packs its c
   /* Nine controls were loose above the feed. Only the two used on every visit
      stay out — LOG DEFECT and SEARCH — and the rest sit behind one button,
      closed until it is opened. */
-  assert.match(html,/ADVANCED ACTIONS/);
+  assert.match(html,/<b>SCAN<\/b>[\s\S]*?<b>SHARE<\/b>/,"since release 210 the header holds SCAN and SHARE beside REFRESH");
   /* The toggle lives in the header now, in the same column as REFRESH, drawn
      like the header's own controls rather than like a card on the page. */
-  assert.match(html,/class="log-header-actions"><button class="app-refresh"[\s\S]*?class="header-advanced-toggle"/,"ADVANCED ACTIONS sits directly under REFRESH, inside the header");
+  assert.match(html,/class="log-header-actions"><button class="app-refresh"[\s\S]*?class="header-advanced-toggle"/,"SCAN sits beside REFRESH, inside the header");
   assert.match(html,/class="header-advanced-toggle"[^>]*aria-expanded="false"/,"it opens closed, which is the point of it");
   /* Closed, the drawer is not in the document at all, so the button must not
      point a screen reader at it. */
@@ -143,28 +143,25 @@ test("the Mystery list renders on the Down Sheet, and the Defect Log packs its c
   const css2=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
   assert.doesNotMatch(css2,/\.log-advanced-toggle/,"the card-style toggle rules died with the card; nothing carries that class now");
   assert.doesNotMatch(html,/class="log-advanced /,"closed, the drawer must not render an empty bordered box");
-  /* Closed, the header button is the last thing in the header - the drawer it
-     opens is a sibling below, not a light panel dropped into the navy. */
-  assert.match(html,/<\/button><\/div><\/header>/);
+  /* Closed, the header buttons are the last thing in the header - the drawer
+     SCAN opens is a sibling below, not a light panel dropped into the navy.
+     Since release 210 SCAN and SHARE sit in their own pair inside the row. */
+  assert.match(html,/<\/button><\/div><\/div><\/header>/);
   assert.match(html,/\+ LOG DEFECT/);
   assert.match(html,/>SEARCH</);
   for(const label of ["QUICK FILTERS","UNDO LAST","CLEAN UP","SCAN SWEEP","SCAN BATCHES","AI OPERATOR"])
-   assert.doesNotMatch(html,new RegExp(">"+label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"<"),label+" must be inside the closed section, not loose on the page");
+   assert.doesNotMatch(html,new RegExp(">"+label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"<"),label+" must not be loose on the page: since release 210 QUICK FILTERS is an icon, UNDO LAST shows only with something to undo, SCAN BATCHES and CLEAN UP are in Settings and the AI Operator is in the More menu");
   const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
    /* Four boxes in a two-column grid: two full rows, nothing sitting alone. */
    assert.match(css,/\.engine-symptom-picker>div\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
 
-  /* MOVING A BUTTON MOVES IT OUT OF ITS OWN RULES. These four were written
-     against .feed-title, which is where they used to live; carried into
-     ADVANCED ACTIONS they matched nothing and quietly lost their paint - the
-     AI OPERATOR link came out as plain dark text with no gradient and CLEAN UP
-     came out with no border at all, both reported off the live site. The
-     buttons render in one place now and the rules must reach it. */
-  for(const rule of [/\.log-advanced \.feed-operator\{/,/\.log-advanced \.cleanup-log\{/,
-                     /\.log-advanced \.sweep-scan-button:disabled/,/\.log-advanced \.scan-batches-button:disabled/])
-   assert.match(css,rule,"a rule that only names .feed-title cannot reach a button that no longer renders there");
-  assert.match(css,/\.log-advanced \.feed-operator\{[^}]*linear-gradient\(120deg,#4a2389,#7138c5\)/,"AI OPERATOR keeps its purple");
-  assert.match(css,/\.log-advanced \.cleanup-log\{border:1px solid/,"CLEAN UP has a border you can see");
+  /* THE THREE SCAN TILES ARE DRAWN THE SAME (release 210): one rule for all
+     three, a white face, one grey edge, a blue camera, on the header-coloured
+     drawer. The per-button purple, lavender and orange the drawer used to
+     carry is what Curtis called out of place. */
+  assert.match(css,/\.log-scan-drawer \.log-scan-tiles\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/,"three side by side");
+  assert.match(css,/\.log-scan-drawer \.log-scan-tiles \.log-scan-tile\{[^}]*background:var\(--log-surface/);
+  assert.doesNotMatch(css,/\.log-advanced\.log-scan-drawer\{[^}]*background/,"the drawer keeps the header colour from .log-advanced");
   /* The toggle is drawn from the header's own translucent-white pair, not the
      light-surface one it had as a card - that was invisible against navy.
 
@@ -501,7 +498,7 @@ test("real-time defect log keeps one linked repair across tracker and down sheet
   assert.ok(page.includes("Real-Time Defect Log"));
   assert.ok(page.includes("+ LOG DEFECT"));
   assert.ok(page.includes("DOWN SHEET"));
-  assert.ok(page.includes("AI OPERATOR"));
+  assert.ok(!page.includes("AI OPERATOR"),"the AI Operator left this page for the More menu in release 210");
   assert.ok(css.includes("@media(max-width:760px)"));
   /* The log's settings live in their own modules now - the model, and the
      panel the Settings page renders - and the log reads the key they write. */
@@ -550,7 +547,8 @@ test("Defect Log counts only direct log records and returns buses to service wit
 
   const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
   const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
-  assert.match(page,/feed-operator/);
+  /* The AI Operator left this page in release 210, for the More menu. */
+  assert.doesNotMatch(page,/feed-operator/);
   assert.match(page,/inline-ds-badge/);
   assert.match(page,/BACK IN SERVICE/);
   assert.match(page,/hideDefectLogRecords\(result\.fleet/);
@@ -5540,7 +5538,7 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  assert.match(scanner,/const loggable=useMemo\(\(\)=>heatLoggable\(findings,held\)/,"what may be logged is asked again after the reviewer's ticks");
  assert.match(scanner,/if\(!photos.length\|\|busy\)return;/,"READ SHEET cannot be pressed twice");
  /* The way back is promised only where there is one. */
- assert.match(scanner,/const back=files\?"[^"]*SCAN BATCHES takes the defects and the checks back out together\.":"[^"]*UNDO LAST takes these checks back out, for as long as you stay on the Defect Log and change nothing else; after that a wrong check is corrected by the next check on that bus\.";/);
+ assert.match(scanner,/const back=files\?"[^"]*SCAN BATCHES, in Settings, takes the defects and the checks back out together\.":"[^"]*UNDO LAST takes these checks back out, for as long as you stay on the Defect Log and change nothing else; after that a wrong check is corrected by the next check on that bus\.";/);
  /* The photos and the notes cannot change under a read that is running. */
  assert.match(scanner,/if\(!files\|\|busy\)return;/,"no photo is added mid-read");
  assert.match(scanner,/const removePhoto=\(key:string\)=>\{if\(busy\)return;setFromPaper\(false\);setPhotos\(/,"none is removed mid-read");
@@ -5564,7 +5562,11 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  assert.match(fileHeat,/setUndoSnapshot\(\{fleet,downEntries,label:[^}]*heatScan:now\}\)/,"the undo keeps the board as it WAS, and the stamp of the scan it undoes");
  assert.doesNotMatch(code(logPage),/writeHeatChecks|mergeHeatChecks|withoutScanChecks/,"the page reads, merges and writes the log through one function per job");
  assert.match(logPage,/\{heatOpen&&<HeatScanner fleet=\{fleet\} handed=\{handed\} onClose=\{\(\)=>setHeatOpen\(false\)\} onFile=\{fileHeat\}\/>\}/);
- assert.match(logPage,/<button className="heat-scan-button"[^>]*onClick=\{\(\)=>setHeatOpen\(true\)\}[^>]*>📷 SCAN HEAT SHEET</);
+ /* Since release 210 each sheet is one tile in SCAN A SHEET, drawn from the
+    sheet table: a sheet this page reads opens its scanner through
+    `openScanner`, the function a hand-off from another page also uses. */
+ assert.match(logPage,/\{PAPER_KINDS\.map\(sheet=>\{const here=sheet\.route===PAPER_HERE;[\s\S]{0,300}onClick=\{\(\)=>\{if\(here\)openScanner\(sheet\.kind\);else window\.location\.assign\(paperScanHref\(sheet\.kind\)\)\}\}/);
+ assert.match(logPage,/const openScanner=\(kind:HandedPhotos\["kind"\]\)=>\{if\(kind==="heat"\)setHeatOpen\(true\);else if\(kind==="sweep"\)setSweepOpen\(true\)\};/);
  /* The address is read through the one function SCAN SHEET's hand-off uses,
     so the campaign's link and a photo arriving from the Down Sheet cannot be
     understood two different ways. tests/scan.test.mjs holds what it returns. */
@@ -5823,8 +5825,11 @@ test("the sweep scanner is its own door on the Defect Log and never touches the 
   readFile(new URL("../app/api/sweep-scan/route.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/down-sheet/_components/down-sheet-scanner.tsx",import.meta.url),"utf8"),
  ]);
- /* A separate button next to LOG DEFECT, not the Down Sheet's scan button. */
- assert.match(logPage,/className="sweep-scan-button"[^>]*onClick=\{\(\)=>setSweepOpen\(true\)\}[^>]*>📷 SCAN SWEEP</);
+ /* Since release 210 each sheet is one tile in SCAN A SHEET, drawn from the
+    sheet table: a sheet this page reads opens its scanner through
+    `openScanner`, the function a hand-off from another page also uses. */
+ assert.match(logPage,/\{PAPER_KINDS\.map\(sheet=>\{const here=sheet\.route===PAPER_HERE;[\s\S]{0,300}onClick=\{\(\)=>\{if\(here\)openScanner\(sheet\.kind\);else window\.location\.assign\(paperScanHref\(sheet\.kind\)\)\}\}/);
+ assert.match(logPage,/const openScanner=\(kind:HandedPhotos\["kind"\]\)=>\{if\(kind==="heat"\)setHeatOpen\(true\);else if\(kind==="sweep"\)setSweepOpen\(true\)\};/);
  assert.match(logPage,/<SweepScanner fleet=\{fleet\} handed=\{handed\} onClose=\{\(\)=>setSweepOpen\(false\)\} onFile=\{fileSweep\}\/>/);
  /* Filing goes through the same single-record save as LOG DEFECT, and UNDO LAST covers it. */
  assert.match(logPage,/saveDefectLogRecord\(nextFleet,nextDown,finding\.busId,sweepDefect\(finding,now\),false,now\)/);
@@ -7954,11 +7959,12 @@ test("WHEN LOGGED narrows the feed, says so outside the drawer, and never outran
  /* A DROP-DOWN, which is how Curtis asked for it: "it should be like a
     drop-down somewhere at the work computer". Not a seventh chip — that row is
     thumb targets and has to stay on one line at 360px. */
- assert.match(page,/<label className="log-feed-window">WHEN LOGGED/);
- assert.match(page,/<select value=\{feedWindow\} onChange=\{event=>setFeedWindow\(event\.target\.value as FeedWindowKey\)\}/);
+ /* Since release 210 the drop-down is ALL ▾ over the feed alone: the WHEN
+    LOGGED copy in ADVANCED ACTIONS asked the same question with the same list,
+    and the drawer is about scanning now. */
+ assert.doesNotMatch(page,/className="log-feed-window"/);
  assert.match(page,/\{FEED_WINDOWS\.map\(item=><option value=\{item\.key\} key=\{item\.key\}>\{item\.label\}<\/option>\)\}/,
   "the options come from the one list, so the drop-down cannot drift from the filter");
- assert.match(page,/aria-label="Show defects logged within"/);
 
  /* SEARCH WINS. Curtis wants to reach a bus "no matter what time" it was
     logged, so an active search sets the limit to null outright. */
@@ -8000,7 +8006,6 @@ test("WHEN LOGGED narrows the feed, says so outside the drawer, and never outran
  assert.doesNotMatch(code,/feed-window-v1|feedWindow[^)]*localStorage|localStorage[^;\n]*feedWindow/,
   "the window is not written to storage");
 
- assert.match(css,/\.log-feed-window select\{width:100%;min-height:44px/,"a real tap target, matching the buttons beside it");
  assert.match(css,/\.log-window-filtered\{/);
  assert.doesNotMatch(css,/\.log-window-filtered\{[^}]*background:#eaf3fd/,
   "it must not be the search bar's blue: both can be on screen at once");
@@ -8200,63 +8205,31 @@ test("DEFECTS LOGGED counts over a span somebody picks, and no other menu row ch
 });
 
 test("AI OPERATOR says where it is going before it goes",async()=>{
- const [page,map,css]=await Promise.all([
+ const [page,map,nav]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/tracker-nav.tsx",import.meta.url),"utf8"),
  ]);
 
  /* Curtis: "When I press Ai operator and I am on the Defect page it routes me
-    to the map. With no warning." It always did — the control is a link, and the
-    modal cannot render on this screen because `executeOperator` is bound to the
-    map's own state. The navigation is the feature; saying so was missing. */
- assert.match(page,/onClick=\{event=>\{if\(!leaveForOperator\(\)\)event\.preventDefault\(\)\}\}/,
-  "the navigation is held until somebody agrees to it");
- assert.match(page,/const leaveForOperator=\(\)=>confirm\("AI OPERATOR runs on the Facility Map, so this leaves the Defect Log\."/,
-  "and the first thing it says is where it is going");
+    to the map. With no warning." The Defect Log's link answered that with a
+    confirm. Since release 210 the link is gone from that page - Curtis found it
+    out of place there - and the Operator is in the More menu on every page,
+    where the row itself says where it opens, before it is pressed. It is still
+    a link there, because the modal cannot render off the map: `executeOperator`
+    is bound to the map's own state. */
+ const pageCode=page.replace(/\/\*[\s\S]*?\*\//g,"").replace(/\{\/\*[\s\S]*?\*\/\}/g,"");
+ assert.doesNotMatch(pageCode,/operator=1|leaveForOperator|feed-operator/,"the Defect Log no longer carries the Operator");
+ assert.match(nav,/const OPERATOR_HREF="\/\?operator=1";/);
+ assert.match(nav,/<a className="tracker-more-tool" href=\{OPERATOR_HREF\}[^>]*>[\s\S]{0,80}AI OPERATOR<small>opens on the map<\/small><\/a>/,
+  "the More menu row names its destination");
 
- /* STILL A LINK. An anchor that is prevented keeps the href, so a long-press
-    can open the map in a second tab — which leaves this board standing and has
-    nothing to warn about. A button would have thrown that away, and the
-    stylesheet reaches this control by class on a descendant selector, so the
-    element was never what was holding the look together. */
- assert.match(page,/<a className="feed-operator" href="\/\?operator=1"/,
-  "the anchor and its href survive the fix");
- assert.match(page,/title="Opens the AI Operator on the Facility Map — this leaves the Defect Log"/,
-  "and it names its destination before it is pressed, with no change to the label");
- assert.match(page,/>&#10022;<\/span> AI OPERATOR<\/a>/,"the label is untouched");
- assert.ok(css.includes(".feed-title .feed-operator,.log-advanced .feed-operator{"),
-  "the look comes from the class on a descendant selector, not from the tag");
-
- /* THE SECOND SENTENCE ONLY WHEN THERE IS SOMETHING TO LOSE. Nothing here is
-    unsaved — the editor is a full-screen shade, so a draft cannot be open while
-    this control is reachable. What a reload costs is the way the BOARD is set,
-    and warning about filters nobody set would train somebody to dismiss the one
-    case that matters. */
- assert.match(page,/const boardIsNarrowed=Boolean\(search\.trim\(\)\)\|\|feedWindow!=="all"\|\|filter!=="all"\|\|Boolean\(quickFilter\)\|\|Boolean\(focusedBusId\)/,
-  "every way this board can be narrowed counts, and nothing else does");
- assert.match(page,/\(boardIsNarrowed\?"\\n\\nThe way you have this board set/,
-  "the cost is named only when there is one");
- assert.doesNotMatch(page,/leaveForOperator\(\)\?"/,
-  "the warning is not the thing that decides what the message says");
-
- /* THE MAP'S OWN TWO COPIES ARE LEFT ALONE. They open the modal in place and
-    leave no screen, so there is nothing for them to warn about — and a confirm
-    on them would be a confirm on the surface the Operator actually runs on. */
- assert.doesNotMatch(map,/leaveForOperator/,"the Facility Map asks nobody");
+ /* THE MAP'S OWN COPIES ARE LEFT ALONE. They open the modal in place and leave
+    no screen, so there is nothing for them to warn about. */
  assert.match(map,/className="ai-operator-command" type="button" onClick=\{\(\)=>setOperatorOpen\(true\)\}/,
   "its command bar still opens the modal in place");
  assert.equal(map.split("setOperatorOpen(true)").length-1,3,
   "the command bar, the phone dock and the operator=1 landing — all in place");
- /* COUNTED IN THE CODE, NOT THE PROSE. The comment above the handler quotes
-    the element it is explaining, and a count taken over the raw file reads that
-    quotation as a second control — the same trap a release ago, where an
-    assertion matched a comment rather than the thing it was about. */
- const pageCode=page.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
- assert.equal(pageCode.split('href="/?operator=1"').length-1,1,
-  "one navigating instance on this screen, and it is the one that now warns");
- assert.match(pageCode,/onClick=\{event=>\{if\(!leaveForOperator\(\)\)event\.preventDefault\(\)\}\}/,
-  "and the guard is on that instance in the code, not described in a comment");
 });
 
 test("FOCUS shares one bus, as text or as a page",async()=>{
@@ -10521,4 +10494,40 @@ test("ALL is a drop-down of when defects were logged, and PREVIOUS SHIFT has two
  assert.match(page,/<select value=\{filter==="all"&&!search\.trim\(\)\?feedWindow:""\} onChange=\{event=>\{if\(event\.target\.value\)pickFeedWindow\(event\.target\.value as FeedWindowKey\)\}\} aria-label="Show all defects logged within">\{\(filter!=="all"\|\|Boolean\(search\.trim\(\)\)\)&&<option value="" disabled>CHOOSE ONE<\/option>\}\{FEED_WINDOWS\.map/);
  const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
  assert.match(css,/\.feed-window-pick>select\{[^}]*opacity:0;font-size:16px/,"16px, or iOS zooms the page into it");
+});
+
+test("the share icon opens on the feed's window where the share has one, and Settings reaches the Defect Log's tools",async()=>{
+ const {shareWindowForFeed,logToolFromSearch,logToolHref,LOG_TOOLS}=await import("../src/lib/defects/defect-log-tools.ts");
+ const {FEED_WINDOWS}=await import("../src/lib/defects/feed-window.ts");
+ const {TIME_WINDOWS_WITH_SHIFT}=await import("../src/lib/shared/time-window.ts");
+ /* Four spans match a chip. The rest, ALL included, take the drawer's own
+    default (null): DEFECTS LOGGED opens on THIS SHIFT, because on ALL it is
+    every bus with an open defect rather than a handover list. */
+ const expected={all:null,shift:"shift",previous:null,today:null,"24h":"24h","3d":"3d","7d":"7d","30d":null};
+ for(const {key} of FEED_WINDOWS){
+  const got=shareWindowForFeed(key,true);
+  assert.equal(got,expected[key],key);
+  assert.ok(got===null||TIME_WINDOWS_WITH_SHIFT.some(item=>item.key===got),key+" opens on a chip the drawer draws");
+ }
+ assert.equal(shareWindowForFeed("shift",false),null,"no SHIFT chip when the shift cannot be read");
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/setQuickFilterWindow\(shareWindowForFeed\(feedWindow,[^)]*\)\)\?\?loggedCountWindow\)/,"null falls back to the drawer's default");
+
+ /* THE DOORS. SHARE in the header opens that share; the filter icon in the
+    feed row is LITE-gated with it; Settings reaches both tools. */
+ assert.match(page,/<button className="header-advanced-toggle header-share" type="button" onClick=\{openLoggedShare\}/);
+ assert.match(page,/\{!hiddenInLite\(appMode,"advancedActions"\)&&<><QuickFilterMenu active=\{quickFilter\}[^>]*icon=\{/,"the filter icon is hidden in LITE like the drawer it came from");
+ const settings=await readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8");
+ for(const [tool,label] of [["scan-batches","SCAN BATCHES"],["clean-up","CLEAN UP"]])
+  assert.ok(settings.includes('onClick={()=>window.location.assign(logToolHref("'+tool+'"))}>'+label+'</button>'),label+" in Settings opens the Defect Log with ?tool="+tool);
+ /* The arrival: once, after the board is read, the parameter off the address
+    before anything is asked, and refused in LITE - Settings hides nothing in
+    LITE, so the refusal has to be here. */
+ const arrival=page.slice(page.indexOf("const logToolDone=useRef(false);"),page.indexOf("},[hydrated]);",page.indexOf("const logToolDone=useRef(false);")));
+ assert.ok(arrival.length>0);
+ assert.match(arrival,/if\(!hydrated\|\|logToolDone\.current\)return;\s*logToolDone\.current=true;/);
+ const strip=arrival.indexOf("url.searchParams.delete(LOG_TOOL_PARAM)"),lite=arrival.indexOf('hiddenInLite(appMode,"advancedActions")'),act=arrival.indexOf("setBatchesOpen(true)");
+ assert.ok(strip>0&&strip<lite&&lite<act,"strip, then refuse in LITE, then act");
+ for(const tool of LOG_TOOLS)assert.equal(logToolFromSearch(new URL(logToolHref(tool),"http://x").search),tool);
+ for(const search of ["","?tool=","?tool=delete-everything","?scan=heat","%%%"])assert.equal(logToolFromSearch(search),null,search);
 });

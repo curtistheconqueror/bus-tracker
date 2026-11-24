@@ -1,43 +1,41 @@
 # Publish next
 
-**STATUS: NONE PENDING.** Application release 209 is live as Sites Version 197,
-deployed 2026-11-24 at 21:03:26.739201 UTC from `9a7cc1f417c53689ee62b5f564609e2a0dc5b32a`.
-It carries releases 207 and 208.
+**STATUS: NONE PENDING.** Application release 210 is live as Sites Version 198,
+deployed 2026-11-24 at 23:04:43.361149 UTC from `8ed0ce2dbf5c5eea6025b846440d43a650d4183c`.
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
-Previous-live rollback: Sites 196 / application release 206 at
-`e649c644c28b66f4bc7d4494726a79834a80164b`. PR39 MCP remains held and excluded.
+Previous-live rollback: Sites 197 / application release 209 at
+`9a7cc1f417c53689ee62b5f564609e2a0dc5b32a`. PR39 MCP remains held and excluded.
 No migration, storage-key, runtime environment or audience change.
 
-The full queue is archived in [releases 207–209](archive/PUBLISH_RELEASE_207_209.md).
+The full queue is archived in [release 210](archive/PUBLISH_RELEASE_210.md).
 Publication evidence is in [RELEASES.md](RELEASES.md).
 
 ## Remaining device checks
 
-On a phone with existing fleet data, verify that the top Defect Log box contains
-+ LOG DEFECT and SEARCH only; LIVE DEFECT FEED shows the count, then the
-unlit ALL dropdown beside DETAILED / COMPACT, then SHOW STATUS COLOR.
-Check the native eight-choice picker, PREVIOUS SHIFT face and shift-hours
-banner, search clearing on ALL, actual card appearance in COMPACT / DETAILED,
-and no sideways scrolling. In Fixed Repairs, check WHEN FIXED → PREVIOUS SHIFT.
-Physical iPhone/Safari/Home Screen and offline acceptance remain unverified.
+On a physical iPhone, confirm the REFRESH / SCAN / SHARE row, the three
+scanner tiles and their routes on a device with local fleet data, the Defects
+Logged share controls, the feed-row Quick Filters, and More → AI OPERATOR on
+the map. Confirm Scan Batches and Clean Up arrival from Settings. Test Undo
+Last and the Clean Up confirmation only with synthetic records on an isolated
+test device, not on the real fleet. Do not share or upload live data to test
+the controls. Home Screen and offline acceptance remain unverified.
 
-The prior release's remaining device-only checks (Log Defect bus/location
-modal open and cancel, and the populated Down Sheet bus label) are preserved
-in [releases 198–206](archive/PUBLISH_RELEASE_198_206.md). These follow-ups are
-not pending source releases; do not change actual fleet records to test them.
-
----
+Continue the native ALL picker and Previous Shift checks from
+[releases 207–209](archive/PUBLISH_RELEASE_207_209.md) and the Log Defect
+location and Down Sheet checks from [releases 198–206](archive/PUBLISH_RELEASE_198_206.md).
+These are device follow-ups, not pending source releases.
 
 ## PR39 (MCP read surface) — NOT MERGED, and not part of any release above
 
 **Nothing in this section is pending publication.** PR39 is an open, unmerged
 pull request, held by Curtis's own release gates; the STATUS line at the top of
-this file is about release 198 and says nothing about this. It is kept here so
-that the gates travel with the branch, and it becomes a release section only if
-and when PR39 is merged — at which point its STATUS, its source SHA and its
-rollback are all written fresh against whatever is live then.
+this file describes whatever release is live and says nothing about this. No
+release is named here, because this section has now outlived four of them. It is
+kept here so that the gates travel with the branch, and it becomes a release
+section only if and when PR39 is merged — at which point its STATUS, its source
+SHA and its rollback are all written fresh against whatever is live then.
 
 
 PR #39 adds five read-only MCP tools at `/api/mcp`. Last code-bearing source:
@@ -49,15 +47,22 @@ passed lint, build and 399 tests on merge candidate
 Any newer code requires reconciliation and current-head checks.
 
 **THAT CI RUN AND ITS 399 TESTS DESCRIBE AN OLDER CANDIDATE, not this head.**
-`main` was merged into this branch on 2026-11-18 at `19f0e90`, and again on
-2026-11-20 at `eaf1c32` — 30 further commits carrying the five PRs queued as
-release 198 — because the branch is published and is not rebased. One file conflicted,
-`tests/helpers/modules.mjs`, where this branch and `main` had each appended
-export lines at the same end: resolved as the union of both, with every module
-path checked to exist. Measured on the merged tree, in a container rather than
-in CI: the production build succeeds, **527 of 527 tests pass** and ESLint is
-clean. CI must re-run on the actual merge SHA before anything is packaged, and
-the test count above moves with every change that adds one.
+`main` is merged into this branch each time Codex publishes, because the branch
+is published and is therefore never rebased; that has now happened five times,
+and the merges are not enumerated here for the same reason the rollback carries
+no number — a list of them was behind within a day of being written. Read
+`git log --merges` on the branch for the actual sequence. Two files have
+conflicted across those merges: `tests/helpers/modules.mjs`, where this branch
+and `main` had each appended export lines at the same end, resolved as the union
+of both with every module path checked to exist; and this file, resolved every
+time by taking `main`'s version whole and re-appending this section, so that a
+release's STATUS line is always Codex's own.
+
+Measured on the merged tree at each merge, in a container rather than in CI.
+On this one: the production build succeeds, **528 of 528 tests pass** and
+ESLint is clean. CI must re-run on the actual merge SHA before anything is
+packaged, and the test count above moves with every change that adds one — it
+was 527 before release 210 added a test of its own.
 
 Nothing about the gates below changed. This merge is maintenance so the branch
 can land when Curtis clears them; it is not a claim that any gate is met.
@@ -103,7 +108,9 @@ before the section was ever used:
 - re-pinned to Sites 194 / release 197; releases 198 to 206 overtook it.
 - re-pinned to 206; release 207 overtook it.
 - 2026-11-24: 207 and 209 are out, and live is Sites Version 197 / release 209.
+- 2026-11-24, later the same day: release 210 is out and live is Sites Version
+  198. The line above was stale within the hour.
 
-Four pins, four times stale. A rollback that undoes unrelated releases is a
+Five pins, five times stale. A rollback that undoes unrelated releases is a
 defect rather than a stale note, which is why this carries no number of its own.
 Do not mark live until deployment and these checks complete.

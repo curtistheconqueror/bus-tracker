@@ -105,7 +105,7 @@ export default function HeatScanner({fleet,onClose,onFile,handed}:Props){
    setFindings(review.findings);
    setHeld(review.held);
    setRead(true);
-   if(review.held.length===photos.length&&review.held.every(item=>item.verdict==="not-a-heat-sheet"))setError("None of these photos is a heat check sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN SHEET on the Down Sheet page, and a farebox or Ventra sheet through SCAN SWEEP."+(fromPaper&&start.wrong?" "+start.wrong:""));
+   if(review.held.length===photos.length&&review.held.every(item=>item.verdict==="not-a-heat-sheet"))setError("None of these photos is a heat check sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN SHEET on the Down Sheet page, and a farebox or Ventra sheet through SCAN, then FAREBOX / VENTRA SWEEP."+(fromPaper&&start.wrong?" "+start.wrong:""));
    else if(!review.findings.length)setError("No bus lines were found. Try a clearer photo, with the whole sheet in frame.");
   }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false);setProgress("")}
  };
@@ -125,7 +125,7 @@ export default function HeatScanner({fleet,onClose,onFile,handed}:Props){
      defects leaves no batch for SCAN BATCHES to find, and the first version
      promised it anyway; what it does have is UNDO LAST, for as long as it is
      the last thing done. */
-  const back=files?"Each defect is an ordinary open record on its bus — editable like one logged by hand. Nothing is closed and the Down Sheet is not touched. SCAN BATCHES takes the defects and the checks back out together.":"Nothing is filed on any bus and the Down Sheet is not touched. UNDO LAST takes these checks back out, for as long as you stay on the Defect Log and change nothing else; after that a wrong check is corrected by the next check on that bus.";
+  const back=files?"Each defect is an ordinary open record on its bus — editable like one logged by hand. Nothing is closed and the Down Sheet is not touched. SCAN BATCHES, in Settings, takes the defects and the checks back out together.":"Nothing is filed on any bus and the Down Sheet is not touched. UNDO LAST takes these checks back out, for as long as you stay on the Defect Log and change nothing else; after that a wrong check is corrected by the next check on that bus.";
   if(!confirm(what+"\n\n"+back))return;
   onFile(findings,loggable);
  };
