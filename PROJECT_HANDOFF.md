@@ -4,8 +4,8 @@ Updated: 2026-11-24
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 197 (application release 209, includes 207 and 208)
-Live feature checkpoint: commit 9a7cc1f417c53689ee62b5f564609e2a0dc5b32a
+Live release: Sites Version 198 (application release 210)
+Live feature checkpoint: commit 8ed0ce2dbf5c5eea6025b846440d43a650d4183c
 
 ## Read this first
 
@@ -24,13 +24,23 @@ The project is an offline-capable fleet maintenance operations application with 
 
 ## Latest publication
 
+Sites Version 198 / application release 210 deployed 2026-11-24 at 23:04:43.361149 UTC from `8ed0ce2dbf5c5eea6025b846440d43a650d4183c`. The Defect Log header is REFRESH, SCAN and SHARE. SCAN offers three sheet-specific tiles; SHARE opens Defects Logged; QUICK FILTERS is on the feed row; UNDO LAST is shown only when usable. SCAN BATCHES and CLEAN UP moved to Settings; AI Operator is on the map and reachable in the phone More menu. No migration, storage-key rename, sync or hosting configuration change. PR39 MCP remains held and excluded.
+
+Exact-source production build, all 485 tests (zero failures or skips), ESLint (no lint diagnostics), and `git diff --check` passed. Exact-build Chromium opened all three scanner dialogs without scanning or uploading; it opened the Defects Logged share and Quick Filters, followed Settings → Scan Batches, and reached the no-eligible-records alert through Settings → Clean Up. Live Chromium verified the new header and tile row, Down Sheet scanner, Share drawer and its three actions, Quick Filters, and the Settings Scan Batches route and panel. It also verified that the Clean Up control was present. The live browser had no device-local fleet, so the other two scanners were disabled there. No live undo, cleanup, file upload or share was executed, and no fleet records were changed. Physical iPhone/Safari, phone More → AI Operator, populated-device Undo Last and Clean Up, Home Screen and offline remain device checks.
+
+Native deployment `appgdep_6b06180053cc8191a86605cf420b267c` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_e08cb5db2244819183afb7d356bac441`. The existing public URL, audience revision 2 and runtime environment revision 2 are unchanged. Immediate rollback: Sites 197 / application release 209 at `9a7cc1f417c53689ee62b5f564609e2a0dc5b32a`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_f9ecbfe3cdb88191b5ff93c099266722`.
+
+The approved queue and phone checklist are in [PUBLISH_RELEASE_210.md](docs/archive/PUBLISH_RELEASE_210.md). The publish queue is reset to NONE PENDING.
+
+### Previous publication — Sites 197 / applications 207–209
+
 Sites Version 197 / application release 209 deployed 2026-11-24 at 21:03:26.739201 UTC from `9a7cc1f417c53689ee62b5f564609e2a0dc5b32a`. It includes 207 and 208: the Defect Log top box holds + LOG DEFECT and SEARCH; LIVE DEFECT FEED puts the count above the view controls; the unlit ALL drop-down exposes eight logged-time choices, including PREVIOUS SHIFT. Fixed Repairs offers PREVIOUS SHIFT as well. No migration, storage-key rename, sync, AI Operator, or hosting configuration change. PR39 MCP remains held and excluded.
 
 Exact-source production build, all 484 tests (zero failures or skips), ESLint (no lint diagnostics), and `git diff --check` passed. No exact-source GitHub Actions run was reported. Chromium on the production build and the live site confirmed the eight options, PREVIOUS SHIFT face and shift-hours banner, clearing search when reselecting ALL, DETAILED/COMPACT selection, the unlit window picker, and the Fixed Repairs option. Live navigation rendered Defect Log, Fixed Repairs, Down Sheet, and Facility Map. No fleet records were added, edited, or moved. A physical iPhone's native picker, phone-width layout and actual card rendering with device-local defect records, Home Screen and offline checks were not independently verified.
 
 Native deployment `appgdep_6b05fb91242481918428e2cfe699fe63` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_f9ecbfe3cdb88191b5ff93c099266722`. The existing public URL, access policy revision 2 and runtime environment revision 2 are unchanged. Previous-live rollback: Sites 196 / application release 206 at `e649c644c28b66f4bc7d4494726a79834a80164b`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_5a0ebd9dfc8c8191b3981192f36f6f0e`.
 
-The approved queue and remaining device checks are archived in [PUBLISH_RELEASE_207_209.md](docs/archive/PUBLISH_RELEASE_207_209.md). The publish queue is reset to NONE PENDING.
+The former queue and remaining device checks are archived in [PUBLISH_RELEASE_207_209.md](docs/archive/PUBLISH_RELEASE_207_209.md).
 
 ### Previous publication — Sites 196 / application 206
 

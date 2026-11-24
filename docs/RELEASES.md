@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 197 / application releases 207–209 | Live | 9a7cc1f417c53689ee62b5f564609e2a0dc5b32a | Defect Log feed layout, time-window picker with PREVIOUS SHIFT, and neutral ALL control; PREVIOUS SHIFT in Fixed Repairs. |
+| 198 / application release 210 | Live | 8ed0ce2dbf5c5eea6025b846440d43a650d4183c | Defect Log header shortcuts for Scan and Share, feed-row Quick Filters, conditional Undo, and relocated Settings tools and phone AI Operator entry. |
+| 197 / application releases 207–209 | Previous live; rollback | 9a7cc1f417c53689ee62b5f564609e2a0dc5b32a | Defect Log feed layout, time-window picker with PREVIOUS SHIFT, and neutral ALL control; PREVIOUS SHIFT in Fixed Repairs. |
 | 196 / application release 206 | Previous live; rollback | e649c644c28b66f4bc7d4494726a79834a80164b | Log Defect BUS wording, location pill and move undo; includes 198–205 already shipped in Sites 195. |
 | 195 / application releases 198–205 | Previous live; rollback | 55812e1829f4a9469e901fb092980f3f86c5e536 | Prior cloud publication, including the general AI Operator question rule; recovered actual baseline. |
 | 194 / application release 197 | Previous live | 12822f60c7e5d76d3702108b33711cc116ca4f61 | Safe installed-app last-page restoration and Doors group display mark. |
@@ -321,3 +322,15 @@ Native deployment `appgdep_6b05fb91242481918428e2cfe699fe63` succeeded; saved ve
 The approved queue and remaining device checks are archived in [PUBLISH_RELEASE_207_209.md](archive/PUBLISH_RELEASE_207_209.md). The publish queue is reset to NONE PENDING.
 
 - Gzip archive SHA256: `09f05cd6e1a65e5bef852e0c1b139d0e095e88390bf2d50852dd91f3b1964026`. Native saved tar hash: `sha256:e0712fc5b45c76f2fd5080991c06b69aabc28c1a50272f05d08275922beb284a` (5,816,320 bytes; 128 files).
+
+## Sites 198 / application 210 — 2026-11-24
+
+Sites Version 198 / application release 210 deployed 2026-11-24 at 23:04:43.361149 UTC from `8ed0ce2dbf5c5eea6025b846440d43a650d4183c`. The Defect Log header is REFRESH, SCAN and SHARE. SCAN offers three sheet-specific tiles; SHARE opens Defects Logged; QUICK FILTERS is on the feed row; UNDO LAST is shown only when usable. SCAN BATCHES and CLEAN UP moved to Settings; AI Operator is on the map and reachable in the phone More menu. No migration, storage-key rename, sync or hosting configuration change. PR39 MCP remains held and excluded.
+
+Exact-source production build, all 485 tests (zero failures or skips), ESLint (no lint diagnostics), and `git diff --check` passed. Exact-build Chromium opened all three scanner dialogs without scanning or uploading; it opened the Defects Logged share and Quick Filters, followed Settings → Scan Batches, and reached the no-eligible-records alert through Settings → Clean Up. Live Chromium verified the new header and tile row, Down Sheet scanner, Share drawer and its three actions, Quick Filters, and the Settings Scan Batches route and panel. It also verified that the Clean Up control was present. The live browser had no device-local fleet, so the other two scanners were disabled there. No live undo, cleanup, file upload or share was executed, and no fleet records were changed. Physical iPhone/Safari, phone More → AI Operator, populated-device Undo Last and Clean Up, Home Screen and offline remain device checks.
+
+Native deployment `appgdep_6b06180053cc8191a86605cf420b267c` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_e08cb5db2244819183afb7d356bac441`. The existing public URL, audience revision 2 and runtime environment revision 2 are unchanged. Immediate rollback: Sites 197 / application release 209 at `9a7cc1f417c53689ee62b5f564609e2a0dc5b32a`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_f9ecbfe3cdb88191b5ff93c099266722`.
+
+The approved queue and phone checklist are in [PUBLISH_RELEASE_210.md](archive/PUBLISH_RELEASE_210.md). The publish queue is reset to NONE PENDING.
+
+- Gzip archive SHA256: `f431a3c9eab08d8e9a2724b72e6cec39000035a5ff6dec2928eef3e791dfea87`. Native saved tar hash: `sha256:1b62c0b02b440e3f9f922b33bdf4fe4184b540fafd3c1594915a24f928b553e4` (5,836,800 bytes; 128 files).
