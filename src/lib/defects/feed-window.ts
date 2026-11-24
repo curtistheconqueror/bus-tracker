@@ -1,4 +1,4 @@
-import {activeShift,type ShiftSettings,DEFAULT_SHIFT_SETTINGS,shiftLabel} from "../settings/shift-clock.ts";
+import {activeShift,clockMinutes,formatClock,type ShiftKey,type ShiftSettings,DEFAULT_SHIFT_SETTINGS,shiftLabel} from "../settings/shift-clock.ts";
 import {completedMinutesElapsed,loggedByHand,loggedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
 
 /* "JUST STAY FOCUSED ON TODAY."
@@ -18,9 +18,14 @@ import {completedMinutesElapsed,loggedByHand,loggedMinutesElapsed,type Structure
    A rolling span says so outright; THIS SHIFT is however long the shift has
    been running; TODAY is however long it has been since midnight. Resolving all
    three to one number means the filter itself is a single comparison and there
-   is no second code path for a clock-based window to be wrong in. */
+   is no second code path for a clock-based window to be wrong in.
 
-export type FeedWindowKey="all"|"shift"|"today"|"24h"|"3d"|"7d"|"30d";
+   PREVIOUS SHIFT IS THE ONE EXCEPTION, added in release 208: the shift before
+   this one has ended, so it has a near edge as well. It is still ages in
+   minutes - see `feedWindowRange` - and its near edge is THIS SHIFT's far edge,
+   so the two windows meet without a gap or an overlap. */
+
+export type FeedWindowKey="all"|"shift"|"previous"|"today"|"24h"|"3d"|"7d"|"30d";
 
 /* DELIBERATELY NOT `TIME_WINDOWS`, and not added to it.
 
@@ -37,6 +42,12 @@ export type FeedWindowKey="all"|"shift"|"today"|"24h"|"3d"|"7d"|"30d";
 export const FEED_WINDOWS:{key:FeedWindowKey;label:string}[]=[
  {key:"all",label:"ALL"},
  {key:"shift",label:"THIS SHIFT"},
+ /* THE ONE WINDOW WITH TWO ENDS. Curtis, asking for the feed's ALL button to
+    become this drop-down: "select if u want to see all defects from current
+    shift, previous, 24 hours, the week". Every other window here reaches back
+    from NOW; the shift before this one ended, so it is the one window that
+    also has a near edge. See `feedWindowRange`. */
+ {key:"previous",label:"PREVIOUS SHIFT"},
  {key:"today",label:"TODAY"},
  {key:"24h",label:"LAST 24H"},
  {key:"3d",label:"LAST 3 DAYS"},
@@ -84,6 +95,7 @@ export function feedWindowMinutes(key:FeedWindowKey,now:Date=new Date(),settings
  const fixed=FIXED_MINUTES[key];
  if(fixed!==undefined)return fixed;
  if(key==="shift")return activeShift(now,settings)?.since??null;
+ if(key==="previous")return feedWindowRange(key,now,settings)?.max??null;
  /* TODAY IS THE CALENDAR DAY ON THIS DEVICE, not a rolling 24 hours — they are
     different questions and he asked for both. At 06:00 "today" is six hours of
     work and "the last 24 hours" still carries all of yesterday afternoon.
@@ -112,7 +124,7 @@ export function feedWindowMinutes(key:FeedWindowKey,now:Date=new Date(),settings
 
 /* AND WHETHER THE WINDOW SOMEBODY PICKED IS ACTUALLY IN FORCE.
 
-   `feedWindowMinutes` and `feedWindowLabel` degrade TOGETHER to "no window"
+   `feedWindowRange` and `feedWindowLabel` degrade TOGETHER to "no window"
    when the clock cannot answer — a shift somebody has edited into a shape with
    no window covering now, or a `now` that cannot be read at all. That pairing
    is deliberate and is the right failure: a narrowed board under a heading
@@ -128,7 +140,68 @@ export function feedWindowMinutes(key:FeedWindowKey,now:Date=new Date(),settings
    ALL is never unresolved: it is the absence of a window, not a failure to
    resolve one. */
 export function feedWindowUnresolved(key:FeedWindowKey,now:Date=new Date(),settings:ShiftSettings=DEFAULT_SHIFT_SETTINGS){
- return key!=="all"&&feedWindowMinutes(key,now,settings)===null;
+ return key!=="all"&&feedWindowRange(key,now,settings)===null;
+}
+
+/* THE SHIFT BEFORE THIS ONE, as the real instants it began and ended.
+
+   "Before this one" is by START: of every shift start, the latest one earlier
+   than the start of the shift that owns now. With the shop's hours that is 1st
+   during 2nd, 2nd during 3rd, and 3rd during 1st. `start` and `end` are that
+   shift's own hours; the WINDOW stops where this shift starts - see
+   `feedWindowRange`.
+
+   BUILT FROM LOCAL DATES rather than by subtracting clock minutes, for the
+   reason TODAY is: `new Date(y,m,d,h,mm)` is the real instant that clock time
+   happened, on a daylight-saving day too. Null when no shift owns now (hours
+   edited into a shape with a gap) or the clock cannot be read - the same
+   degradation THIS SHIFT has. */
+export function previousShift(now:Date=new Date(),settings:ShiftSettings=DEFAULT_SHIFT_SETTINGS):{key:ShiftKey;start:Date;end:Date}|null{
+ const at=now.getTime();
+ if(Number.isNaN(at))return null;
+ const current=activeShift(now,settings);
+ if(!current)return null;
+ const runs:{key:ShiftKey;start:Date;end:Date}[]=[];
+ for(let day=-2;day<=0;day++)for(const shift of settings.shifts){
+  const start=clockMinutes(shift.start),end=clockMinutes(shift.end);
+  if(start===null||end===null)continue;
+  const from=new Date(now.getFullYear(),now.getMonth(),now.getDate()+day,Math.floor(start/60),start%60);
+  let to=new Date(now.getFullYear(),now.getMonth(),now.getDate()+day,Math.floor(end/60),end%60);
+  if(to.getTime()<=from.getTime())to=new Date(now.getFullYear(),now.getMonth(),now.getDate()+day+1,Math.floor(end/60),end%60);
+  runs.push({key:shift.key,start:from,end:to});
+ }
+ const started=(run:{start:Date})=>run.start.getTime()<=at;
+ const latest=<T extends {start:Date}>(list:T[])=>list.reduce<T|null>((best,run)=>!best||run.start.getTime()>best.start.getTime()?run:best,null);
+ const running=latest(runs.filter(run=>run.key===current.key&&started(run)));
+ if(!running)return null;
+ return latest(runs.filter(run=>run.start.getTime()<running.start.getTime()));
+}
+
+/* HOW OLD A DEFECT MAY BE AND STILL BE IN THE WINDOW, as a range of ages in
+   minutes: `min` is the near edge and `max` the far one; `min` is left off
+   for every window that reaches all the way to now. Null is ALL, or a
+   window the clock cannot resolve - see `feedWindowMinutes`, which is `max`.
+
+   Every window but PREVIOUS SHIFT starts at age 0. PREVIOUS SHIFT starts
+   exactly where THIS SHIFT stops - at THIS SHIFT's own `since`, measured the
+   same way - so a defect is in one of the two and never both.
+
+   THE HANDOVER BELONGS TO THE INCOMING SHIFT, the rule `activeShift` and the
+   shift clock already follow and Curtis chose: 14:00-14:30 is 2nd shift's
+   half-hour. Ending the window at 1st shift's own 14:30 instead would put a
+   defect logged at 14:15 under both THIS SHIFT and PREVIOUS SHIFT. So the
+   window is 06:00 to 14:00 and its label says so. Sharing THIS SHIFT's own
+   measure also means a daylight-saving night cannot open a gap between them. */
+export type FeedWindowRange={min?:number;max:number};
+export function feedWindowRange(key:FeedWindowKey,now:Date=new Date(),settings:ShiftSettings=DEFAULT_SHIFT_SETTINGS):FeedWindowRange|null{
+ if(key==="previous"){
+  const shift=previousShift(now,settings),current=activeShift(now,settings);
+  if(!shift||!current)return null;
+  const min=current.since;
+  return {min,max:Math.max(min,(now.getTime()-shift.start.getTime())/60000)};
+ }
+ const max=feedWindowMinutes(key,now,settings);
+ return max===null?null:{max};
 }
 
 /* AND WHAT TO SAY ABOUT IT, here rather than on each screen, for the reason
@@ -139,10 +212,10 @@ export function feedWindowUnresolved(key:FeedWindowKey,now:Date=new Date(),setti
    includes now" and "this device's clock cannot be read" send a person to
    different places — Settings in the first case, the phone itself in the
    second. A single sentence covering both would be wrong half the time, which
-   is how a warning stops being read. Only `shift` can reach the first; `today`
+   is how a warning stops being read. Only `shift` and `previous` can reach the first; `today`
    is the only other key that can degrade at all, and only on a broken clock. */
 export function feedWindowUnresolvedNote(key:FeedWindowKey){
- if(key==="shift")return "SHIFT HOURS DO NOT COVER NOW — SHOWING EVERY DATE";
+ if(key==="shift"||key==="previous")return "SHIFT HOURS DO NOT COVER NOW — SHOWING EVERY DATE";
  return "THIS DEVICE'S CLOCK CANNOT ANSWER — SHOWING EVERY DATE";
 }
 
@@ -150,8 +223,14 @@ export function feedWindowUnresolvedNote(key:FeedWindowKey){
    old and only something logged this minute belongs in it; at 00:00 the same
    is true of TODAY. `if(!limit)` would read either as "no window" and hand back
    the whole board, so the null check is explicit. */
-export function withinFeedWindow(minutes:number|null,limit:number|null){
+export function withinFeedWindow(minutes:number|null,limit:number|null,floor?:number){
  if(limit===null)return true;
+ /* The near edge, only PREVIOUS SHIFT has one. Left off, nothing changes for
+    the other windows - including a record a wrong clock stamped in the future,
+    which has always counted as new. EXCLUSIVE, because THIS SHIFT's far edge
+    is inclusive at the same age: a defect logged the minute this shift began
+    is this shift's, and in exactly one of the two windows. */
+ if(floor!==undefined&&(minutes===null||minutes<=floor))return false;
  /* AN UNDATED DEFECT FALLS OUT OF EVERY NARROWED WINDOW and stays in ALL. A
     record read off a photographed sheet by a device with no clock has no age;
     keeping it in "today" would put a row of unknown age in a list whose whole
@@ -165,7 +244,7 @@ export function withinFeedWindow(minutes:number|null,limit:number|null){
    being put down"; a defect logged on Monday and edited this morning was still
    logged on Monday, and a window keyed off the edit would quietly refill
    TODAY with last week's work every time somebody touched a record. */
-export function defectWithinFeedWindow(defect:StructuredDefect,limit:number|null,now:Date=new Date()){
+export function defectWithinFeedWindow(defect:StructuredDefect,limit:number|null,now:Date=new Date(),floor?:number){
  /* A ROW READ OFF A SCANNED SHEET IS OUT OF EVERY NARROWED WINDOW, because its
     `createdAt` is WHEN THE SCAN RAN rather than when anybody logged anything.
     Importing yesterday's paper at 20:00 would drop that whole sheet into TODAY,
@@ -196,7 +275,7 @@ export function defectWithinFeedWindow(defect:StructuredDefect,limit:number|null
     place the same rule is LIVE is the DEFECTS LOGGED quick filter, which runs
     over the board's own defects. */
  if(limit!==null&&!loggedByHand(defect))return false;
- return withinFeedWindow(loggedMinutesElapsed(defect,now),limit);
+ return withinFeedWindow(loggedMinutesElapsed(defect,now),limit,floor);
 }
 
 /* AND FIXED REPAIRS ASKS WHEN IT WAS FINISHED, which is the same window around
@@ -210,8 +289,8 @@ export function defectWithinFeedWindow(defect:StructuredDefect,limit:number|null
    The comparison itself is `withinFeedWindow`, shared, so there is one place
    that decides what a limit means and one place that decides what an undated
    record does. Only the stamp differs. */
-export function fixedWithinFeedWindow(defect:StructuredDefect,limit:number|null,now:Date=new Date()){
- return withinFeedWindow(completedMinutesElapsed(defect,now),limit);
+export function fixedWithinFeedWindow(defect:StructuredDefect,limit:number|null,now:Date=new Date(),floor?:number){
+ return withinFeedWindow(completedMinutesElapsed(defect,now),limit,floor);
 }
 
 /* What the bar above the feed says it is showing. "" for ALL, because a board
@@ -226,6 +305,14 @@ export function feedWindowLabel(key:FeedWindowKey,now:Date=new Date(),settings:S
  if(key==="shift"){
   const shift=activeShift(now,settings);
   return shift?shiftLabel(shift.key)+" · SINCE "+shift.start:"";
+ }
+ /* Names the shift and both ends of the WINDOW - "1ST SHIFT · 06:00–14:00",
+    ending where this shift began, since the handover is this shift's - for
+    the reason THIS SHIFT names its start. */
+ if(key==="previous"){
+  const shift=previousShift(now,settings),current=activeShift(now,settings);
+  const clock=(at:Date)=>formatClock(at.getHours()*60+at.getMinutes());
+  return shift&&current?shiftLabel(shift.key)+" · "+clock(shift.start)+"–"+current.start:"";
  }
  /* Checked the same way the limit is, so the pair cannot disagree about whether
     there is a window at all. */

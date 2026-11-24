@@ -20,7 +20,7 @@ import type {DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
 import {DeferredNavBadge,DeferredReviewPrompt} from "@/src/components/shared/deferred-watch";
 import {exportFleetBoardBackup,REPORT_EXPORT_HINT} from "@/src/lib/storage/fleet-backup";
 import {copyText,shareOrDownloadFile,shareOutcomeLabel,type ShareOutcome} from "@/src/lib/shared/share-file";
-import {FEED_WINDOWS,feedWindowLabel,feedWindowMinutes,feedWindowUnresolved,feedWindowUnresolvedNote,fixedWithinFeedWindow,type FeedWindowKey} from "@/src/lib/defects/feed-window";
+import {FEED_WINDOWS,feedWindowLabel,feedWindowRange,feedWindowUnresolved,feedWindowUnresolvedNote,fixedWithinFeedWindow,type FeedWindowKey} from "@/src/lib/defects/feed-window";
 import PathToRepairPanel from "@/src/components/defects/path-to-repair-panel";
 import {findPathToRepair,readPathToRepairs,type PathToRepairLibrary} from "@/src/lib/defects/path-to-repair";
 import {readRepairHoursLedger,type RepairHoursLedger} from "@/src/lib/defects/repair-hours-ledger";
@@ -248,14 +248,16 @@ export default function FixedRepairs(){
     A history that hides the bus number somebody has just typed is lying about
     the one question it is being asked directly. Nothing is forgotten — clear
     the search and the window he picked is still in force. */
- const windowLimit=search.trim()?null:feedWindowMinutes(fixedWindow,windowNow,shiftSettings);
+ /* A range, because PREVIOUS SHIFT (release 208) has a near edge too. */
+ const windowSpan=search.trim()?null:feedWindowRange(fixedWindow,windowNow,shiftSettings);
+ const windowLimit=windowSpan?.max??null,windowFloor=windowSpan?.min;
  const windowWords=search.trim()?"":feedWindowLabel(fixedWindow,windowNow,shiftSettings);
  const records=useMemo(()=>fleet.flatMap(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.state==="completed").map(defect=>({bus,defect}))).sort((a,b)=>(b.defect.completedAt||b.defect.updatedAt||"").localeCompare(a.defect.completedAt||a.defect.updatedAt||"")),[fleet]);
  const categories=useMemo(()=>[...new Set(records.map(record=>record.defect.category))].sort(),[records]);
  /* Three stages, narrowest last, so each count can name what IT is holding
     back: the category, then when it was fixed, then the search. */
  const inCategory=useMemo(()=>records.filter(record=>category==="all"||record.defect.category===category),[records,category]);
- const inWindow=useMemo(()=>inCategory.filter(record=>fixedWithinFeedWindow(record.defect,windowLimit,windowNow)),[inCategory,windowLimit,windowNow]);
+ const inWindow=useMemo(()=>inCategory.filter(record=>fixedWithinFeedWindow(record.defect,windowLimit,windowNow,windowFloor)),[inCategory,windowLimit,windowFloor,windowNow]);
  const visible=useMemo(()=>{const query=search.trim().toLowerCase();return inWindow.filter(record=>(!query||[record.bus.n,record.defect.category,record.defect.issue,record.defect.details,record.defect.actionTaken,record.defect.diagnosticNote,record.defect.finding,record.defect.shopNotes,defectPartsText(normalizeDefectParts(record.defect.parts,record.defect)),record.defect.reportedBy,record.defect.completedBy,record.defect.conditionNotDuplicated?"defect condition not duplicated":""].some(value=>String(value||"").toLowerCase().includes(query))))},[inWindow,search]);
  /* Collapses back to the first page on a new search or category, rather than
     staying wherever SHOW ALL last left it. A person narrowing the list wants
