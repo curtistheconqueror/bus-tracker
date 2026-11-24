@@ -48,28 +48,27 @@ Any newer code requires reconciliation and current-head checks.
 
 **THAT CI RUN AND ITS 399 TESTS DESCRIBE AN OLDER CANDIDATE, not this head.**
 `main` is merged into this branch rather than rebased onto, because the branch
-is published; that is done whenever Codex's publishing has left this branch
-behind or in conflict. **How many times, and which releases, is deliberately
-not written here.** This file has now carried a wrong count of those merges and
-a wrong "on every release" besides, and both were claims about history that
-lives outside it — the same defect as a pinned rollback SHA. Read
+is published. **When that has been done, how often, and which releases it
+brought in are deliberately not written here**: that is history, and this file
+is not where it lives — the same reason the rollback below carries no SHA. Read
 `git log --merges --first-parent` on the branch for the sequence, and
-`git show <merge>^2:docs/PUBLISH_NEXT.md` for the release each one brought in.
-Without `--first-parent` the merges `main` carried in with it are mixed into the
-same list, which is how the count came to be wrong.
+`git show <merge>^2:docs/PUBLISH_NEXT.md` for the release each merge brought in.
+Use `--first-parent`: without it, the merges `main` carried in with it are mixed
+into the same list.
 
-Two files have conflicted across those merges: `tests/helpers/modules.mjs`,
-where this branch and `main` had each appended export lines at the same end,
-resolved as the union
-of both with every module path checked to exist; and this file, resolved every
-time by taking `main`'s version whole and re-appending this section, so that a
-release's STATUS line is always Codex's own.
+Two files are where such a merge conflicts, and each has one right resolution.
+`tests/helpers/modules.mjs` conflicts when this branch and `main` have both
+appended export lines at the same end: take the union, and check that every
+module path in the result exists. This file conflicts because Codex rewrites it
+whole for each release while this branch appends the section below it: take
+`main`'s version whole and re-append the section, so that a release's STATUS
+line is always Codex's own and PR39 never claims it.
 
-Measured on the merged tree at each merge, in a container rather than in CI.
-On this one: the production build succeeds, **528 of 528 tests pass** and
-ESLint is clean. CI must re-run on the actual merge SHA before anything is
-packaged, and the test count above moves with every change that adds one — it
-was 527 before release 210 added a test of its own.
+Measured on this head, in a container rather than in CI, rather than carried
+over from an earlier run: the production build succeeds, **528 of 528 tests
+pass** and ESLint is clean. That figure is a measurement of one tree and
+nothing more — it moves with any change that adds a test, so re-measure it
+here, and CI must re-run on the actual merge SHA before anything is packaged.
 
 Nothing about the gates below changed. This merge is maintenance so the branch
 can land when Curtis clears them; it is not a claim that any gate is met.
