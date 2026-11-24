@@ -54,7 +54,7 @@ import HoldBoard,{HoldBadge} from "@/src/components/fleet/hold-board";
 import {heldBusCount,isHeld,setBusHold} from "@/src/lib/fleet/bus-hold";
 import TimeWindowChips from "@/src/components/shared/time-window-chips";
 import {TIME_WINDOWS,TIME_WINDOWS_WITH_SHIFT,timeWindowLabel,timeWindowMinutes,withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
-import {FEED_WINDOWS,defectWithinFeedWindow,feedWindowLabel,feedWindowMinutes,feedWindowUnresolved,feedWindowUnresolvedNote,type FeedWindowKey} from "@/src/lib/defects/feed-window";
+import {FEED_WINDOWS,defectWithinFeedWindow,feedWindowLabel,feedWindowRange,feedWindowUnresolved,feedWindowUnresolvedNote,type FeedWindowKey} from "@/src/lib/defects/feed-window";
 import {DEFAULT_SHIFT_SETTINGS,activeShift,readShiftSettings,shiftLabel} from "@/src/lib/settings/shift-clock";
 import {roadCallNote} from "@/src/lib/fleet/road-calls";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
@@ -883,9 +883,10 @@ export default function DefectLog(){
 
     So ALL clears the search as well as the filter. The keep-the-search branch
     is for a filter being SET; since release 207 no button sets one - the only
-    filter buttons drawn are ALL and whichever saved default view is lit, and
-    pressing either clears back to ALL. A saved default view is therefore
-    left with one tap and comes back on the next load. */
+    filter button drawn is whichever saved default view is lit, and pressing
+    it clears back to ALL. Since 208 ALL itself is a drop-down of when defects
+    were logged, and `pickFeedWindow` clears the same two things. A saved
+    default view is left with one tap and comes back on the next load. */
  const showEverythingOr=(value:Filter)=>{
   const next=filter===value?"all":value;
   setFilter(next);
@@ -917,6 +918,15 @@ export default function DefectLog(){
     again, so nobody ever walks up to that computer and reads a short board
     without having narrowed it themselves. */
  const [feedWindow,setFeedWindow]=useState<FeedWindowKey>("all");
+ /* THE ALL DROP-DOWN. Curtis: "the ALL button should have a drop down and this
+    way u can select if u want to see all defects from current shift, previous,
+    24 hours, the week". Whatever window is picked, the board shows ALL defects
+    in it, so it does what pressing ALL did - drops a lit saved view and the
+    search (a search stands the window down, so a window picked under one would
+    change nothing on screen) - and then narrows by when they were logged. It
+    sets the same state as WHEN LOGGED in ADVANCED ACTIONS, which narrows by
+    date alone and leaves a lit view and the search as they are. */
+ const pickFeedWindow=(value:FeedWindowKey)=>{setFilter("all");setSearch("");setFeedWindow(value)};
  /* The garage's own hours, for the SHIFT window. The defaults ARE this shop's
     real shifts, so the window is already correct on the first render and the
     effect only matters on a device where somebody edited them in Settings —
@@ -1201,7 +1211,10 @@ export default function DefectLog(){
   const id=setInterval(()=>setFeedWindowNow(new Date()),30000);
   return ()=>clearInterval(id);
  },[feedWindow,quickFilterMenuOpen,loggedCountWindow]);
- const feedWindowLimit=search.trim()?null:feedWindowMinutes(feedWindow,feedWindowNow,shiftSettings);
+ /* A range, not a limit, since PREVIOUS SHIFT has a near edge as well as a far
+    one; every other window's near edge is 0. */
+ const feedWindowSpan=search.trim()?null:feedWindowRange(feedWindow,feedWindowNow,shiftSettings);
+ const feedWindowLimit=feedWindowSpan?.max??null;
  /* THE SAME INSTANT REACHES THE AGES TOO, and leaving it off was the bug the
     clock fix above made worse rather than introduced. `defectWithinFeedWindow`
     defaults `now` to a fresh read, so the LIMIT came from `feedWindowNow` while
@@ -1210,7 +1223,7 @@ export default function DefectLog(){
     every thirty seconds, it became up to thirty seconds — long enough that with
     TODAY selected a defect stamped at local midnight is older than the limit
     and drops off a board it belongs on. One clock, all the way through. */
- const matchesFeedWindow=(record:DefectLogRecord)=>defectWithinFeedWindow(record.defect,feedWindowLimit,feedWindowNow);
+ const matchesFeedWindow=(record:DefectLogRecord)=>defectWithinFeedWindow(record.defect,feedWindowLimit,feedWindowNow,feedWindowSpan?.min);
  /* Three stages, narrowest last, so each bar can name what IT is holding back:
     the state buttons, then when it was logged, then the search. */
  const stateOnly=records.filter(matchesStateFilter);
@@ -2164,18 +2177,19 @@ export default function DefectLog(){
    </div>}
    {/* OUTSIDE the collapsed VIEW drawer on purpose. A narrowed board that
        explains itself nowhere is the trap this whole control could have been,
-       and the drop-down that set it is behind ADVANCED ACTIONS — so the state
-       and the way back both live here, where the search bar already taught
-       somebody to look. Hidden entirely on ALL, which is every board that has
+       and one of the two drop-downs that set it is behind ADVANCED ACTIONS
+       (the other is ALL, under the feed's count line, since 208) — so the
+       exact window and the way back both live here, where the search bar
+       already taught somebody to look. Hidden entirely on ALL, which is every board that has
        not been narrowed. */}
    {feedWindowText&&<div className="log-window-filtered" role="status">
-    <span>LOGGED <b>{feedWindowText}</b>{hiddenByFeedWindow>0?" · "+hiddenByFeedWindow+" OLDER BUS"+(hiddenByFeedWindow===1?"":"ES")+" HIDDEN":""}</span>
+    <span>LOGGED <b>{feedWindowText}</b>{hiddenByFeedWindow>0?" · "+hiddenByFeedWindow+(feedWindow==="previous"?" OTHER BUS":" OLDER BUS")+(hiddenByFeedWindow===1?"":"ES")+" HIDDEN":""}</span>
     <button type="button" className="show-all-buses" onClick={()=>setFeedWindow("all")}>SHOW ALL DATES</button>
    </div>}
    {/* The same bar for the case where there IS no window to describe. It
-       carries the way out too, because the drop-down that set this is behind
-       ADVANCED ACTIONS and somebody looking at a board that ignored their
-       choice should not have to go find it. */}
+       carries the way out too, because somebody looking at a board that
+       ignored their choice should not have to go find the drop-down that set
+       it. */}
    {feedWindowBroken&&<div className="log-window-filtered log-window-broken" role="status">
     <span>{feedWindowUnresolvedNote(feedWindow)}</span>
     <button type="button" className="show-all-buses" onClick={()=>setFeedWindow("all")}>SHOW ALL DATES</button>
@@ -2221,9 +2235,21 @@ export default function DefectLog(){
        and DOWN SHEET before them, each is drawn only while it is the active
        filter, which a saved default view can make it. Somebody whose default
        is one of them would otherwise see a narrowed board with no button lit
-       and nothing saying why. Pressing the lit one clears back to ALL. */}
-   <div className="feed-view"><div className={"feed-view-row"+(filter==="all"?"":" with-saved-view")} role="group" aria-label="Which defects to show, and how">{([["all","ALL"],
-    ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
+       and nothing saying why. Pressing the lit one clears back to ALL.
+       Since release 208 ALL is a drop-down of when the defects were logged;
+       see `pickFeedWindow`. */}
+   <div className="feed-view"><div className={"feed-view-row"+(filter==="all"?"":" with-saved-view")} role="group" aria-label="Which defects to show, and how">
+    {/* A real <select> under the face of the button, so a phone opens its own
+        picker and a keyboard reaches it; the face says which window is in
+        force, so ALL reads ALL and a narrowed board reads LAST 24H. */}
+    <label className={"feed-window-pick"+(filter==="all"?" active":"")}><i aria-hidden="true">{FEED_WINDOWS.find(item=>item.key===feedWindow)?.label||"ALL"}<em>▾</em></i>
+     {/* A select only reports a CHANGE, and the window is ALL nearly always,
+         so picking ALL again would do nothing - and clearing a search or a lit
+         saved view is what pressing ALL has always done (see showEverythingOr).
+         While either is in force the select sits on a blank choice that cannot
+         be picked, so every window, ALL included, is a change. */}
+     <select value={filter==="all"&&!search.trim()?feedWindow:""} onChange={event=>{if(event.target.value)pickFeedWindow(event.target.value as FeedWindowKey)}} aria-label="Show all defects logged within">{(filter!=="all"||Boolean(search.trim()))&&<option value="" disabled>CHOOSE ONE</option>}{FEED_WINDOWS.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}</select></label>
+    {([...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
     ...(filter==="in-progress"?[["in-progress","IN PROGRESS"] as [Filter,string]]:[]),
     ...(filter==="fixed"?[["fixed","FIXED TODAY"] as [Filter,string]]:[]),
     ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}
