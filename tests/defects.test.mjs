@@ -823,6 +823,14 @@ test("Version 85 stores Shop Notes and persists editable interface wording and s
   assert.equal(normalizeDefectLogDisplay({styles:{shopNotes:{fontSize:12}}}).styles.shopNotes.fontSize,12);
   assert.equal(normalizeDefectLogDisplay({styles:{repairDetails:{fontSize:12}}}).styles.repairDetails.fontSize,12);
 
+  /* Renamed LIVE DEFECT FEED (release 207), the same way: a device holding the
+     old default wording reads the new one, and a wording somebody typed stays. */
+  assert.equal(DEFAULT_DEFECT_LOG_DISPLAY.labels.feedTitle,"LIVE DEFECT FEED");
+  assert.equal(normalizeDefectLogDisplay({labels:{feedTitle:"LIVE REPAIR FEED"}}).labels.feedTitle,"LIVE DEFECT FEED");
+  assert.equal(normalizeDefectLogDisplay({labels:{feedTitle:"  LIVE REPAIR FEED "}}).labels.feedTitle,"LIVE DEFECT FEED");
+  assert.equal(normalizeDefectLogDisplay({labels:{feedTitle:"BAY 12 FEED"}}).labels.feedTitle,"BAY 12 FEED");
+  assert.equal(normalizeDefectLogDisplay({labels:{shopNotes:"LIVE REPAIR FEED"}}).labels.shopNotes,"LIVE REPAIR FEED","only the feed title is renamed");
+
   const defect={id:"shop-note-1",category:"Engine",issue:"Misfire",details:"Cylinder 1",operability:"down",state:"open",source:"defect-log",shopNotes:"Bay 12 follow-up"};
   const fleet=[{id:"bus-1",n:"20501",s:"out",l:"west-0",defects:[]}];
   const result=saveDefectLogRecord(fleet,[],"bus-1",defect,false,"2026-08-23T18:00:00.000Z");
