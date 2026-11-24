@@ -47,14 +47,16 @@ passed lint, build and 399 tests on merge candidate
 Any newer code requires reconciliation and current-head checks.
 
 **THAT CI RUN AND ITS 399 TESTS DESCRIBE AN OLDER CANDIDATE, not this head.**
-`main` is merged into this branch each time Codex publishes, because the branch
-is published and is therefore never rebased; that has happened on every release
-since this branch was opened. The merges are neither listed nor counted here,
-for the same reason the rollback carries no number — a list of them was behind
-within a day of being written, and a count of them was wrong the moment it was
-typed. Read `git log --merges --first-parent` on the branch for the actual
-sequence; without `--first-parent` the merges `main` brought in with it are
-mixed into the same list, which is how the count came to be wrong.
+`main` is merged into this branch rather than rebased onto, because the branch
+is published; that is done whenever Codex's publishing has left this branch
+behind or in conflict. **How many times, and which releases, is deliberately
+not written here.** This file has now carried a wrong count of those merges and
+a wrong "on every release" besides, and both were claims about history that
+lives outside it — the same defect as a pinned rollback SHA. Read
+`git log --merges --first-parent` on the branch for the sequence, and
+`git show <merge>^2:docs/PUBLISH_NEXT.md` for the release each one brought in.
+Without `--first-parent` the merges `main` carried in with it are mixed into the
+same list, which is how the count came to be wrong.
 
 Two files have conflicted across those merges: `tests/helpers/modules.mjs`,
 where this branch and `main` had each appended export lines at the same end,
