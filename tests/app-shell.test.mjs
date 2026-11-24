@@ -226,10 +226,47 @@ test("ALL means everything, including whatever is in the search box",async()=>{
  assert.equal(/onClick=\{\(\)=>setFilter\(current=>current===value\?"all":value\)\}/.test(page),false,
   "no button may set the filter without going through the handler that clears the search");
 
- /* Only ALL clears it. Narrowing a search down by state is the entire point of
-    IN PROGRESS and FIXED TODAY, so wiping the search there would break them. */
+ /* Only ALL clears it. A filter being SET keeps the search - though since
+    release 207 no button sets one: ALL and a lit saved default view both
+    clear back to ALL. */
  const handler=page.slice(page.indexOf("const showEverythingOr"),page.indexOf("const showEverythingOr")+400);
  assert.equal((handler.match(/setSearch\(""\)/g)||[]).length,1,"the search is cleared in exactly one branch");
+});
+
+test("the LOG DEFECT box holds the button and the search, and the feed holds ALL, DETAILED and COMPACT",async()=>{
+ /* Curtis: "The goal is to get the log defect and search field sort of by
+    themselves so it's easy to see and no guess work." */
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+ const controls=page.slice(page.indexOf('<section className="log-controls">'),page.indexOf("</section>",page.indexOf('<section className="log-controls">')));
+ assert.ok(controls.includes("log-primary-action")&&controls.includes("log-search-wrap"));
+ for(const gone of ["log-filters","card-view-selector","CARD VIEW","aria-pressed"])
+  assert.equal(controls.includes(gone),false,gone+" must not be in the LOG DEFECT box");
+ assert.equal(/>\s*CARD\s+VIEW\s*</.test(page),false,"the CARD VIEW label is gone");
+
+ // The row sits in the feed's own bar, after the count line.
+ const bar=page.slice(page.indexOf('<div className="feed-title">'),page.indexOf("</div>\n   {visibleGroups.length?"));
+ assert.ok(bar.indexOf("feed-estimate")<bar.indexOf('"feed-view-row"'),"the row comes after the count line");
+ assert.ok(bar.indexOf('"feed-view-row"')<bar.indexOf("feed-status-color"));
+ assert.match(bar,/\[\["all","ALL"\],/);
+ assert.match(bar,/\["detailed","compact"\] as CardView\[\]/);
+
+ /* IN PROGRESS and FIXED TODAY are drawn only while they are the active filter,
+    the way OPEN and DOWN SHEET already were - a saved default view can still
+    pick them, and a narrowed board with no lit button would not say why. */
+ for(const [key,label] of [["open","OPEN"],["in-progress","IN PROGRESS"],["fixed","FIXED TODAY"],["downsheet","DOWN SHEET"]])
+  assert.ok(bar.includes(`...(filter==="${key}"?[["${key}","${label}"] as [Filter,string]]:[])`),label+" appears only while active");
+
+ /* `.feed-title button` paints every button in that bar green and 52px tall on
+    a phone; the row's rules must outrank it on specificity, not on order. */
+ assert.match(css,/\.feed-title \.feed-view-row button\{/);
+ assert.match(css,/\.feed-title>span>small\{font-size:10px/);
+ assert.match(css,/@media\(max-width:760px\)\{\n \.feed-title \.feed-view\{order:1\}[\s\S]*?\.feed-title>span>small\{[^}]*font-size:13px\}/);
+ // A fourth (saved-view) button shrinks to fit 360 - by a class, since :has() was dropped by the build.
+ assert.match(page,/"feed-view-row"\+\(filter==="all"\?"":" with-saved-view"\)/);
+ assert.match(css,/@media\(max-width:460px\)\{\.feed-title \.feed-view-row\.with-saved-view button\{[^}]*font-size:11px/);
 });
 
 test("the lists page neutralises the global aside and section styling",async()=>{
