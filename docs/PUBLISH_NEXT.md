@@ -70,8 +70,9 @@ pass** and ESLint is clean. That figure is a measurement of one tree and
 nothing more — it moves with any change that adds a test, so re-measure it
 here, and CI must re-run on the actual merge SHA before anything is packaged.
 
-Nothing about the gates below changed. This merge is maintenance so the branch
-can land when Curtis clears them; it is not a claim that any gate is met.
+Nothing about the gates below changed. Merging `main` in, and correcting what
+this section says, are both maintenance so the branch can land when Curtis
+clears them; neither is a claim that any gate is met.
 
 Curtis authorized publication of the verified ready scope on 2026-10-21 and
 temporarily accepted the unresolved Major URL-token risk for his initial
