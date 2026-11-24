@@ -487,7 +487,10 @@ test("the Defect Log opens on what it is for, not on a status report", async () 
     FIXED TODAY off; 208 made ALL a drop-down of when defects were logged).
     OPEN differed from ALL only by hiding in-progress and today's fixes; DOWN
     SHEET has its own page. */
- assert.match(logPage,/<label className=\{"feed-window-pick"\+\(filter==="all"\?" active":""\)\}>/);
+ /* ...and it is never lit (209): beside a lit DETAILED the row read as one
+    choice of three. The blue on that row is the card view, or a saved view. */
+ assert.match(logPage,/<label className="feed-window-pick">/);
+ assert.doesNotMatch(css,/\.feed-window-pick\.active/);
  const row=logPage.match(/\{\(\[\.\.\.\(filter==="open"[\s\S]*?\] as \[Filter,string\]\[\]/);
  assert.ok(row,"the filter row must still be a literal list");
  /* ALL is always offered, as the drop-down. OPEN, DOWN SHEET, IN PROGRESS and FIXED TODAY appear ONLY while one of them
