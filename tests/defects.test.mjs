@@ -7866,7 +7866,7 @@ test("the LIVE REPAIR FEED can be narrowed to a shift or a day without touching 
  /* Curtis: "filter everything that's being put down ... by the day and by the
     shift, so in the last 24 hours, or by the shift". ALL first, because it is
     the way out of every window and the board's own behaviour until now. */
- assert.deepEqual(FEED_WINDOWS.map(item=>item.key),["all","shift","today","24h","3d","7d","30d"]);
+ assert.deepEqual(FEED_WINDOWS.map(item=>item.key),["all","shift","previous","today","24h","3d","7d","30d"]);
  assert.equal(FEED_WINDOWS[0].key,"all","ALL has to stay first: it is the way back to the whole board");
  assert.equal(isFeedWindowKey("today"),true);
  assert.equal(isFeedWindowKey("8h"),false,"a key only the shared chip row has must not resolve here");
@@ -7969,7 +7969,7 @@ test("WHEN LOGGED narrows the feed, says so outside the drawer, and never outran
     also advances while the page sits idle; the timer itself is pinned in "TODAY
     is measured from a real local midnight". */
  assert.match(page,/const \[feedWindowNow,setFeedWindowNow\]=useState\(\(\)=>new Date\(\)\)/);
- assert.match(page,/const feedWindowLimit=search\.trim\(\)\?null:feedWindowMinutes\(feedWindow,feedWindowNow,shiftSettings\)/,
+ assert.match(page,/const feedWindowSpan=search\.trim\(\)\?null:feedWindowRange\(feedWindow,feedWindowNow,shiftSettings\)/,
   "a search must stand the window down, not merely be applied after it");
  assert.match(page,/const feedWindowText=search\.trim\(\)\?"":feedWindowLabel\(feedWindow,feedWindowNow,shiftSettings\)/,
   "and the bar has to go quiet with it, or it would claim a window that is not in force");
@@ -8084,9 +8084,9 @@ test("one clock reaches the limit, the ages and the label",async()=>{
 
  /* So the page must hand the same instant to all three. */
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
- assert.match(page,/defectWithinFeedWindow\(record\.defect,feedWindowLimit,feedWindowNow\)/,
+ assert.match(page,/defectWithinFeedWindow\(record\.defect,feedWindowLimit,feedWindowNow,feedWindowSpan\?\.min\)/,
   "the ages read the same instant as the limit");
- assert.match(page,/feedWindowMinutes\(feedWindow,feedWindowNow,shiftSettings\)/);
+ assert.match(page,/feedWindowRange\(feedWindow,feedWindowNow,shiftSettings\)/);
  assert.match(page,/feedWindowLabel\(feedWindow,feedWindowNow,shiftSettings\)/);
  /* No fourth reading anywhere in the window's own code path. */
  const span=page.slice(page.indexOf("const [feedWindowNow,setFeedWindowNow]"),page.indexOf("const hiddenByFeedWindow="));
@@ -9428,7 +9428,7 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
     Curtis asked for it on the feed too — and a DEFERRED defect sits on that
     board for as long as it takes, so the argument was wrong on the facts. One
     table now, because the limit and the label have to come off the same one. */
- assert.deepEqual(FEED_WINDOWS.map(item=>item.key),["all","shift","today","24h","3d","7d","30d"]);
+ assert.deepEqual(FEED_WINDOWS.map(item=>item.key),["all","shift","previous","today","24h","3d","7d","30d"]);
  assert.equal(feedWindowMinutes("30d",NOW),30*24*60);
  assert.equal(feedWindowLabel("30d",NOW),"LAST 30 DAYS","the label and the limit read one table");
  /* AND THE GUARD ACCEPTS IT. A key the exported type and the resolver both take,
@@ -9436,7 +9436,7 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
     avoids — latent today because nothing in `app/` calls it, and wrong the
     moment something persisting or URL-parsing a window does. */
  assert.equal(isFeedWindowKey("30d"),true);
- for(const key of ["all","shift","today","24h","3d","7d","30d"])assert.equal(isFeedWindowKey(key),true,key);
+ for(const key of ["all","shift","previous","today","24h","3d","7d","30d"])assert.equal(isFeedWindowKey(key),true,key);
  for(const junk of ["30D","month","",null,7,undefined])assert.equal(isFeedWindowKey(junk),false,String(junk));
  assert.equal(feedWindowLabel("30d",NOW),"LAST 30 DAYS","and the label resolves, or the heading would claim no window");
  const monthBack=fixed("2026-10-04T15:00:00.000Z");
@@ -9503,13 +9503,13 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
     that matters. */
  const page=await readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8");
  assert.match(page,/const shareRepairs=\(\):FixedShareRepair\[\]=>visible\.map/);
- assert.match(page,/const inWindow=useMemo\(\(\)=>inCategory\.filter\(record=>fixedWithinFeedWindow\(record\.defect,windowLimit,windowNow\)\)/);
- assert.equal(/fixedWithinFeedWindow\(record\.defect,windowLimit,windowNow\)\)[\s\S]{0,200}records\.filter/.test(page),false);
+ assert.match(page,/const inWindow=useMemo\(\(\)=>inCategory\.filter\(record=>fixedWithinFeedWindow\(record\.defect,windowLimit,windowNow,windowFloor\)\)/);
+ assert.equal(/fixedWithinFeedWindow\(record\.defect,windowLimit,windowNow,windowFloor\)\)[\s\S]{0,200}records\.filter/.test(page),false);
 
  /* ONE CLOCK, SHARED BY THE LIMIT AND THE LABEL, and it advances on its own —
     this page sits open on a shop computer all day, and a frozen instant leaves
     THIS SHIFT meaning whatever o'clock the page was opened at. */
- assert.match(page,/const windowLimit=search\.trim\(\)\?null:feedWindowMinutes\(fixedWindow,windowNow,shiftSettings\)/);
+ assert.match(page,/const windowSpan=search\.trim\(\)\?null:feedWindowRange\(fixedWindow,windowNow,shiftSettings\)/);
  assert.match(page,/const windowWords=search\.trim\(\)\?"":feedWindowLabel\(fixedWindow,windowNow,shiftSettings\)/);
  assert.match(page,/setInterval\(\(\)=>setWindowNow\(new Date\(\)\),30000\)/);
  assert.match(page,/if\(fixedWindow==="all"\)return;/,"and idles when there is nothing to age");
@@ -10455,4 +10455,70 @@ test("the defect form starts the keyboard inside itself, and the symptom hint ke
  /* BT53-LS-F1: at 360 the hint under the symptom box went from two lines to
     one when a category was picked, moving every field below by 14.3px. */
  assert.match(css,/@media\(max-width:380px\)\{\.log-form \.combo-field\.wide \.combo-footnote\{display:block;min-height:28\.6px\}\}/);
+});
+
+test("ALL is a drop-down of when defects were logged, and PREVIOUS SHIFT has two edges",async()=>{
+ /* Curtis: "the ALL button should have a drop down and this way u can select
+    if u want to see all defects from current shift, previous, 24 hours, the
+    week". */
+ const {FEED_WINDOWS,defectWithinFeedWindow,feedWindowLabel,feedWindowMinutes,feedWindowRange,feedWindowUnresolved,previousShift}=
+  await import("../src/lib/defects/feed-window.ts");
+ const {DEFAULT_SHIFT_SETTINGS}=await import("../src/lib/settings/shift-clock.ts");
+ const at=(clock,day="2026-11-23")=>new Date(day+"T"+clock+":00");
+ assert.deepEqual(FEED_WINDOWS.slice(0,3).map(item=>item.label),["ALL","THIS SHIFT","PREVIOUS SHIFT"]);
+ assert.ok(FEED_WINDOWS.some(item=>item.key==="24h")&&FEED_WINDOWS.some(item=>item.key==="7d"));
+
+ // The shift before the one that owns now, by start, with the real instants.
+ const cases=[["15:00","1st","2026-11-23T06:00","2026-11-23T14:30"],["23:00","2nd","2026-11-23T14:00","2026-11-23T22:30"],
+  ["03:00","2nd","2026-11-22T14:00","2026-11-22T22:30"],["07:00","3rd","2026-11-22T22:00","2026-11-23T06:30"]];
+ for(const [clock,key,start,end] of cases){
+  const shift=previousShift(at(clock),DEFAULT_SHIFT_SETTINGS);
+  assert.equal(shift.key,key,clock);
+  assert.equal(shift.start.getTime(),new Date(start+":00").getTime(),clock+" start");
+  assert.equal(shift.end.getTime(),new Date(end+":00").getTime(),clock+" end");
+ }
+ /* The window ends where THIS SHIFT begins: the handover half-hour is the
+    incoming shift's, the rule activeShift follows and Curtis chose. */
+ assert.equal(feedWindowLabel("previous",at("15:00")),"1ST SHIFT · 06:00–14:00");
+
+ /* Two edges: at 15:00 the previous shift is ages 60..540 minutes. */
+ const range=feedWindowRange("previous",at("15:00"));
+ assert.deepEqual(range,{min:60,max:540});
+ const logged=clock=>({id:"d",category:"Engine",issue:"",details:"",state:"open",source:"defect-log",createdAt:at(clock).toISOString(),updatedAt:at(clock).toISOString()});
+ const inPrevious=clock=>defectWithinFeedWindow(logged(clock),range.max,at("15:00"),range.min);
+ const thisShift=feedWindowRange("shift",at("15:00"));
+ const inThis=clock=>defectWithinFeedWindow(logged(clock),thisShift.max,at("15:00"),thisShift.min);
+ assert.equal(inPrevious("14:45"),false,"logged this shift");
+ assert.equal(inPrevious("10:00"),true,"logged last shift");
+ assert.equal(inPrevious("05:00"),false,"logged the shift before that");
+ /* EXACTLY ONE OF THE TWO, every minute from 06:00 to 15:00 - the handover
+    included, and the minute this shift began. */
+ for(let minute=6*60;minute<15*60;minute+=1){
+  const clock=String(Math.floor(minute/60)).padStart(2,"0")+":"+String(minute%60).padStart(2,"0");
+  assert.equal(inPrevious(clock)!==inThis(clock),true,clock+" belongs to one shift");
+  assert.equal(inThis(clock),minute>=14*60,clock);
+ }
+
+ // During the handover the window still stops at 14:00.
+ assert.equal(feedWindowRange("previous",at("14:10")).min,10);
+ // Every other window has no near edge, so nothing about them changed.
+ assert.deepEqual(feedWindowRange("24h",at("15:00")),{max:1440});
+ assert.equal(feedWindowRange("all",at("15:00")),null);
+ assert.equal(feedWindowMinutes("previous",at("15:00")),540);
+ // A gap in the hours, or a clock that cannot be read, degrades like THIS SHIFT.
+ const gap={...DEFAULT_SHIFT_SETTINGS,shifts:[{key:"1st",start:"06:00",end:"14:00"},{key:"2nd",start:"14:00",end:"22:00"},{key:"3rd",start:"23:00",end:"06:00"}]};
+ assert.equal(feedWindowUnresolved("previous",at("22:30"),gap),true);
+ assert.equal(feedWindowUnresolved("previous",at("20:00"),gap),false);
+ assert.equal(feedWindowUnresolved("previous",new Date(NaN)),true);
+ assert.equal(feedWindowLabel("previous",new Date(NaN)),"");
+
+ // The page: the drop-down sets the same state, through one handler that drops a lit view and the search.
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/const pickFeedWindow=\(value:FeedWindowKey\)=>\{setFilter\("all"\);setSearch\(""\);setFeedWindow\(value\)\};/);
+ /* Picking ALL when the window is already ALL must still clear a search or a
+    lit view, as pressing ALL did - a select only reports a change, so while
+    either is in force it sits on a blank choice. */
+ assert.match(page,/<select value=\{filter==="all"&&!search\.trim\(\)\?feedWindow:""\} onChange=\{event=>\{if\(event\.target\.value\)pickFeedWindow\(event\.target\.value as FeedWindowKey\)\}\} aria-label="Show all defects logged within">\{\(filter!=="all"\|\|Boolean\(search\.trim\(\)\)\)&&<option value="" disabled>CHOOSE ONE<\/option>\}\{FEED_WINDOWS\.map/);
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(css,/\.feed-window-pick>select\{[^}]*opacity:0;font-size:16px/,"16px, or iOS zooms the page into it");
 });
