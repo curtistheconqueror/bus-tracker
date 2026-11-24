@@ -48,12 +48,17 @@ Any newer code requires reconciliation and current-head checks.
 
 **THAT CI RUN AND ITS 399 TESTS DESCRIBE AN OLDER CANDIDATE, not this head.**
 `main` is merged into this branch each time Codex publishes, because the branch
-is published and is therefore never rebased; that has now happened five times,
-and the merges are not enumerated here for the same reason the rollback carries
-no number — a list of them was behind within a day of being written. Read
-`git log --merges` on the branch for the actual sequence. Two files have
-conflicted across those merges: `tests/helpers/modules.mjs`, where this branch
-and `main` had each appended export lines at the same end, resolved as the union
+is published and is therefore never rebased; that has happened on every release
+since this branch was opened. The merges are neither listed nor counted here,
+for the same reason the rollback carries no number — a list of them was behind
+within a day of being written, and a count of them was wrong the moment it was
+typed. Read `git log --merges --first-parent` on the branch for the actual
+sequence; without `--first-parent` the merges `main` brought in with it are
+mixed into the same list, which is how the count came to be wrong.
+
+Two files have conflicted across those merges: `tests/helpers/modules.mjs`,
+where this branch and `main` had each appended export lines at the same end,
+resolved as the union
 of both with every module path checked to exist; and this file, resolved every
 time by taking `main`'s version whole and re-appending this section, so that a
 release's STATUS line is always Codex's own.
