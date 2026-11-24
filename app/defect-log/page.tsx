@@ -26,7 +26,8 @@ import {headerTextFor} from "@/src/lib/settings/header-theme";
 import {pageThemeHeaderPair} from "@/src/lib/settings/page-header-themes";
 import SweepScanner from "./_components/sweep-scanner";
 import HeatScanner from "./_components/heat-scanner";
-import {PAPER_PHOTOS_PARAM,PAPER_SCAN_PARAM} from "@/src/lib/scan/paper-kinds";
+import {PAPER_KINDS,PAPER_PHOTOS_PARAM,PAPER_SCAN_PARAM,paperListWords,paperNamedInSentence,paperScanHref} from "@/src/lib/scan/paper-kinds";
+import {logToolFromSearch,LOG_TOOL_PARAM,shareWindowForFeed} from "@/src/lib/defects/defect-log-tools";
 import {paperHandIn,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
 import {heatFiling,type HeatFinding} from "@/src/lib/defects/heat-check-import";
 import {applyHeatFiling} from "@/src/lib/defects/heat-check-apply";
@@ -1449,6 +1450,15 @@ export default function DefectLog(){
  /* Only a screen that actually resolved a shift may offer the chip — see
     time-window.ts for why it is not in TIME_WINDOWS. */
  const quickFilterWindowChoices=shiftNow?TIME_WINDOWS_WITH_SHIFT:TIME_WINDOWS;
+ /* The share icon over the feed opens DEFECTS LOGGED on the window ALL ▾ is
+    showing where the drawer has a chip of the same span, and otherwise on the
+    drawer's own default, THIS SHIFT (`shareWindowForFeed`).
+    Scrolled to for the reason the quick filter's own opener scrolls: a drawer
+    that opens off screen has shown nobody anything. */
+ const openLoggedShare=()=>{setQuickFilter("logged");setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("");setQuickFilterWindow(shareWindowForFeed(feedWindow,quickFilterWindowChoices.some(item=>item.key==="shift"))??loggedCountWindow);setTimeout(()=>document.querySelector(".quick-filter-drawer")?.scrollIntoView({behavior:"smooth",block:"start"}),0)};
+ /* UNDO LAST is drawn only while there is something to undo (release 210).
+    `undoTools` is the LITE rule written for exactly this button. */
+ const showFeedUndo=Boolean(undoSnapshot)&&!hiddenInLite(appMode,"undoTools");
  /* LOGGED OPENS ON THIS SHIFT. It is the one filter whose question is WHEN, and
     on ALL it is every bus in the fleet carrying an open defect — the opposite
     of the handover list it exists to be. A window already chosen is left
@@ -1638,7 +1648,7 @@ export default function DefectLog(){
    +(skipped?". "+skipped+" could not be filed and "+(skipped===1?"was":"were")+" left off":"")
    +(!log.ok?". THE HEAT CHECKS COULD NOT BE SAVED — "+heatLogProblemWords(log.why)+(log.why==="unreadable"?"":". Scan the sheet again once there is room")
      :log.added?". "+log.added+" new heat check"+(log.added===1?"":"s")+" logged":". No new heat checks — every line on these pages was already in the log")
-   +(filed?". SCAN BATCHES takes the defects and the checks back out together.":log.ok&&log.added?". UNDO LAST takes these checks back out, for as long as you stay on this page and change nothing else.":"."));
+   +(filed?". SCAN BATCHES, in Settings, takes the defects and the checks back out together.":log.ok&&log.added?". UNDO LAST takes these checks back out, for as long as you stay on this page and change nothing else.":"."));
  };
  /* Takes a whole scan sweep back out. The batch is the set of sweep records
     sharing one creation stamp — the fingerprint fileSweep leaves by taking the
@@ -1677,7 +1687,7 @@ export default function DefectLog(){
   const cut=dropScanChecks(localStorage,batch);
   alert(result.removed.length+" record"+(result.removed.length===1?"":"s")+" removed from "+buses+" bus"+(buses===1?"":"es")+"."+(result.kept?" "+result.kept+" kept.":"")
    +(cut.removed||!cut.ok?(cut.ok?" The "+cut.removed+" heat check"+(cut.removed===1?"":"s")+" that scan logged "+(cut.removed===1?"was":"were")+" taken out too.":" ITS HEAT CHECKS COULD NOT BE TAKEN OUT — "+heatLogProblemWords(cut.why)+"."+heatCleanupLeftBehind(cut.why,cut.removed,scanBatchWords(batch).noun,wayBack.ok)):"")
-   +" PUT BACK under SCAN BATCHES returns the records"+(cut.removed&&cut.ok?"; the checks come back by scanning the sheet again":"")+".");
+   +" PUT BACK under SCAN BATCHES, in Settings, returns the records"+(cut.removed&&cut.ok?"; the checks come back by scanning the sheet again":"")+".");
  };
  /* The records go back stamped as new work — newer than the tombstones the
     removal sent — and the ledger forgets them, so the shop cloud accepts them
@@ -1891,36 +1901,25 @@ export default function DefectLog(){
   setSearch("");
   setEditing(recordDraft(record));
  };
-/* AI OPERATOR SAYS WHERE IT IS GOING BEFORE IT GOES.
-
-   Curtis: "When I press Ai operator and I am on the Defect page it routes me to
-   the map. With no warning."
-
-   It always did. The control is an `<a href="/?operator=1">` and the modal it
-   opens cannot render here: `executeOperator` is bound to the map's own state —
-   `setBuses`, `setLocatedBusIds`, `revealLocatedBuses` — and the plan kinds it
-   runs (`locate`, `move`, `bulkMove`, `batch`) are map actions. So the
-   navigation is the feature rather than a bug in it, and what was missing was
-   it being said out loud. The Facility Map's own two copies of this control
-   open the modal in place and have nothing to warn about; this is the one
-   instance that leaves a screen.
-
-   WHAT LEAVING ACTUALLY COSTS, and it is not a record. Nothing on this screen
-   is unsaved — every defect is written on save, and the editor is a full-screen
-   shade at z-index 2147483000, so a draft cannot even be open while this
-   control is reachable. What a reload loses is the way the BOARD is set: the
-   search, the WHEN LOGGED window, the state filter, the quick filter, the focus
-   view. Curtis's own reason for keeping the window in state rather than storage
-   was that "the shop computer's tab does not reload" — navigating is that
-   reload, and on a board somebody has narrowed, that is the whole of the cost.
-
-   So the second sentence appears only when there is something to lose. Warning
-   about filters that are not set would train somebody to dismiss the one case
-   that matters. */
- const boardIsNarrowed=Boolean(search.trim())||feedWindow!=="all"||filter!=="all"||Boolean(quickFilter)||Boolean(focusedBusId);
- const leaveForOperator=()=>confirm("AI OPERATOR runs on the Facility Map, so this leaves the Defect Log."+(boardIsNarrowed?"\n\nThe way you have this board set — the search, the filters and WHEN LOGGED — goes back to showing everything when you come back.":"")+"\n\nOpen it on the map?");
   const removeFromLog=(record:DefectLogRecord)=>{if(!confirm("Remove this repair from the Defect Log only? Bus status, location, defects, and Down Sheet records will stay unchanged."))return;persist(hideDefectLogRecords(fleet,[{busId:record.bus.id,defectId:record.defect.id}]),downEntries)};
  const cleanUpLog=()=>{const cleanable=records.filter(record=>isDefectLogCleanupCandidate(record,activeDownBusIdSet));if(!cleanable.length){alert("Nothing is ready for cleanup. Active repairs that started in this log stay until that repair is fixed.");return}if(!confirm("Clean up "+cleanable.length+" fixed, out-of-service, or Down Sheet record"+(cleanable.length===1?"":"s")+"? Repair data and every bus status will stay unchanged."))return;persist(hideDefectLogRecords(fleet,cleanable.map(record=>({busId:record.bus.id,defectId:record.defect.id}))),downEntries)};
+ /* SCAN BATCHES AND CLEAN UP ARRIVE FROM SETTINGS (210, `defect-log-tools.ts`).
+    Run once, after the board has been read: CLEAN UP counts what it would hide
+    from it, and before hydration it would count the seed. The parameter comes
+    off the address first, so a reload of the page does not ask again. */
+ const logToolDone=useRef(false);
+ useEffect(()=>{
+  if(!hydrated||logToolDone.current)return;
+  logToolDone.current=true;
+  const tool=logToolFromSearch(window.location.search);
+  if(!tool)return;
+  const url=new URL(window.location.href);url.searchParams.delete(LOG_TOOL_PARAM);
+  window.history.replaceState(window.history.state,"",url.pathname+url.search+url.hash);
+  /* LITE kept both of these out of reach behind ADVANCED ACTIONS, and Settings
+     hides nothing in LITE (it is the way out), so the refusal is here. */
+  if(hiddenInLite(appMode,"advancedActions")){alert((tool==="scan-batches"?"SCAN BATCHES":"CLEAN UP")+" is not part of LITE. Turn LITE off in Settings to use it.");return}
+  if(tool==="scan-batches")setBatchesOpen(true);else cleanUpLog();
+ },[hydrated]);// eslint-disable-line react-hooks/exhaustive-deps
  /* ALL THREE READ `quickFilterScope.buses` AND ALL THREE REFUSE AN EMPTIED
     LIST, each in its own body: SHARE falls back to COPY, so a guard on one
     path would be a guard on the path somebody happened to take. */
@@ -2075,65 +2074,48 @@ export default function DefectLog(){
     {/* aria-controls only while the drawer exists: the panel is not rendered
         at all when closed, and pointing at an id that is not in the document
         tells a screen reader about a thing it cannot go to. */}
-    {!hiddenInLite(appMode,"advancedActions")&&<button className="header-advanced-toggle" type="button" aria-expanded={advancedOpen} aria-controls={advancedOpen?"log-advanced-drawer":undefined} onClick={()=>setAdvancedOpen(value=>!value)}>
-     <span><b>ADVANCED ACTIONS</b><small>Filters, undo, scan sweeps and the operator</small></span><i aria-hidden="true">{advancedOpen?"CLOSE":"OPEN"}</i>
-    </button>}
+    {/* SCAN AND SHARE, the two things this row is for (release 210). Curtis:
+        "So really, we just need two buttons ... the scan, and a share button
+        ... with the share icon on it." REFRESH stays where it was. SCAN opens
+        the three sheets below the header; SHARE opens the DEFECTS LOGGED share
+        that used to be two menus deep (`openLoggedShare`). */}
+    {!hiddenInLite(appMode,"advancedActions")&&<div className="log-header-pair">
+     <button className="header-advanced-toggle" type="button" aria-expanded={advancedOpen} aria-controls={advancedOpen?"log-advanced-drawer":undefined} aria-label="Scan: choose the sheet" title={paperListWords()} onClick={()=>setAdvancedOpen(value=>!value)}>
+      <svg className="header-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7l2-3h4l2 3"/><circle cx="12" cy="13.5" r="3.5"/></svg><b>SCAN</b><i aria-hidden="true">{advancedOpen?"▴":"▾"}</i>
+     </button>
+     <button className="header-advanced-toggle header-share" type="button" onClick={openLoggedShare} aria-label="Share defects logged">
+      <svg className="header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M6 12H5a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1h-1"/></svg><b>SHARE</b>
+     </button>
+    </div>}
    </div>
   </header>
-  {/* ADVANCED ACTIONS.
+  {/* SCAN A SHEET (release 210; it was ADVANCED ACTIONS).
 
-      This block used to be nine controls loose on the page: three filter
-      buttons, QUICK FILTERS, UNDO LAST, and four more under the mystery board
-      — all of them above the feed a foreman actually came to read. Only the
-      two things used on every visit stay out: LOG DEFECT and SEARCH.
+      Curtis, looking at a drawer of eight controls in four colours and two
+      sizes of lettering: "just make this whole section about scanning ... take
+      out AI operator and cleanup ... just make this section just 3 drop-down
+      options", then "side by side". So it holds the three sheets this shop
+      photographs and nothing else, one tile each, drawn the same.
 
-      The toggle sits in the header with the nav and REFRESH, drawn like them,
-      because that is where this page keeps the controls that are about the
-      page rather than about a defect. The panel it opens is a drawer directly
-      under the header rather than inside it: the groups are light surfaces and
-      the header is not, and a white panel dropped into the navy read as a card
-      somebody had left there.
+      The tiles come from the sheet table, so a sheet added there is a tile
+      here. A sheet this page reads opens its scanner in place; the Down Sheet
+      is read on its own page, so its tile goes there, to the scanner's empty
+      first screen - the address SCAN SHEET's hand-off already uses. No photo
+      look decides anything: the person pressing the tile named the sheet.
 
-      The two groups are the ones the buttons already formed. VIEW changes what
-      the feed shows; TOOLS acts on the log itself. Collapsed by default, and
-      the choice is remembered per device. */}
-  {advancedOpen&&!hiddenInLite(appMode,"advancedActions")&&<section className="log-advanced open" id="log-advanced-drawer">
-    <div className="log-advanced-body">
-     <div className="log-advanced-group">
-      <b className="log-advanced-label">VIEW</b>
+      Where the rest went: QUICK FILTERS and the share it hid are icons in the
+      feed row; UNDO LAST is in the feed header while there is something to
+      undo; SCAN BATCHES and CLEAN UP are in Settings (`defect-log-tools.ts`);
+      the AI Operator is in the More menu and on the map; WHEN LOGGED is ALL ▾.
 
-      {/* A DROP-DOWN RATHER THAN MORE CHIPS, which is how Curtis asked for it —
-          "like a drop-down somewhere at the work computer". The row above is
-          thumb targets on a phone; this is one question asked at a desk, and a
-          seventh button would have cost that row its single line at 360px.
-
-          It lives in VIEW because it changes what the feed shows, which is what
-          this group is for. VIEW is collapsed by default, so the bar above the
-          feed carries both the state and the way out — nobody has to open a
-          drawer to undo it. */}
-      <label className="log-feed-window">WHEN LOGGED
-       <select value={feedWindow} onChange={event=>setFeedWindow(event.target.value as FeedWindowKey)} aria-label="Show defects logged within">
-        {FEED_WINDOWS.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}
-       </select>
-      </label>
-      <QuickFilterMenu active={quickFilter} counts={quickFilterMenuCounts} onOpenChange={setQuickFilterMenuOpen} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("");setQuickFilterWindow(value==="logged"?loggedCountWindow:"all")}} itemAside={key=>key!=="logged"?null:
-       /* Only this row. Every other count answers "what is true right now",
-          where the age of the record is not the question — the same reason
-          time-window.ts keeps a window off those filters. */
-       <label className="quick-filter-window" onClick={event=>event.stopPropagation()}>
-        <span className="sr-only">Count defects logged within</span>
-        <select value={quickFilterWindowChoices.some(item=>item.key===loggedCountWindow)?loggedCountWindow:"all"}
-         onChange={event=>{const next=event.target.value as TimeWindowKey;setLoggedCountWindow(next);if(quickFilter==="logged")setQuickFilterWindow(next)}}
-         aria-label="Count defects logged within">
-         {quickFilterWindowChoices.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}
-        </select>
-       </label>}/>
-      <button className="log-undo-button" type="button" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent defect-log change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button>
-     </div>
-     <div className="log-advanced-group">
-      <b className="log-advanced-label">TOOLS</b>
-      <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button><button className="scan-batches-button" type="button" onClick={()=>setBatchesOpen(true)} disabled={!batches.length&&!batchUndo} title="Every photo scan filed on this device, and the way to take one back out">↶ SCAN BATCHES</button><a className="feed-operator" href="/?operator=1" title="Opens the AI Operator on the Facility Map — this leaves the Defect Log" onClick={event=>{if(!leaveForOperator())event.preventDefault()}}><span aria-hidden="true">&#10022;</span> AI OPERATOR</a><button className="heat-scan-button" type="button" onClick={()=>setHeatOpen(true)} disabled={!fleet.length} title="Photograph the heat check sheet: N/R becomes a No Heat defect, and every line is logged as a check">📷 SCAN HEAT SHEET</button></div>
-     </div>
+      The toggle and the `advancedActions` LITE rule are unchanged: LITE hid
+      this drawer before and hides it now. */}
+  {advancedOpen&&!hiddenInLite(appMode,"advancedActions")&&<section className="log-advanced log-scan-drawer open" id="log-advanced-drawer">
+    <div className="log-scan-tiles" role="group" aria-label="Scan a sheet">
+     {PAPER_KINDS.map(sheet=>{const here=sheet.route===PAPER_HERE;return <button type="button" className="log-scan-tile" key={sheet.kind} disabled={here&&!fleet.length} onClick={()=>{if(here)openScanner(sheet.kind);else window.location.assign(paperScanHref(sheet.kind))}} aria-label={"Scan "+paperNamedInSentence(sheet.kind)}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7l2-3h4l2 3"/><circle cx="12" cy="13.5" r="3.5"/></svg>
+      <span>{sheet.label}</span>
+     </button>})}
     </div>
   </section>}
   {/* Closed by default. Five tiles were the first thing the page said, above
@@ -2227,8 +2209,15 @@ export default function DefectLog(){
       NOT on that sheet, so it belongs beside the sheet rather than here. The
       MOVE / LOCATION editor stayed: the deferred drawer below still opens it. */}
   <section className="log-feed">
-   <div className="feed-title">{/* LOG DEFECT moved to the top of the controls; it is not repeated here. */}
-   {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}{/* Dropped entirely when nothing is outstanding rather than printed as "0m": the line already says 0 DEFECTS, and a zero beside it reads as a broken counter rather than as a clear board. */}{visibleEstimateMinutes>0&&<b className="feed-estimate">{formatRepairTime(visibleEstimateMinutes)} ESTIMATED</b>}</small></span>
+   <div className={"feed-title"+(showFeedUndo?" with-undo":"")}>{/* LOG DEFECT moved to the top of the controls; it is not repeated here. */}
+   {/* CLEAN UP and SCAN BATCHES are in Settings, the AI Operator in the More menu, and the scanners under SCAN (release 210). */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}{/* Dropped entirely when nothing is outstanding rather than printed as "0m": the line already says 0 DEFECTS, and a zero beside it reads as a broken counter rather than as a clear board. */}{visibleEstimateMinutes>0&&<b className="feed-estimate">{formatRepairTime(visibleEstimateMinutes)} ESTIMATED</b>}</small></span>
+   {/* UNDO LAST, ONLY WHILE THERE IS SOMETHING TO UNDO (210). It sat faded in
+       ADVANCED ACTIONS on every visit, a button that did nothing most of the
+       time; Curtis chose to show it only when it works. On a phone it takes the
+       title's corner, so appearing after a save moves nothing below it; wider,
+       it sits in the title row left of SHOW STATUS COLOR. `undoTools` is the
+       LITE rule written for exactly this button. */}
+   {showFeedUndo&&<button className="feed-undo" type="button" onClick={undoLastChange} aria-label={"Undo "+(undoSnapshot?.label||"the last change")} title={undoSnapshot?.label}><svg className="feed-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>UNDO LAST</button>}
    {/* ALL, DETAILED and COMPACT, in one even row under the count line - Curtis:
        "spread from left to right to look uniform and neat", without the CARD
        VIEW label. IN PROGRESS and FIXED TODAY are no longer offered; like OPEN
@@ -2257,7 +2246,22 @@ export default function DefectLog(){
     ...(filter==="in-progress"?[["in-progress","IN PROGRESS"] as [Filter,string]]:[]),
     ...(filter==="fixed"?[["fixed","FIXED TODAY"] as [Filter,string]]:[]),
     ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}
-    {(["detailed","compact"] as CardView[]).map(value=><button type="button" key={value} aria-pressed={cardView===value} aria-label={(value==="compact"?"Compact":"Detailed")+" cards"} onClick={()=>{setCardView(value);const result=writeSetting(localStorage,CARD_VIEW_KEY,value);setCardViewNotice(result.ok?"":"View changed for this visit. Device storage could not remember it.")}}>{value==="compact"?"COMPACT":"DETAILED"}</button>)}</div>
+    {(["detailed","compact"] as CardView[]).map(value=><button type="button" key={value} aria-pressed={cardView===value} aria-label={(value==="compact"?"Compact":"Detailed")+" cards"} onClick={()=>{setCardView(value);const result=writeSetting(localStorage,CARD_VIEW_KEY,value);setCardViewNotice(result.ok?"":"View changed for this visit. Device storage could not remember it.")}}>{value==="compact"?"COMPACT":"DETAILED"}</button>)}
+    {/* QUICK FILTERS, AS AN ICON AT THE END OF THE ROW (210). It used to be in
+        ADVANCED ACTIONS; the share it hid is the SHARE button in the header.
+        LITE hid it before and hides it now - the `advancedActions` rule. */}
+    {!hiddenInLite(appMode,"advancedActions")&&<><QuickFilterMenu active={quickFilter} counts={quickFilterMenuCounts} onOpenChange={setQuickFilterMenuOpen} icon={<svg className="feed-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("");setQuickFilterWindow(value==="logged"?loggedCountWindow:"all")}} itemAside={key=>key!=="logged"?null:
+     /* Only this row. Every other count answers "what is true right now",
+        where the age of the record is not the question — the same reason
+        time-window.ts keeps a window off those filters. */
+     <label className="quick-filter-window" onClick={event=>event.stopPropagation()}>
+      <span className="sr-only">Count defects logged within</span>
+      <select value={quickFilterWindowChoices.some(item=>item.key===loggedCountWindow)?loggedCountWindow:"all"}
+       onChange={event=>{const next=event.target.value as TimeWindowKey;setLoggedCountWindow(next);if(quickFilter==="logged")setQuickFilterWindow(next)}}
+       aria-label="Count defects logged within">
+       {quickFilterWindowChoices.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}
+      </select>
+     </label>}/></>}</div>
    {cardViewNotice&&<p className="card-view-notice" role="status">{cardViewNotice}</p>}</div>
    <label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · "),roadCall=roadCallNote(group.bus.roadCalls,undefined,timeLabel);return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>

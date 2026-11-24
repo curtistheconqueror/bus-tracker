@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-11-23
+Updated: 2026-11-24
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 196 (application release 206)
-Live feature checkpoint: commit e649c644c28b66f4bc7d4494726a79834a80164b
+Live release: Sites Version 197 (application release 209, includes 207 and 208)
+Live feature checkpoint: commit 9a7cc1f417c53689ee62b5f564609e2a0dc5b32a
 
 ## Read this first
 
@@ -24,13 +24,23 @@ The project is an offline-capable fleet maintenance operations application with 
 
 ## Latest publication
 
+Sites Version 197 / application release 209 deployed 2026-11-24 at 21:03:26.739201 UTC from `9a7cc1f417c53689ee62b5f564609e2a0dc5b32a`. It includes 207 and 208: the Defect Log top box holds + LOG DEFECT and SEARCH; LIVE DEFECT FEED puts the count above the view controls; the unlit ALL drop-down exposes eight logged-time choices, including PREVIOUS SHIFT. Fixed Repairs offers PREVIOUS SHIFT as well. No migration, storage-key rename, sync, AI Operator, or hosting configuration change. PR39 MCP remains held and excluded.
+
+Exact-source production build, all 484 tests (zero failures or skips), ESLint (no lint diagnostics), and `git diff --check` passed. No exact-source GitHub Actions run was reported. Chromium on the production build and the live site confirmed the eight options, PREVIOUS SHIFT face and shift-hours banner, clearing search when reselecting ALL, DETAILED/COMPACT selection, the unlit window picker, and the Fixed Repairs option. Live navigation rendered Defect Log, Fixed Repairs, Down Sheet, and Facility Map. No fleet records were added, edited, or moved. A physical iPhone's native picker, phone-width layout and actual card rendering with device-local defect records, Home Screen and offline checks were not independently verified.
+
+Native deployment `appgdep_6b05fb91242481918428e2cfe699fe63` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_f9ecbfe3cdb88191b5ff93c099266722`. The existing public URL, access policy revision 2 and runtime environment revision 2 are unchanged. Previous-live rollback: Sites 196 / application release 206 at `e649c644c28b66f4bc7d4494726a79834a80164b`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_5a0ebd9dfc8c8191b3981192f36f6f0e`.
+
+The approved queue and remaining device checks are archived in [PUBLISH_RELEASE_207_209.md](docs/archive/PUBLISH_RELEASE_207_209.md). The publish queue is reset to NONE PENDING.
+
+### Previous publication — Sites 196 / application 206
+
 Sites Version 196 / application release 206 deployed 2026-11-23 at 23:36:15.204248 UTC from `e649c644c28b66f4bc7d4494726a79834a80164b`. The Log Defect BUS box says "Tap twice to type bus#" and gives a selected bus a location pill opening the existing BUS LOCATION move window; successful moves replace UNDO LAST. B11/B12 are short labels in that pill. Down Sheet retains its existing bus selector. Releases 198–205 were already live in Sites 195 from `55812e1829f4a9469e901fb092980f3f86c5e536`; this publication retains them and adds 206. The prior queued handoff's Sites 194 / release 197 live baseline was stale.
 
 Fresh exact-source production build, all 482 regression tests (zero failures/skips), ESLint (zero errors/warnings) and whitespace checks passed. An independent source review found no confirmed release blocker; no exact-source GitHub Actions run is claimed. Managed preview served the unchanged production build after the Vite development preview failed on its network-interface API. In cloud Chromium, the new placeholder, Bus 17533 plus CNG East pill, BUS LOCATION modal open/cancel and unchanged `Bus 17533 · CNG East` Down Sheet label passed. No move, save or undo was performed.
 
 Native deployment `appgdep_6b04cdea6f6081919542269fc5b8fbc7` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_5a0ebd9dfc8c8191b3981192f36f6f0e`. Runtime environment revision 2 and public audience revision 2 are unchanged. All eight live routes returned HTTP 200 with FLEETSTEP; all 63 public browser/static assets matched the tested build bytes. The live placeholder was checked in Chromium. That fresh live browser had no device-local fleet; selected-bus live modal and populated Down Sheet checks were not performed, and no fleet was seeded. Physical phone/Safari/Home Screen, touch keyboard and offline checks remain unverified. The accepted 360px placeholder clipping and missing focus return after modal close remain as documented. No production fleet records, cloud configuration, schema or credentials were changed.
 
-Previous-live rollback: Sites 195 / application release 205 at `55812e1829f4a9469e901fb092980f3f86c5e536`. Its saved version is `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_12ff577f153081918db0ea71ee24759d`. The full former queue is in `docs/archive/PUBLISH_RELEASE_198_206.md`; `docs/PUBLISH_NEXT.md` is reset to NONE PENDING. PR39 remains held and excluded.
+Previous-live rollback: Sites 195 / application release 205 at `55812e1829f4a9469e901fb092980f3f86c5e536`. Its saved version is `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_12ff577f153081918db0ea71ee24759d`. The full former queue is in `docs/archive/PUBLISH_RELEASE_198_206.md`. PR39 was excluded.
 
 ### Previous publication — Sites 195 / application 205
 

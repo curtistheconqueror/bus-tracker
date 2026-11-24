@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 196 / application release 206 | Live | e649c644c28b66f4bc7d4494726a79834a80164b | Log Defect BUS wording, location pill and move undo; includes 198–205 already shipped in Sites 195. |
+| 197 / application releases 207–209 | Live | 9a7cc1f417c53689ee62b5f564609e2a0dc5b32a | Defect Log feed layout, time-window picker with PREVIOUS SHIFT, and neutral ALL control; PREVIOUS SHIFT in Fixed Repairs. |
+| 196 / application release 206 | Previous live; rollback | e649c644c28b66f4bc7d4494726a79834a80164b | Log Defect BUS wording, location pill and move undo; includes 198–205 already shipped in Sites 195. |
 | 195 / application releases 198–205 | Previous live; rollback | 55812e1829f4a9469e901fb092980f3f86c5e536 | Prior cloud publication, including the general AI Operator question rule; recovered actual baseline. |
 | 194 / application release 197 | Previous live | 12822f60c7e5d76d3702108b33711cc116ca4f61 | Safe installed-app last-page restoration and Doors group display mark. |
 | 192, 193 | Saved only; never deployed | Superseded review candidates | Do not deploy; use reviewed194. |
@@ -308,3 +309,15 @@ Previous-live rollback: Sites 195 / application release 205 at `55812e1829f4a946
 - Release-record work starts from GitHub main `53bb7d0cd888fab4ea9358b1585e12c62b729418`, preserving its queued handoff verbatim in the archive. Source publication stays pinned to `e649c644c28b66f4bc7d4494726a79834a80164b`; these later records are documentation only.
 
 - Rollback tags `sites-v195` (`55812e1`), `sites-v196` and `sites-release206` (`e649c64`) are prepared in the isolated local checkout. Their GitHub push remains pending: command-line Git has no GitHub credential, the connected GitHub tools expose branch updates but no tag creation, and the browser is signed out. No remote tag is claimed. Saved Sites 195 remains available as the exact rollback independently of these tag aliases.
+
+## Sites 197 / applications 207–209 — 2026-11-24
+
+Sites Version 197 / application release 209 deployed 2026-11-24 at 21:03:26.739201 UTC from `9a7cc1f417c53689ee62b5f564609e2a0dc5b32a`. It includes 207 and 208: the Defect Log top box holds + LOG DEFECT and SEARCH; LIVE DEFECT FEED puts the count above the view controls; the unlit ALL drop-down exposes eight logged-time choices, including PREVIOUS SHIFT. Fixed Repairs offers PREVIOUS SHIFT as well. No migration, storage-key rename, sync, AI Operator, or hosting configuration change. PR39 MCP remains held and excluded.
+
+Exact-source production build, all 484 tests (zero failures or skips), ESLint (no lint diagnostics), and `git diff --check` passed. No exact-source GitHub Actions run was reported. Chromium on the production build and the live site confirmed the eight options, PREVIOUS SHIFT face and shift-hours banner, clearing search when reselecting ALL, DETAILED/COMPACT selection, the unlit window picker, and the Fixed Repairs option. Live navigation rendered Defect Log, Fixed Repairs, Down Sheet, and Facility Map. No fleet records were added, edited, or moved. A physical iPhone's native picker, phone-width layout and actual card rendering with device-local defect records, Home Screen and offline checks were not independently verified.
+
+Native deployment `appgdep_6b05fb91242481918428e2cfe699fe63` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_f9ecbfe3cdb88191b5ff93c099266722`. The existing public URL, access policy revision 2 and runtime environment revision 2 are unchanged. Previous-live rollback: Sites 196 / application release 206 at `e649c644c28b66f4bc7d4494726a79834a80164b`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_5a0ebd9dfc8c8191b3981192f36f6f0e`.
+
+The approved queue and remaining device checks are archived in [PUBLISH_RELEASE_207_209.md](archive/PUBLISH_RELEASE_207_209.md). The publish queue is reset to NONE PENDING.
+
+- Gzip archive SHA256: `09f05cd6e1a65e5bef852e0c1b139d0e095e88390bf2d50852dd91f3b1964026`. Native saved tar hash: `sha256:e0712fc5b45c76f2fd5080991c06b69aabc28c1a50272f05d08275922beb284a` (5,816,320 bytes; 128 files).

@@ -1313,8 +1313,10 @@ key.**
 It was built as a separate button called SCAN PAPER, on both pages, beside the
 three scanners' own. Curtis, before it was published: *"I'd rather the current
 scan button just do the job"*, and *"we will put the other button on the back
-burner."* So SCAN SHEET opens the door; the Defect Log has none and its SCAN
-SWEEP and SCAN HEAT SHEET open their scanner directly, as they always did. The
+burner."* So SCAN SHEET opens the door; the Defect Log has none. Since
+release 210 its SCAN button opens three tiles, one per sheet in the table, and
+each opens its scanner directly with no first look - the person named the
+sheet. The
 name is one constant, `PAPER_DOOR`, drawn by the button, the box it opens and
 the Down Sheet scanner's own heading.
 The code says "paper" for the thing photographed because a Down Sheet is one
@@ -1362,7 +1364,8 @@ is SCAN HEAT SHEET on the Defect Log.
 
 **The scanner can still be opened empty by ADDRESS**: `/down-sheet?scan=down-sheet`
 with no `photos=` opens it with nothing in it, the way the Fleet Campaigns link
-opens the heat scanner. No button on any page makes that address today.
+opens the heat scanner. Since release 210 the Defect Log's VEHICLE DOWN SHEET
+tile, under SCAN, is the button that makes that address.
 
 **PUTTING THE DOOR ON ANOTHER PAGE IS ONE BUTTON.** Curtis: *"we can just place
 this button anywhere we want for ease of access."* `ScanPaper` takes the route

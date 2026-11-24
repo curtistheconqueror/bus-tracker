@@ -16,6 +16,8 @@ const PRIMARY=["/","/down-sheet","/defect-log"];
 const SHORT_LABELS=["Map","Down Sheet","Defects"];
 const ICONS=["\u25a6","\u2637","\u25a4"];
 
+const OPERATOR_HREF="/?operator=1";
+
 export default function TrackerNav({active,className}:{active:string;className?:string}){
  const mode=useAppMode();
  const pages=TRACKER_PAGES.filter(page=>!(page.href==="/lists"&&hiddenInLite(mode,"campaignsPage")));
@@ -52,6 +54,16 @@ export default function TrackerNav({active,className}:{active:string;className?:
    {moreOpen&&<><button className="tracker-more-scrim" type="button" aria-label="Close more pages" tabIndex={-1} onClick={closeMore}/><div className="tracker-more-menu" id={menuId} ref={moreMenu} role="navigation" aria-label="More tracker pages" onBlur={event=>{if(event.relatedTarget&&!event.currentTarget.contains(event.relatedTarget)&&event.relatedTarget!==moreButton.current)setMoreOpen(false)}}>
     <div className="tracker-more-heading"><strong>More pages</strong><button type="button" onClick={closeMore} aria-label="Close more pages">Close</button></div>
     {morePages.map(page=><a key={page.href} href={page.href} aria-current={page.href===active?"page":undefined} onClick={()=>setMoreOpen(false)}>{page.label}</a>)}
+    {/* THE AI OPERATOR, from every page on a phone (release 210). Wider than
+        800px this menu is not drawn and the pages are tiles in the header; a
+        ninth tile there is a change to every page's header, not made here, so
+        on an iPad or the shop computer the Operator is the map's own button.
+        It runs on the
+        Facility Map, whose state it acts on, so this is a link there that
+        opens it - and the row says so, because Curtis once found himself on
+        the map "with no warning". It left the Defect Log's ADVANCED ACTIONS,
+        where it read as out of place; the map keeps its own button. */}
+    <a className="tracker-more-tool" href={OPERATOR_HREF} onClick={()=>setMoreOpen(false)}><span aria-hidden="true">✦</span> AI OPERATOR<small>opens on the map</small></a>
    </div></>}
    <div className="tracker-bottom-nav" role="navigation" aria-label="Main pages">
     {PRIMARY.map((href,index)=><a key={href} href={href} aria-current={href===active?"page":undefined}><span aria-hidden="true">{ICONS[index]}</span>{SHORT_LABELS[index]}</a>)}
