@@ -2241,8 +2241,12 @@ export default function DefectLog(){
    <div className="feed-view"><div className={"feed-view-row"+(filter==="all"?"":" with-saved-view")} role="group" aria-label="Which defects to show, and how">
     {/* A real <select> under the face of the button, so a phone opens its own
         picker and a keyboard reaches it; the face says which window is in
-        force, so ALL reads ALL and a narrowed board reads LAST 24H. */}
-    <label className={"feed-window-pick"+(filter==="all"?" active":"")}><i aria-hidden="true">{FEED_WINDOWS.find(item=>item.key===feedWindow)?.label||"ALL"}<em>▾</em></i>
+        force, so ALL reads ALL and a narrowed board reads LAST 24H.
+        It is NEVER LIT (release 209). Lit, it sat in the same blue beside a lit
+        DETAILED and the row read as one choice of three; Curtis agreed the face
+        already says what is chosen, so the blue on that row is the card view
+        alone, or a saved view while one is in force. */}
+    <label className="feed-window-pick"><i aria-hidden="true">{FEED_WINDOWS.find(item=>item.key===feedWindow)?.label||"ALL"}<em>▾</em></i>
      {/* A select only reports a CHANGE, and the window is ALL nearly always,
          so picking ALL again would do nothing - and clearing a search or a lit
          saved view is what pressing ALL has always done (see showEverythingOr).

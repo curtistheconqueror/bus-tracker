@@ -250,7 +250,7 @@ test("the LOG DEFECT box holds the button and the search, and the feed holds ALL
  const bar=page.slice(page.indexOf('<div className="feed-title">'),page.indexOf("</div>\n   {visibleGroups.length?"));
  assert.ok(bar.indexOf("feed-estimate")<bar.indexOf('"feed-view-row"'),"the row comes after the count line");
  assert.ok(bar.indexOf('"feed-view-row"')<bar.indexOf("feed-status-color"));
- assert.match(bar,/<label className=\{"feed-window-pick"/);
+ assert.match(bar,/<label className="feed-window-pick">/);
  assert.match(bar,/\["detailed","compact"\] as CardView\[\]/);
 
  /* IN PROGRESS and FIXED TODAY are drawn only while they are the active filter,
