@@ -881,8 +881,11 @@ export default function DefectLog(){
     board down and nothing on screen said so. The only way out was to notice
     the text and delete it.
 
-    So ALL clears the search as well as the filter. Every other button keeps
-    the search, because narrowing a search by state is the point of them. */
+    So ALL clears the search as well as the filter. The keep-the-search branch
+    is for a filter being SET; since release 207 no button sets one - the only
+    filter buttons drawn are ALL and whichever saved default view is lit, and
+    pressing either clears back to ALL. A saved default view is therefore
+    left with one tap and comes back on the next load. */
  const showEverythingOr=(value:Filter)=>{
   const next=filter===value?"all":value;
   setFilter(next);
@@ -2135,25 +2138,20 @@ export default function DefectLog(){
   </section>
   <OfflineBackupReminder buses={fleet} interval={settings.backupInterval}/>
   <section className="log-controls">
-   <div className="log-filters">{([["all","ALL"],["in-progress","IN PROGRESS"],["fixed","FIXED TODAY"],
-    /* OPEN and DOWN SHEET are not offered, but both remain choosable as a saved
-       default view. Somebody whose default is one of them would otherwise see a
-       filtered board with no button lit and nothing saying why — and no way back
-       without opening settings. The button appears only while its own filter is
-       the active one, so it explains the view and clears it, without adding two
-       buttons back for everybody else. */
-    ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
-    ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}</div>
-   <div className="card-view-selector" role="group" aria-label="Defect card view"><span>CARD VIEW</span>{(["detailed","compact"] as CardView[]).map(value=><button type="button" key={value} aria-pressed={cardView===value} onClick={()=>{setCardView(value);const result=writeSetting(localStorage,CARD_VIEW_KEY,value);setCardViewNotice(result.ok?"":"View changed for this visit. Device storage could not remember it.")}}>{value==="compact"?"COMPACT":"DETAILED"}</button>)}</div>
-   {cardViewNotice&&<p className="card-view-notice" role="status">{cardViewNotice}</p>}
+   {/* ALL, DETAILED and COMPACT moved down to the feed they change, under its
+       count line. Curtis: "The goal is to get the log defect and search field
+       sort of by themselves so it's easy to see and no guess work. Too many
+       tabs around makes it look intimidating." So this box holds the two
+       things the page is for and nothing else. */}
    {/* First thing under the header, so the page opens on what it is for. */}
    <button className="log-primary-action" type="button" onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button>
-   {/* OPEN and DOWN SHEET are gone as buttons. OPEN differed from ALL only by
-       hiding in-progress and today's fixes, a distinction that reads as noise
-       to somebody new; DOWN SHEET has its own page and the DS badge already
-       says which buses are on it. Both KEYS still work, so a saved default
-       view of either keeps filtering — the button is what was removed, not
-       the filter. Pressing the active one clears back to ALL. */}
+   {/* OPEN and DOWN SHEET are gone as buttons, and since release 207 so are
+       IN PROGRESS and FIXED TODAY. OPEN differed from ALL only by hiding
+       in-progress and today's fixes, a distinction that reads as noise to
+       somebody new; DOWN SHEET has its own page and the DS badge already says
+       which buses are on it. All four KEYS still work, so a saved default view
+       of any of them keeps filtering — the button is what was removed, not the
+       filter. See the row under the feed's count line. */}
    <div className="log-search-wrap"><label className="log-search"><span>SEARCH</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus numbers (space/comma), repair, code, or note" aria-describedby={searchFeedback?"log-search-feedback":undefined}/>{search&&<button type="button" className="clear-log-search" onClick={()=>setSearch("")} aria-label="Clear the search and show every bus">CLEAR</button>}</label>{searchFeedback&&<small className="log-search-feedback" id="log-search-feedback">{searchFeedback}</small>}
    {/* The filtered state used to be silent: the board was held down to one bus
        and nothing on screen said so, which is what made people tap around
@@ -2216,7 +2214,22 @@ export default function DefectLog(){
       MOVE / LOCATION editor stayed: the deferred drawer below still opens it. */}
   <section className="log-feed">
    <div className="feed-title">{/* LOG DEFECT moved to the top of the controls; it is not repeated here. */}
-   {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}{/* Dropped entirely when nothing is outstanding rather than printed as "0m": the line already says 0 DEFECTS, and a zero beside it reads as a broken counter rather than as a clear board. */}{visibleEstimateMinutes>0&&<b className="feed-estimate">{formatRepairTime(visibleEstimateMinutes)} ESTIMATED</b>}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
+   {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}{/* Dropped entirely when nothing is outstanding rather than printed as "0m": the line already says 0 DEFECTS, and a zero beside it reads as a broken counter rather than as a clear board. */}{visibleEstimateMinutes>0&&<b className="feed-estimate">{formatRepairTime(visibleEstimateMinutes)} ESTIMATED</b>}</small></span>
+   {/* ALL, DETAILED and COMPACT, in one even row under the count line - Curtis:
+       "spread from left to right to look uniform and neat", without the CARD
+       VIEW label. IN PROGRESS and FIXED TODAY are no longer offered; like OPEN
+       and DOWN SHEET before them, each is drawn only while it is the active
+       filter, which a saved default view can make it. Somebody whose default
+       is one of them would otherwise see a narrowed board with no button lit
+       and nothing saying why. Pressing the lit one clears back to ALL. */}
+   <div className="feed-view"><div className={"feed-view-row"+(filter==="all"?"":" with-saved-view")} role="group" aria-label="Which defects to show, and how">{([["all","ALL"],
+    ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
+    ...(filter==="in-progress"?[["in-progress","IN PROGRESS"] as [Filter,string]]:[]),
+    ...(filter==="fixed"?[["fixed","FIXED TODAY"] as [Filter,string]]:[]),
+    ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}
+    {(["detailed","compact"] as CardView[]).map(value=><button type="button" key={value} aria-pressed={cardView===value} aria-label={(value==="compact"?"Compact":"Detailed")+" cards"} onClick={()=>{setCardView(value);const result=writeSetting(localStorage,CARD_VIEW_KEY,value);setCardViewNotice(result.ok?"":"View changed for this visit. Device storage could not remember it.")}}>{value==="compact"?"COMPACT":"DETAILED"}</button>)}</div>
+   {cardViewNotice&&<p className="card-view-notice" role="status">{cardViewNotice}</p>}</div>
+   <label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · "),roadCall=roadCallNote(group.bus.roadCalls,undefined,timeLabel);return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
     {cardView==="compact"&&!expanded&&<button className="log-compact-open" type="button" aria-expanded={false} aria-label={"Open full details and actions for bus "+group.bus.n} onClick={event=>{const card=event.currentTarget.closest("article");setExpandedBusIds(current=>current.includes(group.bus.id)?current:[...current,group.bus.id]);requestAnimationFrame(()=>card?.querySelector<HTMLButtonElement>(".log-group-header")?.focus())}}><span className="compact-bus log-bus-number" data-status={group.bus.s}><span aria-hidden="true">▣</span><strong>{group.bus.n}</strong></span><span className="compact-issue"><strong>{preview}</strong><small>{STATUS_LABELS[group.bus.s]||group.bus.s} · {locationLabel(group.bus.l)} · {group.records.length} defect{group.records.length===1?"":"s"}{busOnDownSheet?" · DS":""}{isHeld(group.bus)?" · HOLD":""}</small></span><span className={"state "+groupState}>{STATE_LABELS[groupState]}</span><span aria-hidden="true">›</span></button>}
     <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>

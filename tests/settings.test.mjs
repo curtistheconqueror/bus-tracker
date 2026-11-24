@@ -483,11 +483,12 @@ test("the Defect Log opens on what it is for, not on a status report", async () 
  assert.equal((logPage.match(/\+ LOG DEFECT/g)||[]).length,1,"LOG DEFECT must appear exactly once");
  assert.match(css,/\.log-primary-action\{/);
 
- /* Three filter buttons, not five. OPEN differed from ALL only by hiding
-    in-progress and today's fixes; DOWN SHEET has its own page. */
+ /* One filter button, not five (release 207 took IN PROGRESS and FIXED TODAY
+    off as well). OPEN differed from ALL only by hiding in-progress and today's
+    fixes; DOWN SHEET has its own page. */
  const row=logPage.match(/\[\["all","ALL"\][\s\S]*?\] as \[Filter,string\]\[\]/);
  assert.ok(row,"the filter row must still be a literal list");
- /* Three are always offered. OPEN and DOWN SHEET appear ONLY while one of them
+ /* ALL is always offered. OPEN, DOWN SHEET, IN PROGRESS and FIXED TODAY appear ONLY while one of them
     is the active filter — which happens when somebody's saved default view is
     one of them. Otherwise they would see a filtered board with no button lit,
     nothing explaining why, and no way back without opening settings. */
