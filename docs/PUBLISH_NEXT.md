@@ -1,8 +1,8 @@
 # Publish next
 
-**STATUS: TWO RELEASES PENDING ON `main` — application release 207, from `4f30c91`, and 208, from `f0e12b2`. NOT PUBLISHED.** 208 sits on top of 207; **publish `f0e12b2` (release 208), which carries both.** Both are Defect Log changes Curtis asked for on 2026-11-23; 208 also gives Fixed Repairs' existing WHEN FIXED drop-down a PREVIOUS SHIFT choice. No sync, no AI Operator, no storage key. Codex publishes when Curtis points it at this file.
+**STATUS: THREE RELEASES PENDING ON `main` — application release 207, from `4f30c91`; 208, from `f0e12b2`; and 209, from `9a7cc1f`. NOT PUBLISHED.** Each sits on top of the one before; **publish `9a7cc1f` (release 209), which carries all three.** All are Defect Log changes Curtis asked for on 2026-11-23 and 2026-11-24; 208 also gives Fixed Repairs' existing WHEN FIXED drop-down a PREVIOUS SHIFT choice. No sync, no AI Operator, no storage key. Codex publishes when Curtis points it at this file.
 
-**What is live:** Sites Version 196 / application release 206, deployed 2026-11-23 at 23:36:15.204248 UTC from `e649c644c28b66f4bc7d4494726a79834a80164b`. Rollback for 207 and 208: Sites 196 at `e649c644c28b66f4bc7d4494726a79834a80164b`.
+**What is live:** Sites Version 196 / application release 206, deployed 2026-11-23 at 23:36:15.204248 UTC from `e649c644c28b66f4bc7d4494726a79834a80164b`. Rollback for 207–209: Sites 196 at `e649c644c28b66f4bc7d4494726a79834a80164b`.
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
@@ -10,8 +10,52 @@ PR39 MCP remains separately held and unmerged, excluded from this release. The 1
 
 | Release | What it is | State |
 | --- | --- | --- |
-| 208 | ALL is a drop-down of when defects were logged — THIS SHIFT, a new PREVIOUS SHIFT, TODAY, 24H, 3/7/30 DAYS; Fixed Repairs gets PREVIOUS SHIFT too | On `main`, pending publication — **publish this; it includes 207** |
+| 209 | The ALL drop-down is never lit, so it no longer reads as a third card view beside a lit DETAILED | On `main`, pending publication — **publish this; it includes 207 and 208** |
+| 208 | ALL is a drop-down of when defects were logged — THIS SHIFT, a new PREVIOUS SHIFT, TODAY, 24H, 3/7/30 DAYS; Fixed Repairs gets PREVIOUS SHIFT too | On `main`, pending publication |
 | 207 | The Defect Log's top box holds + LOG DEFECT and SEARCH alone; ALL, DETAILED, COMPACT move under the feed's count line; IN PROGRESS and FIXED TODAY buttons removed; the count line is bigger; LIVE REPAIR FEED is renamed LIVE DEFECT FEED | On `main`, pending publication |
+
+## 209 — ALL is never lit
+
+### Source
+
+Release source: `9a7cc1f`. Previous: `2608c8c`, the commit that queued 208. Run at `9a7cc1f`:
+
+```
+$ git log --oneline 2608c8c..9a7cc1f
+9a7cc1f Release 209: ALL is never lit, so the only blue in the feed row is the card view
+```
+
+```
+$ git diff --name-only 2608c8c..9a7cc1f -- app src tests
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+tests/app-shell.test.mjs
+tests/settings.test.mjs
+```
+
+Proof of no infrastructure change. This returned nothing:
+
+```
+$ git diff --name-only 2608c8c..9a7cc1f -- supabase package.json package-lock.json .github public worker
+```
+
+### Migrations
+
+None. No storage key added or renamed.
+
+### What changed
+
+Asked whether ALL should look different from DETAILED when both were lit in the same blue side by side, Curtis: *"Yes that is fin[e]"* to the proposal of not lighting ALL at all.
+
+1. **The ALL drop-down's face is a plain outlined box at all times.** Its face already says in words which window is in force ("ALL ▾", "PREVIOUS SHIFT ▾"). The only blue left in the row is DETAILED or COMPACT, plus a saved view (OPEN, IN PROGRESS, FIXED TODAY, DOWN SHEET) while one is in force, which is still drawn lit.
+2. Nothing about what it does changed: picking a window still shows every defect logged in it and clears a search or a lit saved view.
+
+### Verified
+
+- `npm test` on Windows: **484 pass, 0 fail** (two assertions updated, one added: the stylesheet must not light it). `npm run lint`: no error, the one existing warning.
+- **In the dev build at 390:** ALL is white with the grey border of an unlit button, DETAILED is the accent blue, COMPACT is unlit; three 109px × 44px boxes, no sideways scroll.
+- **Cold read, one subagent, before the push:** no problems found. It checked that no other rule lights the label, that a saved view still shows as lit, and that no comment still calls ALL lit.
+- **Not done:** no phone.
 
 ## 208 — ALL is a drop-down of when defects were logged, with PREVIOUS SHIFT
 
