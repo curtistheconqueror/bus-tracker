@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 198 / application release 210 | Live | 8ed0ce2dbf5c5eea6025b846440d43a650d4183c | Defect Log header shortcuts for Scan and Share, feed-row Quick Filters, conditional Undo, and relocated Settings tools and phone AI Operator entry. |
+| 199 / application release 211 | Live | db6683d66884c3a25de88c896561a3226e1f67b2 | Removes DAILY STATS from the Defect Log, keeping + LOG DEFECT and SEARCH directly under the header. |
+| 198 / application release 210 | Previous live; rollback | 8ed0ce2dbf5c5eea6025b846440d43a650d4183c | Defect Log header shortcuts for Scan and Share, feed-row Quick Filters, conditional Undo, and relocated Settings tools and phone AI Operator entry. |
 | 197 / application releases 207–209 | Previous live; rollback | 9a7cc1f417c53689ee62b5f564609e2a0dc5b32a | Defect Log feed layout, time-window picker with PREVIOUS SHIFT, and neutral ALL control; PREVIOUS SHIFT in Fixed Repairs. |
 | 196 / application release 206 | Previous live; rollback | e649c644c28b66f4bc7d4494726a79834a80164b | Log Defect BUS wording, location pill and move undo; includes 198–205 already shipped in Sites 195. |
 | 195 / application releases 198–205 | Previous live; rollback | 55812e1829f4a9469e901fb092980f3f86c5e536 | Prior cloud publication, including the general AI Operator question rule; recovered actual baseline. |
@@ -334,3 +335,16 @@ Native deployment `appgdep_6b06180053cc8191a86605cf420b267c` succeeded; saved ve
 The approved queue and phone checklist are in [PUBLISH_RELEASE_210.md](archive/PUBLISH_RELEASE_210.md). The publish queue is reset to NONE PENDING.
 
 - Gzip archive SHA256: `f431a3c9eab08d8e9a2724b72e6cec39000035a5ff6dec2928eef3e791dfea87`. Native saved tar hash: `sha256:1b62c0b02b440e3f9f922b33bdf4fe4184b540fafd3c1594915a24f928b553e4` (5,836,800 bytes; 128 files).
+
+## Sites 199 / application 211 — 2026-11-25
+
+Sites Version 199 / application release 211 deployed 2026-11-25 at 00:12:04.200721 UTC from `db6683d66884c3a25de88c896561a3226e1f67b2`. DAILY STATS and its five tiles are removed from the Defect Log; + LOG DEFECT and SEARCH sit under the header, or under the Scan drawer when open. The retired stats key is left untouched on existing devices. No migration, sync, storage-key addition, hosting change or fleet-record modification. PR39 MCP remains held and excluded.
+
+Exact-source production build, 485 tests (zero failures or skips), ESLint and `git diff --check` passed. Live Facility Map, Down Sheet and Defect Log returned HTTP 200. The live Defect Log response contains the header actions, then LOG DEFECT and SEARCH, then LIVE DEFECT FEED, with no DAILY STATS bar. The cloud browser could not open the managed preview or bind the live tab, so visual spacing and a physical iPhone are not independently verified. The queue records the prior developer width checks.
+
+Native deployment `appgdep_6b0627cca0708191a332f0b1b29af2c3` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_c5dabcca09ec819181a8579372e1621f`. The public URL, audience revision 2 and runtime environment revision 2 are unchanged. Immediate rollback: Sites 198 / application release 210 at `8ed0ce2dbf5c5eea6025b846440d43a650d4183c`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_e08cb5db2244819183afb7d356bac441`.
+
+The approved queue is archived in [PUBLISH_RELEASE_211.md](archive/PUBLISH_RELEASE_211.md). The publish queue is reset to NONE PENDING.
+
+- Native saved tar hash: `sha256:e80d36045464eea5bbe6933b17a94aa97900a9670905e371a17113e0097a25f7` (5,826,560 bytes; 128 files).
+- Rollback alias `sites-v199` was created locally; remote tag publication is not confirmed. Sites 199 and the exact source SHA are available independently of the tag.
