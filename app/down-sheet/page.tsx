@@ -8,6 +8,7 @@ import {Fragment,useEffect,useMemo,useRef,useState,type CSSProperties} from "rea
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
 import "./down-sheet.css";
+import "./down-sheet-tablet.css";
 import DownSheetEditor from "./_components/down-sheet-editor";
 import DownSheetScanner from "./_components/down-sheet-scanner";
 import ScanPaper from "@/src/components/scan/scan-paper";

@@ -1,16 +1,30 @@
 # Publish next
 
-**STATUS: NONE PENDING.** Application release 217 is live as Sites Version 203,
-deployed 2026-11-25 22:06:08.501348 UTC from `2c00cf88bbe51894ad588ac3585122fe025fdf92`.
+**STATUS: NONE PENDING.** Application release 220 is live as Sites Version 206,
+deployed 2026-11-25 23:11:41.557026 UTC from `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`.
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
-Previous-live rollback: Sites 202 / application release 216 at
-`8cdd02358b07301ca4739a5416865736c9686ef4`. PR39 MCP remains held and excluded.
+Previous-live rollback: Sites 205 / application 219 at `d7df976b0cd7fec682407c9cc335a836dab6a6d6`. PR39 MCP remains held and excluded.
 
 Publication evidence is in [RELEASES.md](RELEASES.md).
 
 ## Remaining device checks
+
+On iPad or another tablet, verify the added space after the control panel and
+the 2 px black border around Maintenance Down Sheet. Compare portrait and
+landscape on a phone to confirm no change. No real records need to be edited.
+
+
+On phone-sized hardware, verify the status stripe and footer positioning using
+synthetic defects only. Chromium confirmed fixed geometry and footer coverage.
+
+
+On a physical iPhone, check Detailed light-theme card and defect outlines and,
+where Closing Line is enabled, the white label on the black closing strip.
+Check the full width with the optional vertical number rail and that Off still
+hides the footer. Do not modify real records to verify.
+
 
 On a physical iPhone, confirm that LATEST and OLDEST are readable and stacked
 without crowding VIEW or CLOSE; a filtered bus card still shows the oldest
@@ -97,10 +111,19 @@ whole for each release while this branch appends the section below it: take
 line is always Codex's own and PR39 never claims it.
 
 Measured on this head, in a container rather than in CI, rather than carried
-over from an earlier run: the production build succeeds, **532 of 532 tests
-pass** and ESLint is clean. That figure is a measurement of one tree and
-nothing more — it moves with any change that adds a test, so re-measure it
-here, and CI must re-run on the actual merge SHA before anything is packaged.
+over from an earlier run: the production build succeeds, ESLint is clean, and
+**537 of 538 tests pass**. That figure is a measurement of one tree and nothing
+more — it moves with any change that adds a test, so re-measure it here, and CI
+must re-run on the actual merge SHA before anything is packaged.
+
+**The one failure is not this branch's, and is recorded rather than rounded
+off.** `tests/defect-log-black-footer.test.mjs` spawns a real Chrome and asserts
+on the DOM it dumps; in this container that spawn exceeds the test's own 30s
+budget and fails as `ETIMEDOUT`, twice in a row. It fails identically on a clean
+`main` checkout with this branch absent, it is a `main`-owned test, and nothing
+in it touches the MCP. A container without a fast enough browser cannot measure
+it, which is one more reason the CI run on the merge SHA is the gate and this
+paragraph is not.
 
 Nothing about the gates below changed. Merging `main` in, and correcting what
 this section says, are both maintenance so the branch can land when Curtis

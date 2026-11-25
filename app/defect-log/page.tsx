@@ -2043,7 +2043,7 @@ export default function DefectLog(){
  const headerSkin=useHeaderColor("log",logHeaderTheme?.header,logHeaderTheme?.text);
  const appStyle={...(settings.groupBorder?{"--log-card-border":settings.groupBorder}:{}),"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":headerSkin.color,"--log-header-text":headerSkin.text,"--log-accent-text":headerTextFor(settings.appearance.accent),"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--downsheet-badge":downSheetBadgeColors.badge,"--downsheet-badge-text":downSheetBadgeColors.text,"--log-font":FONT_STACKS[settings.fontFamily],...displayStyleVars(settings.display,settings.theme)} as React.CSSProperties;
 
- return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}
+ return <main className="defect-log-app" style={appStyle} data-log-theme={settings.theme} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}
   /* Three view options, each "off" | "phone" | "always". They are attributes
      rather than conditional markup on purpose: "phone" means a WIDTH, and only
      CSS knows the width without a resize listener. Rotate the iPad and the

@@ -74,3 +74,15 @@ export const COLOR_FIELDS:[keyof LogAppearance,string][]=[["page","BACKGROUND"],
    the switch itself. */
 export const DEFAULT_SETTINGS:LogSettings={defaultInitials:"",requireInitials:false,deferredReviewPrompt:true,defaultFilter:"all",showFixed:true,theme:"light",fontSize:"standard",fontFamily:"clean",groupContrast:"strong",groupBorder:"",statusColor:false,busRail:"off",busBlueOnly:"off",busEndMarker:"off",appearance:{...LIGHT_APPEARANCE},display:DEFAULT_DEFECT_LOG_DISPLAY,backupInterval:FLEET_BACKUP_INTERVAL};
 export function readSettings(raw:string|null):LogSettings{try{const saved=JSON.parse(raw||"{}") as Partial<LogSettings>,requireInitials=saved.requireInitials===true,deferredReviewPrompt=saved.deferredReviewPrompt!==false,theme:LogTheme=["light","dark","midnight","tactical","custom"].includes(String(saved.theme))?saved.theme as LogTheme:"light",preset=theme==="custom"?LIGHT_APPEARANCE:LOG_THEMES[theme].appearance,fontSize:LogFontSize=["standard","large","extra"].includes(String(saved.fontSize))?saved.fontSize as LogFontSize:"standard",fontFamily:LogFontFamily=["clean","condensed","classic"].includes(String(saved.fontFamily))?saved.fontFamily as LogFontFamily:"clean",groupContrast:LogGroupContrast=saved.groupContrast==="standard"?"standard":"strong",statusColor=saved.statusColor===true;return {...DEFAULT_SETTINGS,...saved,requireInitials,deferredReviewPrompt,theme,fontSize,fontFamily,groupContrast,groupBorder:safeBorderColor(saved.groupBorder),statusColor,busRail:normalizeViewScope(saved.busRail),busBlueOnly:normalizeViewScope(saved.busBlueOnly),busEndMarker:normalizeViewScope(saved.busEndMarker),appearance:{...preset,...saved.appearance},display:normalizeDefectLogDisplay(saved.display),backupInterval:normalizeFleetBackupInterval(saved.backupInterval)}}catch{return {...DEFAULT_SETTINGS,appearance:{...LIGHT_APPEARANCE},display:normalizeDefectLogDisplay(null)}}}
+
+
+// Readout for the native hex-only color input. The themed CSS fallback mixes
+// 42% text and 58% surface in sRGB; the light Detailed frame is black instead.
+export function logOutlineSwatch({groupBorder,theme,appearance}:Pick<LogSettings,"groupBorder"|"theme"|"appearance">,cardView:"compact"|"detailed"):string{
+ if(groupBorder) return groupBorder;
+ if(theme==="light"&&cardView==="detailed") return "#000000";
+ const text=safeBorderColor(appearance.text)||LIGHT_APPEARANCE.text;
+ const surface=safeBorderColor(appearance.surface)||LIGHT_APPEARANCE.surface;
+ const channel=(color:string,i:number)=>Number.parseInt(color.slice(i,i+2),16);
+ return "#"+[1,3,5].map(i=>Math.round((42*channel(text,i)+58*channel(surface,i))/100).toString(16).padStart(2,"0")).join("");
+}

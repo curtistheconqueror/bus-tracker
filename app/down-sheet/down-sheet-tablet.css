@@ -1,0 +1,8 @@
+/* Tablet-sized touch viewports only. A phone in landscape still lacks the
+   required height; narrow iPad split views keep the existing narrow layout. */
+@media (min-width:761px) and (max-width:1400px) and (min-height:600px) and (any-pointer:coarse) {
+ .down-app > .sheet-wrap {
+  margin-block-start:18px;
+  border:2px solid #000;
+ }
+}
