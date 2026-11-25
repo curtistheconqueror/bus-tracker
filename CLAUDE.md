@@ -283,7 +283,7 @@ per-device view state — which panel is open, what has been dismissed
   pace-down-sheet-recommended-collapsed-v1  the DOWN SHEET's RECOMMENDED FOR DOWN SHEET board, collapsed by default
   pace-down-sheet-soft-collapsed-v1    the DOWN SHEET's SOFT DOWN board, collapsed by default
   pace-down-sheet-idot-collapsed-v1    the DOWN SHEET's IDOT board, collapsed by default
-  pace-defect-log-stats-open-v1
+  pace-defect-log-stats-open-v1        NO LONGER READ — DAILY STATS is gone
   pace-defect-log-advanced-open-v1     NO LONGER READ — ADVANCED ACTIONS starts collapsed on every visit (#49)
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
@@ -1276,6 +1276,15 @@ below already said; those tiles absorbed the numbers worth keeping and the
 panel went. The key is left listed, and left alone on devices that hold it,
 because it is still a name this repository has used — removing the line is how
 somebody later reuses the name for something else.
+
+**`pace-defect-log-stats-open-v1` is no longer read or written either.** It
+opened DAILY STATS on the Defect Log, which release 211 removed. Curtis: *"Get
+rid of daily stats. It doesn't serve a worthwhile purpose at this time. Keep
+the space it occupied clear to preserve our minimalist look."* Left listed and
+left alone on devices for the same reason. The five stat wordings it drew
+(ACTIVE DEFECTS, BUSES AFFECTED, IN PROGRESS, DOWNING, FIXED TODAY) are still
+in the display settings blob and the Settings wording editor, and now label
+nothing on the page.
 
 **`pace-defect-log-mystery-collapsed-v1` is read and written by the Down Sheet**,
 not the Defect Log. The MYSTERY BUSES board moved there — every bus it lists is

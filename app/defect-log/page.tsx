@@ -97,9 +97,6 @@ type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[]
 /* The route this page is, as the hand-off from SCAN SHEET names it. */
 const PAPER_HERE="/defect-log";
 const BOARD_SETTINGS_KEY="pace-board-settings-v1";
-/* Absent means closed. A new key rather than a settings field, so a device
-   that has never opened the stats does not have to write anything to say so. */
-const STATS_OPEN_KEY="pace-defect-log-stats-open-v1";
 const STATUS_LABELS:Record<string,string>={service:"In Service",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown"};
 const STATE_LABELS:Record<DefectState,string>={open:"OPEN","in-progress":"IN PROGRESS",deferred:"DEFERRED",completed:"FIXED"};
 
@@ -1036,7 +1033,6 @@ export default function DefectLog(){
     rather than in the initialiser because the server render cannot read
     LocalStorage and a mismatch there is a hydration error. */
  const [coachOn,setCoachOn]=useState(false);
- const [statsOpen,setStatsOpen]=useState(false);
  // Start each visit collapsed; keep the opener visible and leave legacy storage untouched.
  const [advancedOpen,setAdvancedOpen]=useState(false);
  const [movingMysteryBusId,setMovingMysteryBusId]=useState("");
@@ -1117,9 +1113,8 @@ export default function DefectLog(){
  const [batchUndo,setBatchUndo]=useState<ScanBatchUndo|null>(null);
  useEffect(()=>setBatchUndo(readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY))),[]);
 
- useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);try{const visuals=JSON.parse(localStorage.getItem(BOARD_SETTINGS_KEY)||"{}").visuals;if(typeof visuals?.downSheetBadge==="string"&&typeof visuals?.downSheetBadgeText==="string")setDownSheetBadgeColors({badge:visuals.downSheetBadge,text:visuals.downSheetBadgeText})}catch{}setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setCoachOn(readCoachSettings(localStorage).on);setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1");setFilter(nextSettings.defaultFilter);setCardView(readCardView(localStorage.getItem(CARD_VIEW_KEY)));setHydrated(true)},[]);
+ useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);try{const visuals=JSON.parse(localStorage.getItem(BOARD_SETTINGS_KEY)||"{}").visuals;if(typeof visuals?.downSheetBadge==="string"&&typeof visuals?.downSheetBadgeText==="string")setDownSheetBadgeColors({badge:visuals.downSheetBadge,text:visuals.downSheetBadgeText})}catch{}setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setCoachOn(readCoachSettings(localStorage).on);setFilter(nextSettings.defaultFilter);setCardView(readCardView(localStorage.getItem(CARD_VIEW_KEY)));setHydrated(true)},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,STATS_OPEN_KEY,statsOpen?"1":"0")},[statsOpen,hydrated]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue));/* Settings are edited on the shared page now, so a change there has to reach a log that is already open - and it has to reach this page's own state, because this page writes the whole settings object back whenever one of its fields changes and would otherwise put the stale copy over the new one. */if(event.key===SETTINGS_KEY)setSettings(readSettings(event.newValue));if(event.key===SCAN_BATCH_UNDO_KEY)setBatchUndo(readScanBatchUndo(event.newValue));if(event.key===COACH_SETTINGS_KEY)setCoachOn(readCoachSettings(localStorage).on)};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const allRecords=useMemo(()=>defectLogRecords(fleet,downEntries),[fleet,downEntries]);
@@ -1140,7 +1135,6 @@ export default function DefectLog(){
     smarter guess about when to stop; it was for the filtered state to stop
     being invisible, which is the bar below the controls. */
  const searchFeedback=busSearch.kind==="numbers"?[...busSearch.ambiguous.map(item=>item.query+" matches "+candidateBusNumbers(item.matches).join(", ")+" — enter the full bus number"),...(busSearch.invalid.length?["Use a full bus number or two ending digits: "+busSearch.invalid.join(", ")]:[]),...(busSearch.missing.length?["No bus matches: "+busSearch.missing.join(", ")]:[])].join(" · "):"";
- const active=records.filter(record=>isUnresolved(record.defect));
  /* Split in two so the page can say what the SEARCH is hiding, as opposed to
     what the state filter is hiding — they are different questions and the
     banner only answers the first. */
@@ -1236,8 +1230,8 @@ export default function DefectLog(){
     numbers on that line therefore always mean the same set of buses, which is
     the only way none of them can be misread.
 
-    Built from `visible` rather than from `active` for exactly that reason —
-    `active` ignores the search, and a line reading "1 BUS · 2 DEFECTS · 31h"
+    Built from `visible` rather than from every unresolved record for exactly
+    that reason — those ignore the search, and a line reading "1 BUS · 2 DEFECTS · 31h"
     while standing on one bus would be quoting the whole fleet's hours. */
  const visibleEstimateMinutes=openDefectsEstimateMinutes(visible.map(record=>record.defect),repairHours);
  /* How many buses the search alone is holding back. Zero when nothing is typed,
@@ -1525,7 +1519,6 @@ export default function DefectLog(){
     being applied. */
  const quickFilterOwnedLabel=quickFilter==="logged"&&myInitials?quickFilterLabel+" by "+myInitials:quickFilterLabel;
  const quickFilterShareLabel=quickFilterOwnedLabel+(quickFilterWindowed&&timeWindowLabel(quickFilterWindow,shiftWindowText)?" ("+timeWindowLabel(quickFilterWindow,shiftWindowText)+")":"");
- const stats={active:active.length,progress:active.filter(record=>record.defect.state==="in-progress").length,downing:active.filter(record=>record.defect.operability==="down").length,/* allRecords, NOT records, and this was a real undercount rather than a tidy-up. Pressing MARK FIXED completes a repair and stamps defectLogHiddenAt in the SAME action, and `records` is defined as everything without that stamp - so every fix made on this device fell straight out of its own counter. Measured: a board holding two repairs completed today, one hidden and one not, reported 1. The ones it did count were the ones that arrived some other way. Nothing was ever lost; the record keeps them all, and this is the list that can see them. */fixedToday:allRecords.filter(record=>record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)).length,buses:new Set(active.map(record=>record.bus.id)).size};
 
  /* Reports why nothing was kept instead of returning in silence. The state is
     not advanced on a refusal, on purpose — the screen keeps showing what is
@@ -2118,19 +2111,11 @@ export default function DefectLog(){
      </button>})}
     </div>
   </section>}
-  {/* Closed by default. Five tiles were the first thing the page said, above
-      the filters and the button that logs a defect, so a first-time user had
-      to scroll past a wall of tallies to reach the thing the page is for. The
-      numbers still matter to a foreman, so they are one tap away and the
-      choice is remembered per device. */}
-  <section className={"daily-stats"+(statsOpen?" open":"")}>
-   <button type="button" className="daily-stats-toggle" aria-expanded={statsOpen} onClick={()=>setStatsOpen(open=>!open)}>
-    <b>DAILY STATS</b><small>{stats.active} {settings.display.labels.active.toLowerCase()} · {stats.buses} {settings.display.labels.buses.toLowerCase()} · {stats.downing} {settings.display.labels.downing.toLowerCase()} · {stats.fixedToday} {settings.display.labels.fixed.toLowerCase()}</small><i aria-hidden="true">{statsOpen?"CLOSE":"OPEN"}</i>
-   </button>
-   {statsOpen&&<section className="log-summary" aria-label="Defect log summary">
-   <div className="primary"><strong>{stats.active}</strong><span>{settings.display.labels.active}</span></div><div><strong>{stats.buses}</strong><span>{settings.display.labels.buses}</span></div><div><strong>{stats.progress}</strong><span>{settings.display.labels.progress}</span></div><div className="downing"><strong>{stats.downing}</strong><span>{settings.display.labels.downing}</span></div><div className="fixed-today"><strong>{stats.fixedToday}</strong><span>{settings.display.labels.fixed}</span></div>
-   </section>}
-  </section>
+  {/* DAILY STATS WAS HERE, and release 211 took it off the page. Curtis: "Get
+      rid of daily stats. It doesn't serve a worthwhile purpose at this time.
+      Keep the space it occupied clear to preserve our minimalist look." Its
+      key, pace-defect-log-stats-open-v1, is no longer read or written and is
+      left alone on devices that hold it, as SHEET STATS' was. */}
   <OfflineBackupReminder buses={fleet} interval={settings.backupInterval}/>
   <section className="log-controls">
    {/* ALL, DETAILED and COMPACT moved down to the feed they change, under its
