@@ -55,7 +55,7 @@ import HoldBoard,{HoldBadge} from "@/src/components/fleet/hold-board";
 import {heldBusCount,isHeld,setBusHold} from "@/src/lib/fleet/bus-hold";
 import TimeWindowChips from "@/src/components/shared/time-window-chips";
 import {TIME_WINDOWS,TIME_WINDOWS_WITH_SHIFT,timeWindowLabel,timeWindowMinutes,withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
-import {FEED_WINDOWS,defectWithinFeedWindow,feedWindowLabel,feedWindowRange,feedWindowUnresolved,feedWindowUnresolvedNote,type FeedWindowKey} from "@/src/lib/defects/feed-window";
+import {FEED_WINDOWS,defectWithinFeedWindow,feedWindowRange,feedWindowUnresolved,feedWindowUnresolvedNote,type FeedWindowKey} from "@/src/lib/defects/feed-window";
 import {DEFAULT_SHIFT_SETTINGS,activeShift,readShiftSettings,shiftLabel} from "@/src/lib/settings/shift-clock";
 import {roadCallNote} from "@/src/lib/fleet/road-calls";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
@@ -907,8 +907,8 @@ export default function DefectLog(){
  const [quickFilterMenuOpen,setQuickFilterMenuOpen]=useState(false);
  /* WHEN WAS IT LOGGED. Curtis: "filter everything that's being put down ... by
     the day and by the shift ... it should be like a drop-down somewhere at the
-    work computer." Sticky once chosen — he puts it back to ALL himself, which
-    is why the bar below the controls carries its own way out.
+    work computer." Sticky once chosen — he puts it back to ALL himself, from
+    the same drop-down, whose face names the window in force.
 
     Held in state rather than written to storage, and that is the deliberate
     half. The shop computer's tab does not reload, so within a session is
@@ -921,9 +921,9 @@ export default function DefectLog(){
     24 hours, the week". Whatever window is picked, the board shows ALL defects
     in it, so it does what pressing ALL did - drops a lit saved view and the
     search (a search stands the window down, so a window picked under one would
-    change nothing on screen) - and then narrows by when they were logged. It
-    sets the same state as WHEN LOGGED in ADVANCED ACTIONS, which narrows by
-    date alone and leaves a lit view and the search as they are. */
+    change nothing on screen) - and then narrows by when they were logged.
+    WHEN LOGGED, the second drop-down that set this, left with ADVANCED
+    ACTIONS in release 210. */
  const pickFeedWindow=(value:FeedWindowKey)=>{setFilter("all");setSearch("");setFeedWindow(value)};
  /* The garage's own hours, for the SHIFT window. The defaults ARE this shop's
     real shifts, so the window is already correct on the first render and the
@@ -1237,20 +1237,11 @@ export default function DefectLog(){
  /* How many buses the search alone is holding back. Zero when nothing is typed,
     which is what keeps the banner off the page the rest of the time. */
  const hiddenBySearch=search.trim()?groupDefectLogRecords(unsearched).length-visibleGroups.length:0;
- /* How many buses the WINDOW alone is holding back — measured against the state
-    filter's own result, not the whole board, so the number answers "what did
-    this drop-down cost me" rather than double-counting what OPEN or FIXED TODAY
-    had already set aside. Zero while a search is running, because the window is
-    standing down and claiming otherwise would be the lie above. */
- const feedWindowText=search.trim()?"":feedWindowLabel(feedWindow,feedWindowNow,shiftSettings);
  /* The drop-down reads THIS SHIFT and the feed is the whole board, because the
     hours on this device describe no window covering now. The limit and the
     label degrade together on purpose — see `feedWindowUnresolved` — which is
-    the right failure and was also a silent one: the bar below hangs off
-    `feedWindowText`, so the whole explanation disappeared in exactly the case
-    that needed explaining. */
+    the right failure and was also a silent one, so the bar below says so. */
  const feedWindowBroken=!search.trim()&&feedWindowUnresolved(feedWindow,feedWindowNow,shiftSettings);
- const hiddenByFeedWindow=feedWindowLimit===null?0:groupDefectLogRecords(stateOnly).length-groupDefectLogRecords(unsearched).length;
  /* Focus reads one bus at arm's length. Editing hands off to the existing
     editor, while completion reuses the same Mark Fixed path as the main log. */
  const focusedGroup=focusedBusId?visibleGroups.find(group=>group.bus.id===focusedBusId):undefined;
@@ -2142,21 +2133,16 @@ export default function DefectLog(){
     <span><b>{visibleGroups.length}</b> BUS{visibleGroups.length===1?"":"ES"} SHOWN{hiddenBySearch>0?" · "+hiddenBySearch+" HIDDEN BY THIS SEARCH":""}{feedWindow!=="all"?" · SEARCHING EVERY DATE":""}</span>
     <button type="button" className="show-all-buses" onClick={()=>setSearch("")}>SHOW ALL</button>
    </div>}
-   {/* OUTSIDE the collapsed VIEW drawer on purpose. A narrowed board that
-       explains itself nowhere is the trap this whole control could have been,
-       and one of the two drop-downs that set it is behind ADVANCED ACTIONS
-       (the other is ALL, under the feed's count line, since 208) — so the
-       exact window and the way back both live here, where the search bar
-       already taught somebody to look. Hidden entirely on ALL, which is every board that has
-       not been narrowed. */}
-   {feedWindowText&&<div className="log-window-filtered" role="status">
-    <span>LOGGED <b>{feedWindowText}</b>{hiddenByFeedWindow>0?" · "+hiddenByFeedWindow+(feedWindow==="previous"?" OTHER BUS":" OLDER BUS")+(hiddenByFeedWindow===1?"":"ES")+" HIDDEN":""}</span>
-    <button type="button" className="show-all-buses" onClick={()=>setFeedWindow("all")}>SHOW ALL DATES</button>
-   </div>}
-   {/* The same bar for the case where there IS no window to describe. It
-       carries the way out too, because somebody looking at a board that
-       ignored their choice should not have to go find the drop-down that set
-       it. */}
+   {/* THE WINDOW BAR IS GONE (release 212). It said "LOGGED 2ND SHIFT · SINCE
+       14:00 · 80 OLDER BUSES HIDDEN" with SHOW ALL DATES. Curtis: "we don't
+       need this badge banner about other buses hidden. It's not necessary."
+       It was written when the window was set from a drawer that hid its own
+       state; since release 208 ALL ▾ says the window on its face and picking
+       ALL is the way back. */}
+   {/* KEPT: the bar for the case where there IS no window to describe. ALL ▾
+       says THIS SHIFT while the feed shows every date, because the shift hours
+       on this device cover no window at the moment - the one case where the
+       face of the drop-down is not the truth, so it is still said here. */}
    {feedWindowBroken&&<div className="log-window-filtered log-window-broken" role="status">
     <span>{feedWindowUnresolvedNote(feedWindow)}</span>
     <button type="button" className="show-all-buses" onClick={()=>setFeedWindow("all")}>SHOW ALL DATES</button>
