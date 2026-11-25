@@ -174,10 +174,13 @@ test("LITE stands the right things down on every surface", async () => {
  assert.match(name, /mode==="lite"&&<i className="app-name-lite">LITE<\/i>/);
  // Both sheets: ADVANCED ACTIONS, and the drawer as well as its button — a
  // device that had it open when Lite went on must not keep it open.
- for (const [source, label] of [[down, "down sheet"], [log, "defect log"]]) {
-  assert.match(source, /!hiddenInLite\(appMode,"advancedActions"\)&&<(button|div className="log-header-pair">)/, label + " keeps its advanced toggle in lite");
-  assert.match(source, /advancedOpen&&!hiddenInLite\(appMode,"advancedActions"\)/, label + " would keep an open drawer open");
- }
+ assert.match(log, /!hiddenInLite\(appMode,"advancedActions"\)&&<div className="log-header-pair">/, "the defect log keeps SCAN and SHARE out of lite");
+ assert.match(log, /advancedOpen&&!hiddenInLite\(appMode,"advancedActions"\)/, "the defect log would keep an open drawer open");
+ /* The Down Sheet's drawer is gone (release 213); what it held is still out
+    of LITE where it went: SCAN in the header, SHOW COMPLETED on the title,
+    CLEAR DOWNSHEET refused on arrival from Settings. */
+ assert.match(down, /\{!hiddenInLite\(appMode,"advancedActions"\)&&<button className="down-header-button"/, "the down sheet keeps SCAN out of lite");
+ assert.match(down, /\{!hiddenInLite\(appMode,"advancedActions"\)&&<label className="completed-toggle sheet-completed">/, "and SHOW COMPLETED");
  // DEFERRED, everywhere it shows: the board, the badge, the evening prompt, the
  // tick in the form and the history note.
  assert.match(down, /!hiddenInLite\(appMode,"deferred"\)&&<DeferredBoard/);

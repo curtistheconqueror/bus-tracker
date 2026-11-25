@@ -128,7 +128,7 @@ export default function SweepScanner({fleet,onClose,onFile,handed}:Props){
    setOkAgainstBoard(sweepOkAgainstBoard(scanned,fleet));
    setHeldPages(held);
    setRead(true);
-   if(held.length&&held.every(item=>item.verdict==="not-a-sweep-sheet")&&held.length===photos.length)setError("None of these photos is a farebox or Ventra check-off sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN SHEET on the Down Sheet page."+(fromPaper&&start.wrong?" "+start.wrong:""));
+   if(held.length&&held.every(item=>item.verdict==="not-a-sweep-sheet")&&held.length===photos.length)setError("None of these photos is a farebox or Ventra check-off sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN on the Down Sheet page."+(fromPaper&&start.wrong?" "+start.wrong:""));
    else if(!scanned.length)setError("No marked bus rows were found. Try a clearer photo, with the whole sheet in frame.");
   }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false);setProgress("")}
  };
@@ -167,7 +167,7 @@ export default function SweepScanner({fleet,onClose,onFile,handed}:Props){
     </>}
     {read&&<>
      <div className="sweep-review-head"><div><b>REVIEW FINDINGS</b><span>{busesRead} bus{busesRead===1?"":"es"} read · {findings.length} finding{findings.length===1?"":"s"} · {approved.length} ready to file{flagged?` · ${flagged} flagged`:""}</span></div><button type="button" onClick={()=>{setRead(false);setRows([]);setFindings([]);setOkAgainstBoard([]);setHeldPages([]);setError("")}}>CHANGE PHOTOS</button></div>
-     {heldPages.filter(item=>item.verdict==="not-a-sweep-sheet").map(item=><p className="sweep-error" role="alert" key={"held-"+item.page}>PAGE {item.page} IS NOT A FAREBOX OR VENTRA SHEET. It reads as another document — a Vehicle Down Sheet, most likely. Nothing from it is shown and nothing from it can be filed here. A down sheet goes through SCAN SHEET on the Down Sheet page.</p>)}
+     {heldPages.filter(item=>item.verdict==="not-a-sweep-sheet").map(item=><p className="sweep-error" role="alert" key={"held-"+item.page}>PAGE {item.page} IS NOT A FAREBOX OR VENTRA SHEET. It reads as another document — a Vehicle Down Sheet, most likely. Nothing from it is shown and nothing from it can be filed here. A down sheet goes through SCAN on the Down Sheet page.</p>)}
      {heldPages.filter(item=>item.verdict==="unsure").map(item=><p className="sweep-warning" role="alert" key={"unsure-"+item.page}>PAGE {item.page} DOES NOT LOOK LIKE A SWEEP SHEET. Most of its rows could not be placed on the farebox or the Ventra sheet, so nothing from it is ticked. Tick a row only if you can see it on one of the two sheets.</p>)}
      {findings.length>0&&<div className="sweep-rows">{findings.map(finding=><article className={`sweep-row ${finding.fleetMatch}${finding.alreadyOpen?" already":""}`} key={finding.key}>
       <label className="sweep-select"><input type="checkbox" checked={finding.selected} disabled={finding.fleetMatch!=="matched"} onChange={event=>updateFinding(finding.key,{selected:event.target.checked})}/><span/></label>

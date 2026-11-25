@@ -112,16 +112,20 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
   assert.equal(quickFilterShareText("Defect / Condition Not Duplicated",[buses[9]],"not-duplicated"),"Defect / Condition Not Duplicated — 1 bus\n\nBus 8\n   Electrical / Multiplex — Intermittent electrical — Reported cutting out");
 });
 
-test("the Mystery list renders on the Down Sheet, and the Defect Log packs its controls away", async () => {
+test("the Mystery list is reached from the Down Sheet's quick filters, and the Defect Log packs its controls away", async () => {
   /* MYSTERY BUSES moved: every bus it lists is a bus that is NOT on the Down
-     Sheet, so it belongs beside that sheet rather than on the Defect Log. */
+     Sheet, so it belongs beside that sheet rather than on the Defect Log.
+     Since release 213 it is the first watch list in the Down Sheet's QUICK
+     FILTERS and opens only when picked, so the page opens without it. */
   const downResponse=await render("/down-sheet");
   assert.equal(downResponse.status,200);
   const downHtml=await downResponse.text();
-  assert.match(downHtml,/MYSTERY BUSES/);
-  assert.match(downHtml,/ON-SITE WORK AREAS NOT ON DOWN SHEET/);
-  assert.match(downHtml,/class="mystery-board"/);
-  assert.match(downHtml,/class="mystery-toggle"/);
+  assert.match(downHtml,/class="down-tab"[^>]*aria-label="Filters: none"/);
+  assert.doesNotMatch(downHtml,/class="mystery-board/,"closed until somebody picks it");
+  const downPage=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+  assert.match(downPage,/\{watchList==="mystery"&&<MysteryBoard fleet=\{fleet\}/);
+  const {WATCH_LISTS}=await import("../src/lib/down-sheet/down-sheet-watch-lists.ts");
+  assert.equal(WATCH_LISTS[0].key,"mystery");
 
   const response=await render("/defect-log");
   assert.equal(response.status,200);
@@ -6197,7 +6201,7 @@ test("the sweep scanner refuses a page that is not a sweep sheet",async()=>{
  assert.match(scanner,/if\(verdict!=="not-a-sweep-sheet"\)scanned\.push\(\.\.\.pageRows\)/);
  assert.match(scanner,/unsure\.has\(finding\.pageNumber\)\?\{\.\.\.finding,selected:false\}:finding/);
  assert.match(scanner,/IS NOT A FAREBOX OR VENTRA SHEET/);
- assert.match(scanner,/A down sheet goes through SCAN SHEET on the Down Sheet page/);
+ assert.match(scanner,/A down sheet goes through SCAN on the Down Sheet page/);
  assert.match(scanner,/DOES NOT LOOK LIKE A SWEEP SHEET/);
  assert.match(css,/\.sweep-warning\{/);
 });

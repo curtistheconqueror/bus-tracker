@@ -437,13 +437,19 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /Interactive Down Sheet/);
-  /* Shift pills are daily view controls now; destructive and scan tools
-     still remain behind the remembered, initially closed advanced drawer. */
-  assert.match(html, /class="down-advanced-toggle"[^>]*aria-expanded="false"/);
-  assert.match(html, /aria-pressed="true">ALL SHIFTS/);
-  for(const shift of ["1ST SHIFT","2ND SHIFT","3RD SHIFT"])assert.ok(html.includes(shift),shift+" remains visible outside advanced");
-  for(const shift of [/SHOW COMPLETED/,/SCAN SHEET/,/CLEAR DOWNSHEET/])
-   assert.doesNotMatch(html, shift, "it lives behind the closed panel now");
+  /* Release 213: the header is REFRESH · SCAN · SHARE, and SHIFT, COUNTS and
+     FILTERS are three tabs across under SEARCH, none open when the page opens.
+     Curtis: "I don't want the screen just defaulting to them being expanded
+     already." */
+  assert.match(html, /<b>SCAN<\/b>/);
+  assert.match(html, /<b>SHARE<\/b>/);
+  const tabs=[...html.matchAll(/<button type="button" class="down-tab[^"]*"[^>]*aria-expanded="(true|false)"/g)].map(match=>match[1]);
+  assert.deepEqual(tabs,["false","false","false"],"three tabs, all closed");
+  assert.doesNotMatch(html, /class="down-tab-panel/, "no panel is drawn until a tab is tapped");
+  assert.match(html, /class="down-tab"[^>]*>ALL SHIFTS<i/, "the SHIFT tab names the shift in force");
+  assert.doesNotMatch(html, /aria-pressed="true">ALL SHIFTS/, "the shift buttons are in the closed SHIFT panel");
+  assert.doesNotMatch(html, /CLEAR DOWNSHEET/, "in Settings now");
+  assert.match(html, /SHOW COMPLETED/, "on the sheet's own title now");
   assert.doesNotMatch(html, /ACTIVE DOWN(?! COUNT)/, "the duplicate of TOTAL ON SHEET went with the panel; the footnote's ACTIVE DOWN COUNT is not it");
   assert.match(html, /BUS NUMBER/);
   assert.match(html, /REASON DOWN/);
@@ -468,19 +474,15 @@ test("renders the interactive down sheet with All as the default shift view", as
      which is which; the HTML here only proves the page opens quiet. */
   for(const label of ["PENDING","ACCIDENT","WAITING PARTS","COMPLETED TODAY","EST. ACTIVE LABOR","TOTAL ON SHEET"])
    assert.doesNotMatch(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")), label+" must not be drawn while the count board is collapsed");
-  assert.match(html, /class="down-counts-toggle" aria-expanded="false"/, "the count board opens collapsed");
-  assert.match(html, /class="down-counts-lead"><strong>0<\/strong><span>DOWN BUSES<\/span>/, "DOWN BUSES is the one number it keeps while collapsed");
+  assert.match(html, /class="down-tab"[^>]*aria-expanded="false"[^>]*>COUNTS<i/, "COUNTS opens closed");
+  assert.match(html, /class="sheet-title-down">0(<!-- -->)? DOWN<\/b>/, "DOWN is on the sheet's own title (release 213)");
   /* What the page opens on: the button that adds a bus, and the search under
-     it. SHOW COMPLETED and CLEAR DOWNSHEET are behind ADVANCED ACTIONS and are
-     asserted absent above. */
+     it, in one box (release 213). STATUS REPORT went into SHARE's drawer with
+     the whole-sheet share, which is closed when the page opens. */
   assert.match(html, /\+ ADD DOWN BUS/);
-  /* ADD DOWN BUS still LEADS the row. SHOW COMPLETED and CLEAR DOWNSHEET went
-     behind ADVANCED ACTIONS to clear it and must not creep back; STATUS REPORT
-     sits after the primary action rather than in front of it, because adding a
-     bus is the job and sending the report is what you do once at the end. */
-  assert.match(html, /class="down-controls"><button class="down-primary-action"/,"ADD DOWN BUS still leads its row");
-  assert.match(html, /<\/button><button class="down-status-report-action"[^>]*>STATUS REPORT<\/button>/,"the status report sits beside it, not before it");
-  assert.match(html, /class="down-view-controls"/,"with SEARCH directly under it");
+  assert.match(html, /class="down-controls"><button class="down-primary-action"/,"ADD DOWN BUS still leads its box");
+  assert.match(html, /\+ ADD DOWN BUS<\/button><label class="down-search">/,"with SEARCH directly under it, in the same box");
+  assert.doesNotMatch(html, /STATUS REPORT<\/button>/,"STATUS REPORT is in SHARE's closed drawer");
   assert.match(html, /SETTINGS/);
   // QUICK NOTES is off by default now — a permanent panel between the counts
   // and the sheet, on the page whose problem was how much sits above the rows.
@@ -749,7 +751,7 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
   /* The button, not the words: "SCAN SHEET" is in this page's comments too,
      so `includes` went on passing with the button deleted. Its label is the
      scan door's one constant. */
-  assert.match(page, /<button className="scan-sheet-button" type="button"[\s\S]{0,200}>▣ \{PAPER_DOOR\}<\/button>/);
+  assert.match(page, /<button className="down-header-button" type="button" onClick=\{\(\)=>setPaperOpen\(true\)\} aria-label=\{"Scan: "\+PAPER_DOOR\}/);
   assert.ok(page.includes("UNDO IMPORT"));
   assert.ok(scanner.includes("TAKE PHOTO"));
   assert.ok(scanner.includes("UPLOAD FILE"));
@@ -1925,11 +1927,11 @@ test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maint
     count counted lands in exactly one of the three new buckets, so no bus can
     go missing off this page by being reclassified — which is the failure that
     would actually hurt: a bus nobody is counting is a bus nobody fixes. */
- assert.match(page,/const hardDownCount=useMemo\(\(\)=>shown\.filter\(entry=>downSheetAvailability\(entry\)==="down"\)\.length,\[shown\]\)/);
+ assert.match(page,/const hardDownCount=useMemo\(\(\)=>shown\.filter\(entry=>isActive\(entry\)&&downSheetAvailability\(entry\)==="down"\)\.length,\[shown\]\)/,"open rows only: a completed row is not a bus that is down");
  /* SOFT DOWN is the soft buses NOBODY HAS PUT ON A RUN. A bus the yard has
     decided to use is not part of the morning's shortage — that is what the
     switch is for, and the number has to follow the decision. */
- assert.match(page,/const softDownCount=useMemo\(\(\)=>shown\.filter\(entry=>isSoftDownEntry\(entry\)&&!isEntryInService\(entry\)\)\.length,\[shown\]\)/);
+ assert.match(page,/const softDownCount=useMemo\(\(\)=>shown\.filter\(entry=>isActive\(entry\)&&isSoftDownEntry\(entry\)&&!isEntryInService\(entry\)\)\.length,\[shown\]\)/);
  {
   const {downSheetAvailability}=await import("../src/lib/down-sheet/down-sheet-availability.ts");
   const sheet=[
@@ -1959,8 +1961,9 @@ test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maint
     question nobody has on a morning when nothing has been switched on. */
  assert.match(page,/\{inServiceCount>0&&<div className="group-count in-service">/);
  /* SOFT also rides beside the lead number, so the press that opens these tiles
-    is not needed to learn that some of those buses can still work. */
- assert.match(page,/down-counts-soft.{0,120}?\{softDownCount\}/s);
+    is not needed to learn that some of those buses can still work. Since
+    release 213 that is the sheet's own title, and the closed COUNTS row. */
+ assert.match(page,/\{!fixedToday&&<><b className="sheet-title-down">\{hardDownCount\} DOWN<\/b>\{softDownCount>0&&<>\{" "\}<b className="sheet-title-soft">\{softDownCount\} SOFT<\/b><\/>\}\{" · "\}<\/>\}/,"not over COMPLETED TODAY's finished rows");
 
  /* The total used to take a whole row by itself on a phone. It is one of a pair
     now, so it takes half like every other tile. */
@@ -2979,7 +2982,8 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  const {DEFAULT_DOWN_SHEET_DISPLAY:DOWN_LABELS}=await import("../src/lib/down-sheet/down-sheet-display-settings.ts");
  for(const key of [...page.matchAll(/displaySettings\.labels\.([A-Za-z]+)/g)].map(match=>match[1]))
   assert.ok(key in DOWN_LABELS.labels, "displaySettings.labels."+key+" is not a label that exists, so it would draw blank");
- const board=page.slice(page.indexOf('<div className="down-group-counts" id="down-counts-tiles">'),page.indexOf("</div>}\n  </section>"));
+ const board=page.slice(page.indexOf('<div className="down-group-counts" id="down-counts-tiles">'),page.indexOf('{openTab==="filters"&&'));
+ assert.ok(board.length>100,"the tiles must be found for this to mean anything");
  assert.deepEqual(
   [...board.matchAll(/tileFor\("([a-z-]+)"\)|<span>(TOTAL ON SHEET|DOWN BUSES)<\/span>|completed-today-tile|"(DOWNED BUSES ON ROAD|INSPECTIONS ON ROAD)"/g)]
    .map(match=>match[1]||match[2]||match[3]||"completed").filter((value,index,all)=>all.indexOf(value)===index),
@@ -2990,7 +2994,10 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
   assert.doesNotMatch(page,filtered,"no status report tile may be recomputed from the road-filtered set");
  /* What DOES follow the filter: the row count in view, the estimate, and the
     note that says so - each of those describes the view rather than the sheet. */
- assert.match(page,/<span className="view-results"><b>\{visible\.length\}<\/b> IN VIEW<\/span>/);
+ /* The "N IN VIEW" chip went with release 213; the sheet's title says the
+    rows in view. */
+ assert.match(page,/\{visible\.length\} ROW\{visible\.length===1\?"":"S"\}/);
+ assert.doesNotMatch(page,/IN VIEW<\/span>/);
  assert.match(page,/\{visible\.length\} of \{shown\.length\} on the sheet/);
  // And it says what it is showing, with a way back.
  assert.match(page,/SHOW THE WHOLE SHEET/);
@@ -3127,72 +3134,72 @@ test("SHEET STATS folds into the tiles the foreman actually reads, without losin
   assert.match(claude,/`pace-down-sheet-stats-open-v1` is no longer read or written/);
 });
 
-test("the Down Sheet gets its own ADVANCED ACTIONS, and it cannot be mistaken for the Defect Log's", async () => {
+test("the Down Sheet's header is REFRESH, SCAN and SHARE, and SHARE's drawer wears its button's colour", async () => {
   const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
 
-  /* In the header, under REFRESH, in a column of its own so it is under it at
-     every width rather than only where the header happens to stack. */
-  assert.match(page,/<div className="down-header-actions">\s*<RefreshButton\/>\s*\{!hiddenInLite\(appMode,"advancedActions"\)&&<button className="down-advanced-toggle"/);
+  /* Release 213, the Defect Log's header: REFRESH, then SCAN and SHARE as a
+     pair. ADVANCED ACTIONS is gone - SHOW COMPLETED is on the sheet's title and
+     CLEAR DOWNSHEET is in Settings. SCAN is LITE-gated as it was in the drawer;
+     SHARE is not, because the share box it opens never was. */
+  assert.match(page,/<div className="down-header-actions">\s*<RefreshButton\/>\s*<div className="down-header-pair">\s*\{!hiddenInLite\(appMode,"advancedActions"\)&&<button className="down-header-button" type="button" onClick=\{\(\)=>setPaperOpen\(true\)\}/);
+  assert.match(page,/<button className="down-header-button" type="button" aria-expanded=\{shareOpen\}[^>]*onClick=\{\(\)=>setShareOpen\(value=>!value\)\}>/);
+  assert.doesNotMatch(page,/down-advanced-toggle|advancedOpen/,"the old toggle and its state are gone");
   assert.match(css,/\.down-header-actions\{[^}]*flex-direction:column/);
 
-  /* UNMISTAKABLY THIS PAGE'S. Both headers are navy, so the Defect Log's
-     translucent white here would have made the two read as one header. This
-     wears #6b31b6 - what SCAN SHEET already wears on this page and nothing on
-     the Defect Log does. */
-  assert.match(css,/\.down-advanced-toggle\{[^}]*background:#6b31b6/);
-
-  /* AND THE DRAWER WEARS THAT SAME PURPLE. It opened white under the purple
-     button, so the two read as unrelated and the drawer looked like it
-     belonged to the sheet below it. Curtis, about both pages: "that button for
-     advanced features, it brings down the menu that doesn't look like it
-     belongs with the color of that button."
-
-     Purple here and navy on the Defect Log is the rule, not a drift: each
-     drawer takes the colour of the button that opens it, and the assertion
-     below keeps the two buttons -- and now the two drawers -- apart. */
-  assert.match(css,/\.down-advanced\{[^}]*background:#6b31b6/,
-   "the Down Sheet drawer takes the colour of the button that opens it");
+  /* EACH DRAWER WEARS THE COLOUR OF THE BUTTON THAT OPENS IT. Curtis, about
+     both pages: "that button for advanced features, it brings down the menu
+     that doesn't look like it belongs with the color of that button." SHARE
+     sits on the header, so its drawer is the header's colour, not the purple
+     ADVANCED ACTIONS wore, and never white. */
+  assert.match(css,/\.down-advanced\.down-share-drawer\{[^}]*background:var\(--app-header-fill/);
   assert.match(css,/\.down-advanced-body\{[^}]*background:transparent/,
    "the body lets the drawer colour through instead of painting a light sheet over it");
-  assert.doesNotMatch(css,/\.down-advanced\{[^}]*background:#fff/,
-   "a white drawer under a purple button is the thing this fixed");
-  const logCss = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
-  /* Any translucent white: the opacity moved when the toggle was made easier
-     to find, and what matters here is only that it is not this page's purple. */
-  /* The Defect Log's toggle belongs to its header and now takes the header's
-     computed ink rather than the translucent white it used while every header
-     was navy; the Down Sheet's stays purple. What matters here is that the
-     two cannot be confused, which is why this reads both sides. */
-  assert.match(logCss,/\.header-advanced-toggle\{[^}]*background:transparent/);
-  assert.doesNotMatch(logCss,/\.header-advanced-toggle\{[^}]*background:#6b31b6/,"the two toggles must not share a colour");
-  assert.match(css,/\.down-advanced-toggle\{[^}]*background:#6b31b6/,"the Down Sheet's keeps its own purple");
+  assert.doesNotMatch(css,/\.down-advanced(\.down-share-drawer)?\{[^}]*background:#fff/,
+   "a white drawer under its button is the thing this fixed");
+  const drawer=page.slice(page.indexOf('className="down-advanced open down-share-drawer"'),page.indexOf('<section className="down-controls">'));
+  for(const inside of ["down-quick-filter-note","copyFilteredList","shareFilteredList","shareFilteredPage","down-status-report-action"])
+   assert.ok(drawer.includes(inside),inside+" belongs in SHARE's drawer");
 
-  /* What went in, and what deliberately stayed out. ADD DOWN BUS and SEARCH
-     are the two things used on every visit and now sit together, instead of
-     with six controls wedged between them. */
-  const drawer=page.slice(page.indexOf('className="down-advanced open"'),page.indexOf('<section className="down-controls">'));
-  for(const inside of ["completed-toggle","scan-sheet-button","clear-downsheet","undo-scan","undo-clear"])
-   assert.ok(drawer.includes(inside),inside+" belongs in ADVANCED ACTIONS");
-  assert.ok(!drawer.includes("down-primary-action"),"ADD DOWN BUS stays out");
-  assert.ok(!drawer.includes("down-search"),"SEARCH stays out");
-  const controls=page.slice(page.indexOf('<section className="down-controls">'),page.indexOf('<section className="down-shifts"'));
-  assert.ok(controls.includes("down-primary-action"),"ADD DOWN BUS is what is left in that row");
-  for(const gone of ["shift-filter","completed-toggle","scan-sheet-button","down-more"])
-   assert.ok(!controls.includes(gone),gone+" moved out of the controls row");
+  /* ADD DOWN BUS and SEARCH sit together, and the recovery undos come up beside
+     them only while there is something to undo. */
+  const controls=page.slice(page.indexOf('<section className="down-controls">'),page.indexOf('{openTab==="shift"&&'));
+  for(const inside of ["down-primary-action","down-search","{(undoScanAvailable||undoClearAvailable)&&",'className="down-tabs"'])
+   assert.ok(controls.includes(inside),inside+" is in the ADD DOWN BUS box");
+  for(const gone of ["shift-filter","completed-toggle","scan-sheet-button","clear-downsheet","down-status-report-action"])
+   assert.ok(!controls.includes(gone),gone+" is not in the ADD DOWN BUS box");
 
-  /* Closed by default and remembered per device, under a key of its own -
-     documented, because an undocumented key is how one gets renamed later. */
-  assert.match(page,/const ADVANCED_OPEN_KEY="pace-down-sheet-advanced-open-v1"/);
-  assert.match(page,/writeSetting\(localStorage,ADVANCED_OPEN_KEY,advancedOpen\?"1":"0"\)/);
+  /* The open/closed key is retired, not reused: listed as NO LONGER READ. */
+  assert.doesNotMatch(page,/pace-down-sheet-advanced-open-v1|ADVANCED_OPEN_KEY/);
   const claude = await readFile(new URL("../CLAUDE.md", import.meta.url), "utf8");
-  assert.match(claude,/pace-down-sheet-advanced-open-v1/);
+  assert.match(claude,/pace-down-sheet-advanced-open-v1\s+NO LONGER READ/);
 
   /* THE COLUMN IS CAPPED. Uncapped it rendered 285px wide next to a 700px nav
      and pushed the whole page 40px sideways at 1180 - iPad landscape - which
      is the exact class of fault this page has already been fixed for twice. */
   assert.match(css,/\.down-header-actions\{[^}]*max-width:210px/);
   assert.match(css,/\.down-header-actions\{width:100%;max-width:none\}/,"and uncapped again once the header stacks");
+
+  /* THE THREE TABS. One panel at a time, none on every visit, not stored, and
+     the open tab's second tap hides it. The watch lists and CLEAR DOWNSHEET's
+     arrival from Settings come through `down-sheet-watch-lists.ts`. */
+  assert.match(page,/const \[openTab,setOpenTab\]=useState<"shift"\|"counts"\|"filters"\|null>\(null\);/);
+  assert.match(page,/const toggleTab=\(tab:"shift"\|"counts"\|"filters"\)=>setOpenTab\(current=>current===tab\?null:tab\);/,"a second tap hides it");
+  for(const tab of ["shift","counts","filters"]){
+   assert.match(page,new RegExp('aria-expanded=\\{openTab==="'+tab+'"\\}[\\s\\S]{0,400}?onClick=\\{\\(\\)=>toggleTab\\("'+tab+'"\\)\\}'),tab+" toggles");
+   assert.match(page,new RegExp('\\{openTab==="'+tab+'"&&<section className="down-tab-panel'),tab+" draws its panel only while open");
+  }
+  assert.doesNotMatch(page,/COUNTS_OPEN_KEY|_COLLAPSED_KEY/,"no row or board remembers itself open");
+  const {sheetToolFromSearch,clearSheetHref}=await import("../src/lib/down-sheet/down-sheet-watch-lists.ts");
+  assert.equal(sheetToolFromSearch(new URL(clearSheetHref(),"http://x").search),"clear-sheet");
+  for(const search of ["","?tool=","?tool=clean-up","%%%"])assert.equal(sheetToolFromSearch(search),null,search);
+  const arrival=page.slice(page.indexOf("const sheetToolDone=useRef(false);"),page.indexOf("},[hydrated]);",page.indexOf("const sheetToolDone=useRef(false);")));
+  const strip=arrival.indexOf("url.searchParams.delete(SHEET_TOOL_PARAM)"),lite=arrival.indexOf('hiddenInLite(appMode,"advancedActions")'),act=arrival.indexOf("setClearPending(true)");
+  assert.ok(arrival.includes("if(!hydrated||sheetToolDone.current)return;")&&strip>0&&strip<lite&&lite<act,"once, after the sheet is read: strip, refuse in LITE, then mark it pending");
+  /* The clear itself runs a commit later, after the load-time reconcile's
+     fleet write has landed - in the same commit it was written over (review). */
+  assert.match(page,/useEffect\(\(\)=>\{if\(!clearPending\)return;setClearPending\(false\);clearEntireDownSheet\(\)\},\[clearPending\]\);/);
+  assert.doesNotMatch(arrival,/clearEntireDownSheet\(\)/,"never in the arrival commit");
 });
 
 test("no Down Sheet cell is a flex container, or it stops stretching to its row", async () => {
@@ -3349,8 +3356,11 @@ test("the Down Sheet's quick filters ask about the entry, and what is shared is 
     long it has been on the sheet, whether anything is estimated — or something
     only the MAP knows. None of it is answerable from a defect's wording, which
     is all the Defect Log's thirteen filters ever look at. */
+ /* Release 213 kept four. Curtis: "Get rid of everything under the first 3
+    options except roadcalls." The others' keys still match an entry - a saved
+    or linked one is read as no filter - they are simply no longer offered. */
  assert.deepEqual(DOWN_SHEET_FILTERS.map(item=>item.key),
-  ["unassigned","waiting-parts","off-property","on-road","aging","body-shop","road-call","inspection","no-estimate"]);
+  ["unassigned","waiting-parts","off-property","road-call"]);
  assert.ok(DOWN_SHEET_FILTERS.every(item=>item.label&&item.shortLabel&&item.hint));
  assert.equal(downSheetFilterFromValue("waiting-parts"),"waiting-parts");
  // A key off a link or an old device reads as no filter rather than as a crash.
@@ -3414,8 +3424,10 @@ test("the Down Sheet's quick filters ask about the entry, and what is shared is 
  const counts=downSheetFilterCounts(sheet,locations,now);
  assert.equal(counts["waiting-parts"],1);
  assert.equal(counts.unassigned,1);
- assert.equal(counts.inspection,1);
- assert.equal(counts["no-estimate"],3);
+ /* Only what the menu offers is counted (release 213): INSPECTIONS and NO
+    ESTIMATE are no longer filters, though their tiles still count. */
+ assert.equal(counts.inspection,undefined);
+ assert.equal(counts["no-estimate"],undefined);
  assert.deepEqual(Object.keys(counts).sort(),DOWN_SHEET_FILTERS.map(item=>item.key).sort());
 
  /* A REPAIR WRITTEN TWICE IS ONE PROBLEM. A sheet photographed on three
