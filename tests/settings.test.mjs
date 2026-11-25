@@ -337,7 +337,8 @@ test("no class name collides with a Tailwind positioning utility",async()=>{
  // and the tile keeps its own name and no longer needs a position reset to exist
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
  const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
- assert.match(page,/className="fixed-today"><strong>\{stats\.fixedToday\}/);
+ /* The tile itself left with DAILY STATS in release 211; its CSS stays, unmatched. */
+ assert.doesNotMatch(page,/className="fixed-today"/);
  assert.match(css,/\.log-summary \.fixed-today\{grid-column:1\/-1\}/);
  assert.ok(!/\.log-summary \.fixed\{/.test(css),"the old colliding selector must be gone, not merely overridden");
 });
@@ -474,15 +475,15 @@ test("the Defect Log opens on what it is for, not on a status report", async () 
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
  ]);
 
- /* Five stat tiles were the first thing on the page, above the filters and the
-    button that logs a defect. They are behind one bar now, closed unless the
-    device says otherwise, so absent storage means closed. */
- assert.match(logPage,/const STATS_OPEN_KEY="pace-defect-log-stats-open-v1"/);
- assert.match(logPage,/const \[statsOpen,setStatsOpen\]=useState\(false\)/,"stats must default to closed");
- assert.match(logPage,/setStatsOpen\(localStorage\.getItem\(STATS_OPEN_KEY\)==="1"\)/,"only an explicit 1 opens it");
- assert.match(logPage,/writeSetting\(localStorage,STATS_OPEN_KEY,statsOpen\?"1":"0"\)/);
- assert.match(logPage,/\{statsOpen&&<section className="log-summary"/,"the tiles must not render while closed");
- assert.match(css,/\.daily-stats-toggle\{/);
+ /* Five stat tiles were the first thing on the page; then one DAILY STATS bar;
+    since release 211, nothing. Curtis: "Get rid of daily stats. It doesn't
+    serve a worthwhile purpose at this time." Gone, not hidden: no bar, no
+    tiles, and no state left writing a key nothing reads. */
+ for(const dead of [/className=\{"daily-stats"/,/daily-stats-toggle/,/className="log-summary"/,/STATS_OPEN_KEY/,/statsOpen/,/DAILY STATS<\/b>/])
+  assert.doesNotMatch(logPage,dead,"DAILY STATS left something behind");
+ assert.doesNotMatch(css,/\.daily-stats/,"and its styles went with it");
+ const claude=await readFile(new URL("../CLAUDE.md",import.meta.url),"utf8");
+ assert.match(claude,/pace-defect-log-stats-open-v1\s+NO LONGER READ/,"the key is recorded as retired, never reused");
 
  /* LOG DEFECT is the first control, and it is not also repeated in the feed
     header — two buttons doing one thing is what made the page feel busy. */
@@ -506,11 +507,9 @@ test("the Defect Log opens on what it is for, not on a status report", async () 
     nothing explaining why, and no way back without opening settings. */
  assert.match(row[0],/\.\.\.\(filter==="open"\?\[\["open","OPEN"\] as \[Filter,string\]\]:\[\]\)/);
  assert.match(row[0],/\.\.\.\(filter==="downsheet"\?\[\["downsheet","DOWN SHEET"\] as \[Filter,string\]\]:\[\]\)/);
- /* The summary bar everyone sees must honour the labels a shop can rename in
-    settings; it hardcoded the English words while the tiles that respect them
-    are now closed by default. */
- assert.match(logPage,/\{settings\.display\.labels\.active\.toLowerCase\(\)\}/);
- assert.match(logPage,/\{settings\.display\.labels\.fixed\.toLowerCase\(\)\}/);
+ /* The summary bar that drew the renameable stat labels left with DAILY
+    STATS in release 211. */
+ assert.doesNotMatch(logPage,/settings\.display\.labels\.(active|fixed)/);
 
  /* But BOTH removed keys still filter, so a saved default view of either keeps
     working. Removing the button must not remove the behaviour. */

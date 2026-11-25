@@ -508,14 +508,12 @@ test("SETTINGS keeps its place beside QUICK FILTERS and says what it is", async 
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
  ]);
- /* It belongs with the controls, not the stats: it is not a stat, and it must
-    not disappear when they collapse. Asserted by position in the markup — the
-    button sits inside .log-controls, which is outside the .daily-stats block. */
+ /* The gear is not in the LOG DEFECT box: SETTINGS is a page in the nav.
+    Asserted on the markup between .log-controls and the feed. */
  const controls=logPage.slice(logPage.indexOf('<section className="log-controls">'),logPage.indexOf('<section className="log-feed"'));
  assert.equal(controls.includes("log-settings-button"),false,"the gear left the controls row: SETTINGS is a page in the nav now");
- const statsBlock=logPage.slice(logPage.indexOf('className={"daily-stats"'),logPage.indexOf('<section className="log-controls">'));
- assert.ok(statsBlock.length>0&&statsBlock.includes("daily-stats-toggle"),"the stats block must be found for this check to mean anything");
- assert.ok(!statsBlock.includes("log-settings-button"),"and never inside the collapsible stats");
+ /* DAILY STATS, which this used to check the gear stayed out of, left the
+    page in release 211. */
  /* A bare gear read as decoration beside two buttons that say what they do. */
  /* Same height as the two buttons beside it, so the row is one set of controls. */
  assert.match(css,/\.log-controls \.log-undo-button\{height:44px;min-height:44px\}/);
