@@ -1404,3 +1404,13 @@ html.page-scroll-locked,body.page-scroll-locked{overflow:hidden;overscroll-behav
    a multi-selected bus looked like it had deselected it. */
 .token.drag-armed{position:relative}
 .token.drag-armed::after{content:"";position:absolute;inset:-3px;border:2px solid #0969d9;border-radius:6px;box-shadow:0 7px 16px #0b3a7a66;pointer-events:none}
+
+/* THE WELCOME SCREEN NEVER SLIDES UNDER ITS OWN × (release 214). Centred with
+   align-items:center, a tall step - Maintenance, then Union, then six jobs -
+   pushed FLEETSTEP up under the fixed close button, and centring inside a box
+   that scrolls puts the overflow above the top, where scrolling cannot reach
+   it. Curtis saw the overlap on his phone. So the content is centred with auto
+   margins, which centre when it fits and start at the top when it does not,
+   and the top padding keeps the title clear of the × at every height. */
+.welcome-gate{align-items:flex-start;padding-top:calc(max(10px,env(safe-area-inset-top)) + 58px);padding-bottom:calc(26px + env(safe-area-inset-bottom))}
+.welcome-gate>.welcome-inner{margin:auto}

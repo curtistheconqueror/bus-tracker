@@ -4,8 +4,8 @@ Updated: 2026-11-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 199 (application release 211)
-Live feature checkpoint: commit db6683d66884c3a25de88c896561a3226e1f67b2
+Live release: Sites Version 201 (application release 215)
+Live feature checkpoint: commit 24ccb374a578f7ffa80fa4037399aaa6ab5b953b
 
 ## Read this first
 
@@ -23,6 +23,26 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 201 / application release 215 deployed 2026-11-25 at 03:29:24.389651 UTC from `24ccb374a578f7ffa80fa4037399aaa6ab5b953b`. Only the Maintenance Down Sheet title default increased, from 15 px to 17 px. Legacy 15 px values without customization metadata take the new default; other stored sizes and colors are preserved, and a newly selected 15 px size is retained. No fleet data, sync, hosting configuration, or storage key changed. PR39 remains excluded.
+
+Exact-source production build, ESLint, 486 tests, and `git diff --check` passed. GitHub CI run 510 succeeded and CodeRabbit completed on this exact PR #59 head without a release blocker. The live title rendered at 17 px in Chromium. Physical iPhone layout remains unverified.
+
+Native deployment `appgdep_6b06560fac348191b1f15b181d5c1c21` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_efe1de3a58d4819199e7ecfc58805473`. Public access and the runtime environment remain unchanged. Rollback: Sites 200 / application release 214 at `4d205dbef009f1a74aff807dd6db474c6ddb97d3`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_b44b682c12d48191a184a89654ff3adc`.
+
+No other release is pending.
+
+### Previous publication — Sites 200 / applications 212–214
+
+Sites Version 200 / application release 214 deployed 2026-11-25 at 03:11:32.770199 UTC from `4d205dbef009f1a74aff807dd6db474c6ddb97d3`, carrying 212 and 213. The Defect Log no longer adds the normal older-buses banner when changing windows; the unavailable-window and search notices remain. The Down Sheet has REFRESH, SCAN and SHARE, compact shift/counts/filter tabs, five watch lists, and CLEAR DOWNSHEET in Settings. Phone CSS addresses crowded Defect Log bus numbers, the welcome heading and the Map DECOMMISSIONED tile. No migration, sync, storage-key addition or rename; seven retired panel keys are left untouched on devices. PR39 MCP remains held and excluded.
+
+Exact-source production build, 485 tests (zero failures or skips), ESLint and `git diff --check` passed. Managed Chromium preview verified closed-by-default panels, mutually exclusive switching and repeat-tap collapse, Mystery, Scan, the four Share drawer actions, Settings’ CLEAR DOWNSHEET control, and Maintenance → Union with all six roles and the heading below Close at desktop width. Preview and live Chromium verified THIS SHIFT and ALL without the normal older-buses banner or a feed-height change. Live Chromium opened the Down Sheet Share drawer, Mystery (open and close), and Scan dialog. No records were changed, no share or upload was performed, and Clear was not activated. Physical iPhone, phone CSS geometry (developer measurements in the archive), synthetic clear confirmation/undo, and installed/offline checks remain open.
+
+Native deployment `appgdep_6b0651dfd5408191b3484bc0edcff59c` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_b44b682c12d48191a184a89654ff3adc`. Public URL, access policy revision 2 and runtime environment revision 2 are unchanged. Immediate rollback: Sites 199 / release 211 at `db6683d66884c3a25de88c896561a3226e1f67b2`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_c5dabcca09ec819181a8579372e1621f`.
+
+The approved queue and detailed checks are archived in [PUBLISH_RELEASE_212_214.md](docs/archive/PUBLISH_RELEASE_212_214.md). The publish queue is reset to NONE PENDING.
+
+### Previous publication — Sites 199 / application 211
 
 Sites Version 199 / application release 211 deployed 2026-11-25 at 00:12:04.200721 UTC from `db6683d66884c3a25de88c896561a3226e1f67b2`. DAILY STATS and its five tiles are removed from the Defect Log; + LOG DEFECT and SEARCH sit under the header, or under the Scan drawer when open. The retired stats key is left untouched on existing devices. No migration, sync, storage-key addition, hosting change or fleet-record modification. PR39 MCP remains held and excluded.
 

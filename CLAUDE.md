@@ -277,15 +277,15 @@ per-device settings, never synced
 per-device view state — which panel is open, what has been dismissed
   pace-tracker-collapsed-sections-v1
   pace-down-sheet-stats-open-v1        NO LONGER READ — SHEET STATS is gone
-  pace-down-sheet-advanced-open-v1     ADVANCED ACTIONS on the DOWN SHEET
-  pace-down-sheet-counts-open-v1       the DOWN SHEET count tiles, collapsed by default
-  pace-down-sheet-deferred-collapsed-v1  the DOWN SHEET's DEFERRED board, collapsed by default
-  pace-down-sheet-recommended-collapsed-v1  the DOWN SHEET's RECOMMENDED FOR DOWN SHEET board, collapsed by default
-  pace-down-sheet-soft-collapsed-v1    the DOWN SHEET's SOFT DOWN board, collapsed by default
-  pace-down-sheet-idot-collapsed-v1    the DOWN SHEET's IDOT board, collapsed by default
+  pace-down-sheet-advanced-open-v1     NO LONGER READ — the DOWN SHEET's ADVANCED ACTIONS is gone
+  pace-down-sheet-counts-open-v1       NO LONGER READ — COUNTS starts closed on every visit
+  pace-down-sheet-deferred-collapsed-v1  NO LONGER READ — the board opens from QUICK FILTERS
+  pace-down-sheet-recommended-collapsed-v1  NO LONGER READ — the board opens from QUICK FILTERS
+  pace-down-sheet-soft-collapsed-v1    NO LONGER READ — the board opens from QUICK FILTERS
+  pace-down-sheet-idot-collapsed-v1    NO LONGER READ — the board opens from QUICK FILTERS
   pace-defect-log-stats-open-v1        NO LONGER READ — DAILY STATS is gone
   pace-defect-log-advanced-open-v1     NO LONGER READ — ADVANCED ACTIONS starts collapsed on every visit (#49)
-  pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
+  pace-defect-log-mystery-collapsed-v1 NO LONGER READ — MYSTERY BUSES opens from the DOWN SHEET's QUICK FILTERS
   pace-deferred-review-dismissed-v1
   pace-status-report-picks-v1          which boxes are ticked on the STATUS REPORT
   pace-defect-log-card-view-v1         DETAILED or COMPACT cards on the Defect Log
@@ -1286,11 +1286,22 @@ left alone on devices for the same reason. The five stat wordings it drew
 in the display settings blob and the Settings wording editor, and now label
 nothing on the page.
 
-**`pace-defect-log-mystery-collapsed-v1` is read and written by the Down Sheet**,
-not the Defect Log. The MYSTERY BUSES board moved there — every bus it lists is
-a bus that is *not* on the sheet — and the key kept its old name because
-renaming one throws away what the device already holds. The name records where
-the panel used to live; the value is still "is this panel collapsed".
+**Seven Down Sheet panel keys are no longer read or written (release 213).**
+Curtis cleaned up everything above the sheet: *"I am trying to make the area
+above the actual downsheet section as compact and clean as possible."* The
+header became REFRESH · SCAN · SHARE, so ADVANCED ACTIONS' open key went; the
+five boards (Mystery, Deferred, Recommended, Soft down, IDOT) became the first
+section of FILTERS and open only when picked, so their collapsed keys went;
+and SHIFT, COUNTS and FILTERS are three tabs across whose panels start closed
+on every visit, by his choice — *"I don't want the screen just defaulting to
+them being expanded already"* — so the counts key went. All
+seven stay listed above and are left alone on devices.
+
+**`pace-defect-log-mystery-collapsed-v1` was read and written by the Down Sheet**,
+not the Defect Log, until release 213. The MYSTERY BUSES board moved there —
+every bus it lists is a bus that is *not* on the sheet — and the key kept its
+old name because renaming one throws away what the device already holds. Since
+213 the board opens from QUICK FILTERS and nothing reads the key.
 
 `pace-locate-ack`, `pace-touch-drop` and `pace-open-quick-filter` look like keys
 and are not — they are CustomEvent names. **`pace-header-theme-v1` is BOTH**:

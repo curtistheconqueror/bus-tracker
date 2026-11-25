@@ -18,7 +18,7 @@ export default function DownSheetSettings({transfer,defaultInitials,setDefaultIn
  };
  const toggleTile=(key:OptionalDownTile,on:boolean)=>setExtraTiles(on?[...extraTiles.filter(item=>item!==key),key]:extraTiles.filter(item=>item!==key));
  const setLabel=(key:keyof DownSheetLabels,value:string)=>setDisplay({...display,labels:{...display.labels,[key]:value}});
- const setStyle=(key:DownSheetStyleKey,field:"color"|"fontSize",value:string)=>setDisplay({...display,styles:{...display.styles,[key]:{...display.styles[key],[field]:field==="fontSize"?Number(value):value}}});
+ const setStyle=(key:DownSheetStyleKey,field:"color"|"fontSize",value:string)=>setDisplay({...display,styles:{...display.styles,[key]:{...display.styles[key],[field]:field==="fontSize"?Number(value):value,...(key==="sheetTitle"&&field==="fontSize"?{customSize:true as const}:{})}}});
  const panel=<>
   <section className="down-settings-modal">
    {/* THE PANEL'S OWN "PAGE NAME / Settings" HEADER IS NOT DRAWN INLINE.
