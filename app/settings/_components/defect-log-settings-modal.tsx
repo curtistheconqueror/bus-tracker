@@ -4,8 +4,9 @@ import {useEffect,useState,type ReactNode} from "react";
 import {safeBorderColor,DEFAULT_DEFECT_LOG_DISPLAY,DEFECT_LOG_LABEL_NAMES,DEFECT_LOG_STYLE_LABELS,followsTheme,normalizeDefectLogDisplay,type DefectLogLabels,type DefectLogStyleKey} from "@/src/lib/defects/defect-log-display-settings";
 import {REPORT_EXPORT_HINT} from "@/src/lib/storage/fleet-backup";
 import {FLEET_BACKUP_INTERVAL_CHOICES,normalizeFleetBackupInterval} from "@/src/lib/storage/storage";
-import {COLOR_FIELDS,type Filter,LOG_THEMES,type LogAppearance,type LogFontFamily,type LogFontSize,type LogGroupContrast,type LogSettings,type LogTheme,VIEW_SCOPES,normalizeViewScope} from "@/src/lib/defects/defect-log-settings";
+import {COLOR_FIELDS,type Filter,LOG_THEMES,type LogAppearance,type LogFontFamily,type LogFontSize,type LogGroupContrast,type LogSettings,type LogTheme,VIEW_SCOPES,normalizeViewScope,logOutlineSwatch} from "@/src/lib/defects/defect-log-settings";
 import {SettingsDrawer,SettingsDrawers} from "@/src/components/settings/settings-drawer";
+import {CARD_VIEW_KEY,readCardView,type CardView} from "@/src/lib/settings/card-view";
 import {readCoachSettings,writeCoachSettings} from "@/src/lib/settings/coach-settings";
 
 /* The Defect Log's settings panel.
@@ -41,6 +42,14 @@ export default function LogSettingsModal({settings,setSettings,close,exportLog,t
     returns whether the record was actually stored, and a full device must not
     be shown a switch that moved while nothing was saved — the discipline the
     rest of this app's writes already follow. */
+ const [cardView,setCardView]=useState<CardView>("detailed");
+ useEffect(()=>{
+  const sync=()=>setCardView(readCardView(localStorage.getItem(CARD_VIEW_KEY)));
+  const onStorage=(event:StorageEvent)=>{if(event.key===CARD_VIEW_KEY||event.key===null) sync()};
+  sync();
+  window.addEventListener("storage",onStorage);
+  return ()=>window.removeEventListener("storage",onStorage);
+ },[]);
  const setCoach=(on:boolean)=>{if(writeCoachSettings(localStorage,{on}))setCoachOn(on)};
  const applyTheme=(theme:Exclude<LogTheme,"custom">)=>setSettings({...settings,theme,appearance:{...LOG_THEMES[theme].appearance}});
  const setColor=(key:keyof LogAppearance,value:string)=>setSettings({...settings,theme:"custom",appearance:{...settings.appearance,[key]:value}});
@@ -81,7 +90,7 @@ export default function LogSettingsModal({settings,setSettings,close,exportLog,t
    <section className="log-settings-group"><div className="log-font-grid"><label>STYLE<select value={settings.fontFamily} onChange={event=>setSettings({...settings,fontFamily:event.target.value as LogFontFamily})}><option value="clean">Clean</option><option value="condensed">Condensed</option><option value="classic">Classic</option></select></label><label>SIZE<select value={settings.fontSize} onChange={event=>setSettings({...settings,fontSize:event.target.value as LogFontSize})}><option value="standard">Standard</option><option value="large">Large</option><option value="extra">Extra Large</option></select></label></div></section>
    </SettingsDrawer>
    <SettingsDrawer title="BUS GROUP SEPARATION" note="Telling one bus apart from the next: contrast, outline, and the three view options.">
-   <section className="log-settings-group log-group-contrast-setting"><label>CONTRAST<select value={settings.groupContrast} onChange={event=>setSettings({...settings,groupContrast:event.target.value as LogGroupContrast})}><option value="strong">Strong (recommended)</option><option value="standard">Standard</option></select></label><small>Strong adds a clearer outer border, extra space, and an expanded-bus shade without changing defect or status colors.</small><label>OUTLINE COLOR<div className="group-border-row"><input type="color" value={settings.groupBorder||"#9ea6b4"} aria-label="Bus group outline color" onChange={event=>setSettings({...settings,groupBorder:safeBorderColor(event.target.value)})}/><button type="button" onClick={()=>setSettings({...settings,groupBorder:""})} disabled={!settings.groupBorder}>USE THEME COLOR</button><small>Detailed cards use black outlines on the light theme by default. Darker themes keep their own outline color. Choosing a color here overrides the bus outline on this device.</small></div></label>
+   <section className="log-settings-group log-group-contrast-setting"><label>CONTRAST<select value={settings.groupContrast} onChange={event=>setSettings({...settings,groupContrast:event.target.value as LogGroupContrast})}><option value="strong">Strong (recommended)</option><option value="standard">Standard</option></select></label><small>Strong adds a clearer outer border, extra space, and an expanded-bus shade without changing defect or status colors.</small><label>OUTLINE COLOR<div className="group-border-row"><input type="color" value={logOutlineSwatch(settings,cardView)} aria-label="Bus group outline color" onChange={event=>setSettings({...settings,groupBorder:safeBorderColor(event.target.value)})}/><button type="button" onClick={()=>setSettings({...settings,groupBorder:""})} disabled={!settings.groupBorder}>USE THEME COLOR</button><small>Detailed cards use black outlines on the light theme by default. Darker themes keep their own outline color. Choosing a color here overrides the bus outline on this device.</small></div></label>
    {/* THE THREE WAYS OF TELLING ONE BUS FROM THE NEXT, each off until somebody
        asks for it, and each answering WHERE rather than just whether — see
        ViewScope in defect-log-settings.ts for why the answer is a width and
