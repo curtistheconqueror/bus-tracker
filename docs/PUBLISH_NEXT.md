@@ -1,15 +1,20 @@
 # Publish next
 
-**STATUS: NONE PENDING.** Application release 219 is live as Sites Version 205,
-deployed 2026-11-25 23:04:58.042903 UTC from `d7df976b0cd7fec682407c9cc335a836dab6a6d6`.
+**STATUS: NONE PENDING.** Application release 220 is live as Sites Version 206,
+deployed 2026-11-25 23:11:41.557026 UTC from `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`.
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
-Previous-live rollback: Sites 204 / application 218 at `50340aef96e9bc87f9b8d43b7c485af97fab3d9d`. PR39 MCP remains held and excluded.
+Previous-live rollback: Sites 205 / application 219 at `d7df976b0cd7fec682407c9cc335a836dab6a6d6`. PR39 MCP remains held and excluded.
 
 Publication evidence is in [RELEASES.md](RELEASES.md).
 
 ## Remaining device checks
+
+On iPad or another tablet, verify the added space after the control panel and
+the 2 px black border around Maintenance Down Sheet. Compare portrait and
+landscape on a phone to confirm no change. No real records need to be edited.
+
 
 On phone-sized hardware, verify the status stripe and footer positioning using
 synthetic defects only. Chromium confirmed fixed geometry and footer coverage.

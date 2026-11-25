@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 205 / application release 219 | Live | d7df976b0cd7fec682407c9cc335a836dab6a6d6 | Stable Detailed card positions, accurate Settings outline swatch, and browser regression checks. |
+| 206 / application release 220 | Live | 1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f | Adds space and a thicker black frame around the tablet Down Sheet only. |
+| 205 / application release 219 | Previous live; rollback | d7df976b0cd7fec682407c9cc335a836dab6a6d6 | Stable Detailed card positions, accurate Settings outline swatch, and browser regression checks. |
 | 204 / application release 218 | Previous live; rollback | 50340aef96e9bc87f9b8d43b7c485af97fab3d9d | Detailed Defect Log black outlines and solid black labeled closing line. |
 | 203 / application release 217 | Previous live; rollback | 2c00cf88bbe51894ad588ac3585122fe025fdf92 | Shows the oldest active logged date, removes repeated detailed card descriptions, and enlarges Defect Log dates. |
 | 202 / application release 216 | Previous live; rollback | 8cdd02358b07301ca4739a5416865736c9686ef4 | Enlarges emoji/category subtitles in Fixed Repairs only. |
@@ -419,3 +420,11 @@ No other release is pending.
 - ESLint and production build passed. [CI run 523](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45717734939) ran 494 tests, all passing including the Chromium geometry check at 320, 390 and 1280 px. [CodeRabbit PR #63](https://github.com/curtistheconqueror/bus-tracker/pull/63#issuecomment-7177017490) reviewed the exact source with no actionable findings; its default lockfile exclusion was independently checked (one root dev-dependency entry, exact version retained, clean npm ci). Map, Down Sheet, Defect Log, Fixed Repairs and Settings returned HTTP 200; live Defect Log CSS matched the build bytes. Physical iPhone and real fleet data were not exercised.
 - Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_f9d22b00e324819193666243659b5794`; deployment: `appgdep_6b076993b7608191935489bfc35e7ede`; archive: `sha256:fbde327f7c28810ae42c3be47ba0d0a227ed1ae3ce649a6a445f375f03261dcb`.
 - Immediate rollback: Sites 204 / application 218 at `50340aef96e9bc87f9b8d43b7c485af97fab3d9d`. Public URL and access/runtime revisions are unchanged.
+
+## Sites 206 / application 220 — 2026-11-25
+
+- Live source: `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`, published 2026-11-25 23:11:41.557026 UTC.
+- Adds an 18 px leading gap and a 2 px black outline around the actual Maintenance Down Sheet at touch viewports 761–1400 px wide and at least 600 px tall. Styles are isolated in the Down Sheet tablet stylesheet. Phone layouts, narrower split views, mouse-only desktops, navigation, scanner, workflows, data, storage and hosting are unchanged. Pages and header layouts shared as mockups are not part of this release. PR39 remains held.
+- ESLint, production build, diff checks, and [CI run 525](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45718896889) passed, with 495 tests and no skips in CI. [CodeRabbit PR #64](https://github.com/curtistheconqueror/bus-tracker/pull/64#issuecomment-7177182948) reviewed all three changed files at the exact commit with no actionable findings. Map, Down Sheet, Defect Log, and Fixed Repairs returned HTTP 200; the live Down Sheet CSS matched the compiled artifact byte-for-byte. Physical tablet, phone and local fleet data were not exercised.
+- Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_404d375ff7dc81918b452159f040826b`; deployment: `appgdep_6b076b2714808191ba75d4174e25ab3f`; archive: `sha256:84c59ea2bd5b5fb49778e9d923161c1115d7b7b375020aca0b0e295c106e9eda`.
+- Immediate rollback: Sites 205 / application 219 at `d7df976b0cd7fec682407c9cc335a836dab6a6d6`. Public URL and access/runtime revisions are unchanged.

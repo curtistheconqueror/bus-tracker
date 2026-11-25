@@ -4,8 +4,8 @@ Updated: 2026-11-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 205 (application release 219)
-Live feature checkpoint: commit d7df976b0cd7fec682407c9cc335a836dab6a6d6
+Live release: Sites Version 206 (application release 220)
+Live feature checkpoint: commit 1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f
 
 ## Read this first
 
@@ -23,6 +23,16 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 206 / application release 220 deployed 2026-11-25 23:11:41.557026 UTC from `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`. Adds an 18 px leading gap and a 2 px black outline around the actual Maintenance Down Sheet at touch viewports 761–1400 px wide and at least 600 px tall. Styles are isolated in the Down Sheet tablet stylesheet. Phone layouts, narrower split views, mouse-only desktops, navigation, scanner, workflows, data, storage and hosting are unchanged. Pages and header layouts shared as mockups are not part of this release. PR39 remains held.
+
+ESLint, production build, diff checks, and [CI run 525](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45718896889) passed, with 495 tests and no skips in CI. [CodeRabbit PR #64](https://github.com/curtistheconqueror/bus-tracker/pull/64#issuecomment-7177182948) reviewed all three changed files at the exact commit with no actionable findings. Map, Down Sheet, Defect Log, and Fixed Repairs returned HTTP 200; the live Down Sheet CSS matched the compiled artifact byte-for-byte. Physical tablet, phone and local fleet data were not exercised.
+
+Native deployment `appgdep_6b076b2714808191ba75d4174e25ab3f` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_404d375ff7dc81918b452159f040826b`. Public access and runtime revisions remain 2. Immediate rollback: Sites 205 / application 219 at `d7df976b0cd7fec682407c9cc335a836dab6a6d6`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_f9d22b00e324819193666243659b5794`.
+
+No other release is pending.
+
+### Previous publication — Sites 205 / application 219
 
 Sites Version 205 / application release 219 deployed 2026-11-25 23:04:58.042903 UTC from `d7df976b0cd7fec682407c9cc335a836dab6a6d6`. Addresses all four SD-QG findings on PR #62. The Detailed light-theme frame stays 1 px in every work state; the status color paints inside it so the header, rows, and footer do not shift. The outline swatch follows the saved card view and theme unless customized. The labeled closing line and its visibility settings are preserved. Added runtime geometry and source-binding regressions and declared the existing PostCSS 8.5.14 build-time dependency. Compact, fleet records, storage, sync, and hosting are unchanged. PR39 remains held.
 
