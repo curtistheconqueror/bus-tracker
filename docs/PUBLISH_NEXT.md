@@ -1,15 +1,21 @@
 # Publish next
 
-**STATUS: NONE PENDING.** Application release 220 is live as Sites Version 206,
-deployed 2026-11-25 23:11:41.557026 UTC from `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`.
+**STATUS: NONE PENDING.** Application release 221 is live as Sites Version 207,
+deployed 2026-11-25 23:43:23.549182 UTC from `29538b916d5029ab3c11068424872db2cf2f142b`.
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
-Previous-live rollback: Sites 205 / application 219 at `d7df976b0cd7fec682407c9cc335a836dab6a6d6`. PR39 MCP remains held and excluded.
+Previous-live rollback: Sites 206 / application 220 at `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`. PR39 MCP remains held and excluded.
 
 Publication evidence is in [RELEASES.md](RELEASES.md).
 
 ## Remaining device checks
+
+On a physical iPad or Android tablet, verify REFRESH on its own row, SCAN and
+SHARE together, and PAGES below. PAGES starts closed; opening it overlays the
+sheet without movement, and tapping away closes it. On a phone in portrait or
+landscape, confirm the existing navigation and actions are unchanged. Open and
+cancel Scan to check the existing entry screen without selecting real photos.
 
 On iPad or another tablet, verify the added space after the control panel and
 the 2 px black border around Maintenance Down Sheet. Compare portrait and

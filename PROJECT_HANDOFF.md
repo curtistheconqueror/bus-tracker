@@ -4,8 +4,8 @@ Updated: 2026-11-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 206 (application release 220)
-Live feature checkpoint: commit 1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f
+Live release: Sites Version 207 (application release 221)
+Live feature checkpoint: commit 29538b916d5029ab3c11068424872db2cf2f142b
 
 ## Read this first
 
@@ -23,6 +23,16 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 207 / application release 221 deployed 2026-11-25 23:43:23.549182 UTC from `29538b916d5029ab3c11068424872db2cf2f142b`. Tablet-size touch viewports (761–1400 px wide and at least 600 px tall) use a compact Down Sheet header: REFRESH on its own row, SCAN and SHARE side by side, and PAGES below. PAGES starts closed and overlays the sheet without moving it. It uses the shared destinations, highlights Down Sheet, and respects Lite Mode. The existing tablet frame, phone/desktop navigation, other pages, Scan, Share, records, storage and hosting are unchanged. PR39 remains held.
+
+ESLint, production build, and diff checks passed. [CI run 531](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45723103426) passed 496 tests, including the Chromium check of the built Down Sheet on tablet, phone portrait/landscape, and desktop. The check also covers Pages overlay/dismissal, scanner entry and Share drawer, and Lite Mode. [CodeRabbit PR #65](https://github.com/curtistheconqueror/bus-tracker/pull/65#issuecomment-7177617066) covered all four changed files across the original and incremental reviews, including the exact release head; its browser-fixture exit finding was addressed and the final review had no new actionable findings. Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200. Live Down Sheet CSS and JavaScript matched the build. Physical devices, photos, actual sharing, and live records were not exercised.
+
+Native deployment `appgdep_6b0772968e208191b749afff78caa678` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_cfed301bf56081918b6d591d7a096b6d`. Public access and runtime revisions remain 2. Immediate rollback: Sites 206 / application 220 at `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_404d375ff7dc81918b452159f040826b`.
+
+No other release is pending.
+
+### Previous publication — Sites 206 / application 220
 
 Sites Version 206 / application release 220 deployed 2026-11-25 23:11:41.557026 UTC from `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`. Adds an 18 px leading gap and a 2 px black outline around the actual Maintenance Down Sheet at touch viewports 761–1400 px wide and at least 600 px tall. Styles are isolated in the Down Sheet tablet stylesheet. Phone layouts, narrower split views, mouse-only desktops, navigation, scanner, workflows, data, storage and hosting are unchanged. Pages and header layouts shared as mockups are not part of this release. PR39 remains held.
 
