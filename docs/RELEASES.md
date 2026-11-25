@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 201 / application release 215 | Live | 24ccb374a578f7ffa80fa4037399aaa6ab5b953b | Slightly enlarges the Maintenance Down Sheet title. |
+| 202 / application release 216 | Live | 8cdd02358b07301ca4739a5416865736c9686ef4 | Enlarges emoji/category subtitles in Fixed Repairs only. |
+| 201 / application release 215 | Previous live; rollback | 24ccb374a578f7ffa80fa4037399aaa6ab5b953b | Slightly enlarges the Maintenance Down Sheet title. |
 | 200 / application releases 212–214 | Previous live; rollback | 4d205dbef009f1a74aff807dd6db474c6ddb97d3 | Defect Log window cleanup, compact Down Sheet controls and phone text fixes. |
 | 199 / application release 211 | Previous live; rollback | db6683d66884c3a25de88c896561a3226e1f67b2 | Removes DAILY STATS from the Defect Log, keeping + LOG DEFECT and SEARCH directly under the header. |
 | 198 / application release 210 | Previous live; rollback | 8ed0ce2dbf5c5eea6025b846440d43a650d4183c | Defect Log header shortcuts for Scan and Share, feed-row Quick Filters, conditional Undo, and relocated Settings tools and phone AI Operator entry. |
@@ -375,3 +376,14 @@ Native deployment `appgdep_6b06560fac348191b1f15b181d5c1c21` succeeded; saved ve
 No other release is pending.
 
 - The `sites-v201` alias was created locally; remote tag publication is not confirmed. The saved Sites checkpoint is available independently.
+
+## Sites 202 / application 216 — 2026-11-25
+
+Sites Version 202 / application release 216 deployed 2026-11-25 04:30:06.350181 UTC from `8cdd02358b07301ca4739a5416865736c9686ef4`. In Fixed Repairs → Completed Repair History, emoji/category subtitles such as Amerex and Suspension and Steering increase from 9 px to 12 px. Issue descriptions, other headings, data, storage, sync, and hosting configuration do not change. PR39 MCP remains held and excluded.
+
+Exact-source ESLint, production build, 486 tests, and diff checks passed. GitHub CI run 514 succeeded. [CodeRabbit reviewed the exact PR #60 head](https://github.com/curtistheconqueror/bus-tracker/pull/60#issuecomment-7152790675) with no actionable findings. Isolated Chromium preview confirmed four synthetic cards at desktop and 360/415 px phone-like widths: 12 px labels, unchanged 13 px issue text, no overlap or horizontal overflow. The public Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200; the served Fixed Repairs stylesheet includes the scoped 12 px rule. No real data was written. Physical iPhone verification remains open.
+
+Native deployment `appgdep_6b06644737e081918ca934338170efdd` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_27f08c6b3e00819191b39b6a1a12bf47`. Public access and runtime revisions remain 2. Immediate rollback: Sites 201 / application release 215 at `24ccb374a578f7ffa80fa4037399aaa6ab5b953b`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_efe1de3a58d4819199e7ecfc58805473`.
+
+- Native saved tar hash: `sha256:9737bcd2b850dc6fb7f17790807083236a669c82260ba870e9bf9fc3c0412a9c`.
+- The `sites-v202` alias was created locally; remote tag publication is not confirmed.

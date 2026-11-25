@@ -1,17 +1,20 @@
 # Publish next
 
-**STATUS: NONE PENDING.** Application release 215 is live as Sites Version 201,
-deployed 2026-11-25 at 03:29:24.389651 UTC from `24ccb374a578f7ffa80fa4037399aaa6ab5b953b`.
+**STATUS: NONE PENDING.** Application release 216 is live as Sites Version 202,
+deployed 2026-11-25 04:30:06.350181 UTC from `8cdd02358b07301ca4739a5416865736c9686ef4`.
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
-Previous-live rollback: Sites 200 / application release 214 at
-`4d205dbef009f1a74aff807dd6db474c6ddb97d3`. PR39 MCP remains held and excluded.
+Previous-live rollback: Sites 201 / application release 215 at
+`24ccb374a578f7ffa80fa4037399aaa6ab5b953b`. PR39 MCP remains held and excluded.
 
-Publication evidence is in [RELEASES.md](RELEASES.md); the last queued batch
-is archived in [releases 212–214](archive/PUBLISH_RELEASE_212_214.md).
+Publication evidence is in [RELEASES.md](RELEASES.md).
 
 ## Remaining device checks
+
+On a physical iPhone, confirm the Fixed Repairs emoji/category subtitles are
+easier to read and longer names wrap without covering the repair description.
+
 
 On a physical iPhone, check that the slightly larger Maintenance Down Sheet
 title remains clear and does not crowd the count or Show Completed control.

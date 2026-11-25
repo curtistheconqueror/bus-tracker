@@ -4,8 +4,8 @@ Updated: 2026-11-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 201 (application release 215)
-Live feature checkpoint: commit 24ccb374a578f7ffa80fa4037399aaa6ab5b953b
+Live release: Sites Version 202 (application release 216)
+Live feature checkpoint: commit 8cdd02358b07301ca4739a5416865736c9686ef4
 
 ## Read this first
 
@@ -23,6 +23,16 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 202 / application release 216 deployed 2026-11-25 04:30:06.350181 UTC from `8cdd02358b07301ca4739a5416865736c9686ef4`. In Fixed Repairs → Completed Repair History, emoji/category subtitles such as Amerex and Suspension and Steering increase from 9 px to 12 px. Issue descriptions, other headings, data, storage, sync, and hosting configuration do not change. PR39 MCP remains held and excluded.
+
+Exact-source ESLint, production build, 486 tests, and diff checks passed. GitHub CI run 514 succeeded. [CodeRabbit reviewed the exact PR #60 head](https://github.com/curtistheconqueror/bus-tracker/pull/60#issuecomment-7152790675) with no actionable findings. Isolated Chromium preview confirmed four synthetic cards at desktop and 360/415 px phone-like widths: 12 px labels, unchanged 13 px issue text, no overlap or horizontal overflow. The public Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200; the served Fixed Repairs stylesheet includes the scoped 12 px rule. No real data was written. Physical iPhone verification remains open.
+
+Native deployment `appgdep_6b06644737e081918ca934338170efdd` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_27f08c6b3e00819191b39b6a1a12bf47`. Public access and runtime revisions remain 2. Immediate rollback: Sites 201 / application release 215 at `24ccb374a578f7ffa80fa4037399aaa6ab5b953b`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_efe1de3a58d4819199e7ecfc58805473`.
+
+No other release is pending.
+
+### Previous publication — Sites 201 / application 215
 
 Sites Version 201 / application release 215 deployed 2026-11-25 at 03:29:24.389651 UTC from `24ccb374a578f7ffa80fa4037399aaa6ab5b953b`. Only the Maintenance Down Sheet title default increased, from 15 px to 17 px. Legacy 15 px values without customization metadata take the new default; other stored sizes and colors are preserved, and a newly selected 15 px size is retained. No fleet data, sync, hosting configuration, or storage key changed. PR39 remains excluded.
 
