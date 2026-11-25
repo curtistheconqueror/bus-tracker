@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 200 / application releases 212–214 | Live | 4d205dbef009f1a74aff807dd6db474c6ddb97d3 | Defect Log window cleanup, compact Down Sheet controls and phone text fixes. |
+| 201 / application release 215 | Live | 24ccb374a578f7ffa80fa4037399aaa6ab5b953b | Slightly enlarges the Maintenance Down Sheet title. |
+| 200 / application releases 212–214 | Previous live; rollback | 4d205dbef009f1a74aff807dd6db474c6ddb97d3 | Defect Log window cleanup, compact Down Sheet controls and phone text fixes. |
 | 199 / application release 211 | Previous live; rollback | db6683d66884c3a25de88c896561a3226e1f67b2 | Removes DAILY STATS from the Defect Log, keeping + LOG DEFECT and SEARCH directly under the header. |
 | 198 / application release 210 | Previous live; rollback | 8ed0ce2dbf5c5eea6025b846440d43a650d4183c | Defect Log header shortcuts for Scan and Share, feed-row Quick Filters, conditional Undo, and relocated Settings tools and phone AI Operator entry. |
 | 197 / application releases 207–209 | Previous live; rollback | 9a7cc1f417c53689ee62b5f564609e2a0dc5b32a | Defect Log feed layout, time-window picker with PREVIOUS SHIFT, and neutral ALL control; PREVIOUS SHIFT in Fixed Repairs. |
@@ -362,3 +363,15 @@ The approved queue and detailed checks are archived in [PUBLISH_RELEASE_212_214.
 
 - Native saved tar hash: `sha256:656105f9c6aba79b3f3958522eb36bd5cfe5c39afb965d9b2e5c3eed005c38f3` (5,847,040 bytes; 132 files).
 - The `sites-v200` alias was created locally; remote tag publication is not confirmed. The exact source and saved Sites checkpoint are available independently.
+
+## Sites 201 / application 215 — 2026-11-25
+
+Sites Version 201 / application release 215 deployed 2026-11-25 at 03:29:24.389651 UTC from `24ccb374a578f7ffa80fa4037399aaa6ab5b953b`. Only the Maintenance Down Sheet title default increased, from 15 px to 17 px. Legacy 15 px values without customization metadata take the new default; other stored sizes and colors are preserved, and a newly selected 15 px size is retained. No fleet data, sync, hosting configuration, or storage key changed. PR39 remains excluded.
+
+Exact-source production build, ESLint, 486 tests, and `git diff --check` passed. GitHub CI run 510 succeeded and CodeRabbit completed on this exact PR #59 head without a release blocker. The live title rendered at 17 px in Chromium. Physical iPhone layout remains unverified.
+
+Native deployment `appgdep_6b06560fac348191b1f15b181d5c1c21` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_efe1de3a58d4819199e7ecfc58805473`. Public access and the runtime environment remain unchanged. Rollback: Sites 200 / application release 214 at `4d205dbef009f1a74aff807dd6db474c6ddb97d3`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_b44b682c12d48191a184a89654ff3adc`.
+
+No other release is pending.
+
+- The `sites-v201` alias was created locally; remote tag publication is not confirmed. The saved Sites checkpoint is available independently.

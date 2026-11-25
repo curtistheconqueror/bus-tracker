@@ -1,18 +1,21 @@
 # Publish next
 
-**STATUS: NONE PENDING.** Application release 214, including 212 and 213, is
-live as Sites Version 200, deployed 2026-11-25 at 03:11:32.770199 UTC from `4d205dbef009f1a74aff807dd6db474c6ddb97d3`.
+**STATUS: NONE PENDING.** Application release 215 is live as Sites Version 201,
+deployed 2026-11-25 at 03:29:24.389651 UTC from `24ccb374a578f7ffa80fa4037399aaa6ab5b953b`.
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
-Previous-live rollback: Sites 199 / application release 211 at
-`db6683d66884c3a25de88c896561a3226e1f67b2`. PR39 MCP remains held and excluded.
-No migration, sync, runtime environment or audience change.
+Previous-live rollback: Sites 200 / application release 214 at
+`4d205dbef009f1a74aff807dd6db474c6ddb97d3`. PR39 MCP remains held and excluded.
 
-The full queue is archived in [releases 212–214](archive/PUBLISH_RELEASE_212_214.md).
-Publication evidence is in [RELEASES.md](RELEASES.md).
+Publication evidence is in [RELEASES.md](RELEASES.md); the last queued batch
+is archived in [releases 212–214](archive/PUBLISH_RELEASE_212_214.md).
 
 ## Remaining device checks
+
+On a physical iPhone, check that the slightly larger Maintenance Down Sheet
+title remains clear and does not crowd the count or Show Completed control.
+
 
 On a physical iPhone, verify THIS SHIFT does not add the older-buses banner or
 move the Defect Log feed, and ALL brings all dates back. Check the gap between
