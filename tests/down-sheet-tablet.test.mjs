@@ -164,6 +164,21 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
   await viewport(1024,768,true);
   await openPage();
   await chooseWelcomeMode("full");
+  const footer=".down-app > .down-footnote";
+  assert.equal(await evalPage(visible(footer)),false,"the floating footnote must not cover tablet rows");
+  // The isolated sheet has no fleet records. Add the same band structure as
+  // the saved-record renderer, then measure the production stylesheet.
+  const mountBand=()=>evalPage(`{
+   const row=document.createElement("tr");
+   row.className="down-group-row group-unscheduled";
+   row.id="tablet-test-band";
+   row.innerHTML="<td colspan='10'><b>UNSCHEDULED</b><i>1</i><span>Down in the yard with nobody assigned yet</span></td>";
+   document.querySelector(".down-table tbody").append(row);
+  }`);
+  await mountBand();
+  const bandFonts=()=>evalPage('[...document.querySelectorAll(".down-group-row td > b,.down-group-row td > span")].map(el=>getComputedStyle(el).fontSize)');
+  assert.deepEqual(await bandFonts(),["14px","12px"]);
+  await evalPage('document.getElementById("tablet-test-band").remove()');
   // CSS visibility reflects both the route scope and the interaction media query.
   assert.equal(await evalPage(visible(pages)),true);
   assert.equal(await evalPage(visible(legacy)),false);
@@ -211,6 +226,9 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
   // The oldest tablet width overlaps the shared mobile dock breakpoint.
   await viewport(768,1024,true);
   await verifyRows();
+  await mountBand();
+  assert.deepEqual(await bandFonts(),["14px","12px"]);
+  assert.equal(await evalPage(visible(footer)),false);
   assert.equal(await evalPage(visible(pages)),true);
   assert.equal(await evalPage(visible(dock)),false);
   await click(pages);
@@ -219,6 +237,8 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
    assert.equal(await evalPage(visible(pages)),false,`unexpected tablet UI at ${width}x${height}, touch=${touch}`);
    assert.equal(await evalPage(visible(legacy)),true);
    assert.equal(await evalPage(visible(dock)),width<=800);
+   assert.deepEqual(await bandFonts(),["11px","8px"]);
+   assert.equal(await evalPage(visible(footer)),width>760);
   }
   await viewport(1024,768,true);
   assert.equal(await evalPage(visible(panel)),false,"an open menu cannot survive leaving the tablet layout");

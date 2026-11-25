@@ -7,6 +7,17 @@
   margin-block-start:18px;
   border:2px solid #000;
  }
+ /* The shared fixed footer was sitting over repair rows on tablets. */
+ .down-app > .down-footnote {
+  display:none;
+ }
+ .down-app .down-table .down-group-row td > b {
+  font-size:14px;
+ }
+ .down-app .down-table .down-group-row td > span {
+  font-size:12px;
+  line-height:1.35;
+ }
  .fleetstep-shell .down-app > .down-header {
   display:flex;
   align-items:flex-start;
