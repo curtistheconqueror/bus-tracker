@@ -1813,3 +1813,13 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    the buttons size to their words rather than sharing the row equally: PROGRESS
    alone is wider than an equal share. */
 @media(max-width:400px){.feed-title .feed-view-row.with-saved-view>.feed-window-pick{flex:1 1 auto;min-width:52px}.feed-title .feed-view-row.with-saved-view>button{flex:1 1 auto;min-width:min-content;font-size:10px;white-space:normal;line-height:1.1}}
+
+/* THE BUS NUMBER'S COLUMN FITS THE NUMBER (release 214). It was a fixed 52px,
+   and a five-digit number at 17px is 57px - measured at 390 in Chromium, 5px
+   into the repair text beside it, and more on an iPhone, whose font is wider.
+   Curtis saw it on his phone: "some overlap in bus numbers over the text to the
+   right of them." 52px stays the least it takes, so short numbers line up. */
+.quick-filter-drawer .quick-filter-bus{grid-template-columns:minmax(52px,max-content) minmax(0,1fr) auto;column-gap:10px}
+/* The same for a bus left out of the share, whose struck-through number is
+   15px in the same fixed 52px column (review). */
+.quick-filter-drawer .quick-filter-bus-card.left-out{grid-template-columns:minmax(52px,max-content) minmax(0,1fr) auto}
