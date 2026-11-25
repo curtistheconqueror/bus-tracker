@@ -150,17 +150,25 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
   assert.equal(await evalPage(visible(legacy)),false);
   assert.equal(await evalPage(visible(dock)),false);
   assert.equal(await evalPage(visible(panel)),false);
-  const layout=await evalPage(`[...document.querySelectorAll(".down-header-actions > .app-refresh,.down-header-pair > button,.down-tablet-pages-toggle")].map(el=>{const {left,right,top,bottom}=el.getBoundingClientRect();return {left,right,top,bottom}})`);
-  const [refresh,scan,share,pageButton]=layout;
-  assert.ok(refresh.bottom<scan.top&&scan.top===share.top&&scan.right<share.left&&scan.bottom<pageButton.top);
-  assert.deepEqual([refresh.left,refresh.right],[pageButton.left,pageButton.right]);
+  const verifyRows=async()=>{
+   const [refresh,scan,share,pageButton]=await evalPage(`[...document.querySelectorAll(".down-header-actions > .app-refresh,.down-header-pair > button,.down-tablet-pages-toggle")].map(el=>{const {left,right,top,bottom}=el.getBoundingClientRect();return {left,right,top,bottom}})`);
+   assert.ok(refresh.bottom<scan.top&&scan.top===share.top&&scan.right<share.left&&scan.bottom<pageButton.top);
+   assert.deepEqual([refresh.left,refresh.right],[pageButton.left,pageButton.right]);
+  };
+  await verifyRows();
   const sheetY=await evalPage('document.querySelector(".sheet-wrap").getBoundingClientRect().top');
   await click(pages);
   assert.equal(await evalPage(visible(panel)),true);
   assert.equal(await evalPage('document.querySelector(".sheet-wrap").getBoundingClientRect().top'),sheetY,"Pages must not push the sheet down");
   assert.deepEqual(await evalPage(`[...document.querySelectorAll("${panel} a")].map(a=>a.getAttribute("href"))`),TRACKER_PAGES.map(page=>page.href));
   assert.equal(await evalPage(`document.querySelector('${panel} [aria-current=page]').getAttribute("href")`),"/down-sheet");
-  assert.equal(await evalPage(`{const a=document.querySelector("${panel} a"),r=a.getBoundingClientRect();document.elementFromPoint(r.left+12,r.top+12)===a}`),true,"the overlay is above the sheet controls");
+  const hit=await evalPage(`{
+   const a=document.querySelector("${panel} a"),r=a.getBoundingClientRect();
+   const x=r.left+r.width/2,y=r.top+r.height/2,stack=document.elementsFromPoint(x,y);
+   ({ok:a.contains(stack[0]),rect:r.toJSON(),hit:stack.slice(0,5).map(e=>[e.tagName,e.className]),
+     viewport:[innerWidth,innerHeight,visualViewport.width,visualViewport.height]})
+  }`);
+  assert.ok(hit.ok,"Pages must be tappable above the sheet controls: "+JSON.stringify(hit));
   await evalPage(`document.querySelector("${panel} a").focus()`);
   await call("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
   await call("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
@@ -183,6 +191,7 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
   await click(".down-header-pair button[aria-expanded]");
   // The oldest tablet width overlaps the shared mobile dock breakpoint.
   await viewport(768,1024,true);
+  await verifyRows();
   assert.equal(await evalPage(visible(pages)),true);
   assert.equal(await evalPage(visible(dock)),false);
   await click(pages);
