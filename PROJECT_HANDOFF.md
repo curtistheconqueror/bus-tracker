@@ -4,8 +4,8 @@ Updated: 2026-11-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 203 (application release 217)
-Live feature checkpoint: commit 2c00cf88bbe51894ad588ac3585122fe025fdf92
+Live release: Sites Version 204 (application release 218)
+Live feature checkpoint: commit 50340aef96e9bc87f9b8d43b7c485af97fab3d9d
 
 ## Read this first
 
@@ -23,6 +23,16 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 204 / application release 218 deployed 2026-11-25 22:39:33.488072 UTC from `50340aef96e9bc87f9b8d43b7c485af97fab3d9d`. Detailed light-theme Defect Log cards have thin black bus and defect outlines, preserving chosen bus outline colors and colored work-state rails. When the existing Closing Line preference shows the footer, it is solid black with its original white-on-black label and height, including with the optional number rail. Compact, timestamps, records, storage, sync, and hosting are unchanged. PR39 MCP remains held and excluded.
+
+ESLint, production build, all 491 local tests, and diff checks passed. [CI run 520](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45714445250) passed. [CodeRabbit PR #62 review](https://github.com/curtistheconqueror/bus-tracker/pull/62#issuecomment-7176541937) covered the exact source commit and all four changed files with no actionable comments. Map, Down Sheet, Defect Log, and Fixed Repairs returned HTTP 200. The live Defect Log CSS and JavaScript matched the build byte-for-byte. Managed preview could not start; physical iPhone appearance and local fleet data were not verified.
+
+Native deployment `appgdep_6b07639f63408191a9bb53e4e03e9ea2` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_ede58b709fac81918d39415c9ef46061`. Public access and runtime revisions remain 2. Immediate rollback: Sites 203 / application release 217 at `2c00cf88bbe51894ad588ac3585122fe025fdf92`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_71cfdae29cf88191bec50026bef6d549`.
+
+No other release is pending.
+
+### Previous publication — Sites 203 / application 217
 
 Sites Version 203 / application release 217 deployed 2026-11-25 22:06:08.501348 UTC from `2c00cf88bbe51894ad588ac3585122fe025fdf92`. Detailed Defect Log bus cards show OLDEST directly below LATEST, using the original logged time of the oldest dated, not-completed, non-removed Defect Log record on that bus across feed windows and search. The repeated issue preview is removed from the detailed card face; the individual expanded rows and Compact preview are preserved. LATEST, OLDEST, and the expanded LOGGED, UPDATED, and LAST REPORTED timestamps grow from 9 px to 12 px at the default root size. Their underlying timestamps, sorting, data, storage, sync, and hosting configuration are unchanged. PR39 MCP remains held and excluded.
 

@@ -1,16 +1,21 @@
 # Publish next
 
-**STATUS: NONE PENDING.** Application release 217 is live as Sites Version 203,
-deployed 2026-11-25 22:06:08.501348 UTC from `2c00cf88bbe51894ad588ac3585122fe025fdf92`.
+**STATUS: NONE PENDING.** Application release 218 is live as Sites Version 204,
+deployed 2026-11-25 22:39:33.488072 UTC from `50340aef96e9bc87f9b8d43b7c485af97fab3d9d`.
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
-Previous-live rollback: Sites 202 / application release 216 at
-`8cdd02358b07301ca4739a5416865736c9686ef4`. PR39 MCP remains held and excluded.
+Previous-live rollback: Sites 203 / application release 217 at `2c00cf88bbe51894ad588ac3585122fe025fdf92`. PR39 MCP remains held and excluded.
 
 Publication evidence is in [RELEASES.md](RELEASES.md).
 
 ## Remaining device checks
+
+On a physical iPhone, check Detailed light-theme card and defect outlines and,
+where Closing Line is enabled, the white label on the black closing strip.
+Check the full width with the optional vertical number rail and that Off still
+hides the footer. Do not modify real records to verify.
+
 
 On a physical iPhone, confirm that LATEST and OLDEST are readable and stacked
 without crowding VIEW or CLOSE; a filtered bus card still shows the oldest

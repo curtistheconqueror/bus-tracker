@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 203 / application release 217 | Live | 2c00cf88bbe51894ad588ac3585122fe025fdf92 | Shows the oldest active logged date, removes repeated detailed card descriptions, and enlarges Defect Log dates. |
+| 204 / application release 218 | Live | 50340aef96e9bc87f9b8d43b7c485af97fab3d9d | Detailed Defect Log black outlines and solid black labeled closing line. |
+| 203 / application release 217 | Previous live; rollback | 2c00cf88bbe51894ad588ac3585122fe025fdf92 | Shows the oldest active logged date, removes repeated detailed card descriptions, and enlarges Defect Log dates. |
 | 202 / application release 216 | Previous live; rollback | 8cdd02358b07301ca4739a5416865736c9686ef4 | Enlarges emoji/category subtitles in Fixed Repairs only. |
 | 201 / application release 215 | Previous live; rollback | 24ccb374a578f7ffa80fa4037399aaa6ab5b953b | Slightly enlarges the Maintenance Down Sheet title. |
 | 200 / application releases 212–214 | Previous live; rollback | 4d205dbef009f1a74aff807dd6db474c6ddb97d3 | Defect Log window cleanup, compact Down Sheet controls and phone text fixes. |
@@ -401,3 +402,11 @@ Native deployment `appgdep_6b075bc8d554819192aeefb860b2267e` succeeded; saved ve
 - The `sites-v203` alias was recorded locally; remote tag publication is not confirmed.
 
 No other release is pending.
+
+## Sites 204 / application 218 — 2026-11-25
+
+- Live source: `50340aef96e9bc87f9b8d43b7c485af97fab3d9d`, published 2026-11-25 22:39:33.488072 UTC.
+- Detailed light-theme Defect Log cards have thin black bus and defect outlines, preserving chosen bus outline colors and colored work-state rails. When the existing Closing Line preference shows the footer, it is solid black with its original white-on-black label and height, including with the optional number rail. Compact, timestamps, records, storage, sync, and hosting are unchanged. PR39 MCP remains held and excluded.
+- ESLint, production build, all 491 local tests, and diff checks passed. [CI run 520](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45714445250) passed. [CodeRabbit PR #62 review](https://github.com/curtistheconqueror/bus-tracker/pull/62#issuecomment-7176541937) covered the exact source commit and all four changed files with no actionable comments. Map, Down Sheet, Defect Log, and Fixed Repairs returned HTTP 200. The live Defect Log CSS and JavaScript matched the build byte-for-byte. Managed preview could not start; physical iPhone appearance and local fleet data were not verified.
+- Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_ede58b709fac81918d39415c9ef46061`; deployment: `appgdep_6b07639f63408191a9bb53e4e03e9ea2`. Archive: `sha256:bf84ad804df87642674d8509f85a174c8aabe506c11e94a70654e1088cf779b6`.
+- Immediate rollback: Sites 203 / application release 217 at `2c00cf88bbe51894ad588ac3585122fe025fdf92`. Public URL and access/runtime revisions are unchanged.
