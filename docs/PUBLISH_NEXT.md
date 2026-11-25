@@ -112,18 +112,25 @@ line is always Codex's own and PR39 never claims it.
 
 Measured on this head, in a container rather than in CI, rather than carried
 over from an earlier run: the production build succeeds, ESLint is clean, and
-**537 of 538 tests pass**. That figure is a measurement of one tree and nothing
+**538 of 538 tests pass**. That figure is a measurement of one tree and nothing
 more — it moves with any change that adds a test, so re-measure it here, and CI
 must re-run on the actual merge SHA before anything is packaged.
 
-**The one failure is not this branch's, and is recorded rather than rounded
-off.** `tests/defect-log-black-footer.test.mjs` spawns a real Chrome and asserts
-on the DOM it dumps; in this container that spawn exceeds the test's own 30s
-budget and fails as `ETIMEDOUT`, twice in a row. It fails identically on a clean
-`main` checkout with this branch absent, it is a `main`-owned test, and nothing
-in it touches the MCP. A container without a fast enough browser cannot measure
-it, which is one more reason the CI run on the merge SHA is the gate and this
-paragraph is not.
+**THE BROWSER TESTS NEED `CHROME_BIN` SET IN A CONTAINER LIKE THIS ONE, AND
+WITHOUT IT ONE OF THEM FAILS FOR A REASON THAT IS NOT A DEFECT.**
+`tests/defect-log-black-footer.test.mjs` tries `google-chrome`, `chromium` and
+`chromium-browser` in that order and spawns the first that answers `--version`,
+with a 30 second budget. Here the first is a wrapper onto full Chromium, which
+exceeds that budget and dies `ETIMEDOUT`. Pointing `CHROME_BIN` at Playwright's
+`chrome-headless-shell` instead is not enough on its own: the shell refuses to
+run as root without `--no-sandbox`, which this test does not pass, so it exits
+1 saying so. Both readings are environment, not behaviour — the test is sound
+and `main`-owned, and nothing in it touches the MCP.
+
+So `CHROME_BIN` wants a one-line wrapper that execs
+`chrome-headless-shell --no-sandbox "$@"`, and with that the file passes 5 of 5
+and the whole suite 538 of 538. Worth knowing before somebody reads a red
+`ETIMEDOUT` here as a regression: it is neither this branch's nor a defect.
 
 Nothing about the gates below changed. Merging `main` in, and correcting what
 this section says, are both maintenance so the branch can land when Curtis
