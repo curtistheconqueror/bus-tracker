@@ -67,39 +67,49 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
   }catch{res.writeHead(500);res.end()}
  });
  const browser=spawn(chrome,["--headless","--disable-gpu","--disable-dev-shm-usage","--disable-background-networking",
-  "--no-first-run","--remote-debugging-pipe","--user-data-dir="+profile,"about:blank"],
-  {stdio:["ignore","ignore","pipe","pipe","pipe"]});
- let errors="";
+  "--no-first-run","--remote-debugging-port=0","--user-data-dir="+profile,"about:blank"],
+  {stdio:["ignore","ignore","pipe"]});
+ let errors="",socket;
  browser.stderr.on("data",chunk=>{errors=(errors+chunk).slice(-1600)});
- const running=once(browser,"exit");
- let seq=0,buffer="";
+ const stopped=new Promise(resolve=>{browser.once("exit",resolve);browser.once("error",error=>{errors+=error.message;resolve()})});
+ let seq=0;
  const requests=new Map();
- browser.stdio[4].setEncoding("utf8").on("data",data=>{
-  buffer+=data;
-  let end;
-  while((end=buffer.indexOf("\0"))>=0){
-   const message=JSON.parse(buffer.slice(0,end));
-   buffer=buffer.slice(end+1);
-   requests.get(message.id)?.(message);
-  }
- });
  const send=(method,params={},sessionId)=>new Promise((resolve,reject)=>{
   const id=++seq;
   const timer=setTimeout(()=>{
    requests.delete(id);
    reject(Error(method+" timed out: "+errors));
-  },4500);
+  },7000);
   requests.set(id,message=>{
    requests.delete(id);clearTimeout(timer);
    if(message.error)reject(Error(method+": "+message.error.message));
    else resolve(message.result);
   });
-  browser.stdio[3].write(JSON.stringify({id,method,params,sessionId})+"\0");
+  socket.send(JSON.stringify({id,method,params,sessionId}));
  });
  try{
   server.listen(0,"127.0.0.1");
   await once(server,"listening");
   const origin="http://127.0.0.1:"+server.address().port;
+  const portFile=join(profile,"DevToolsActivePort");
+  let endpoint;
+  for(let i=0;i<120;i++){
+   let data="";
+   try{data=await readFile(portFile,"utf8")}catch(error){if(error.code!=="ENOENT")throw error}
+   const [port,path]=data.trim().split("\n");
+   if(/^\d+$/.test(port)&&path?.startsWith("/devtools/browser/")){
+    endpoint="ws://127.0.0.1:"+port+path;
+    break;
+   }
+   await new Promise(resolve=>setTimeout(resolve,75));
+  }
+  assert.ok(endpoint,"Chrome did not expose its loopback testing endpoint: "+errors);
+  socket=new WebSocket(endpoint);
+  await once(socket,"open",{signal:AbortSignal.timeout(7000)});
+  socket.addEventListener("message",event=>{
+   const message=JSON.parse(event.data);
+   requests.get(message.id)?.(message);
+  });
   const {targetId}=await send("Target.createTarget",{url:"about:blank"});
   const {sessionId}=await send("Target.attachToTarget",{targetId,flatten:true});
   const call=(method,params)=>send(method,params,sessionId);
@@ -110,7 +120,8 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
   };
   const wait=async expression=>{
    for(let i=0;i<60;i++){
-    if(await evalPage(expression))return;
+    try{if(await evalPage(expression))return}
+    catch(error){if(!/Cannot find context|Execution context was destroyed|Inspected target navigated/.test(error.message))throw error}
     await new Promise(resolve=>setTimeout(resolve,50));
    }
    assert.fail("Timed out waiting for "+expression);
@@ -192,8 +203,9 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
   assert.deepEqual(await evalPage(`[...document.querySelectorAll("${panel} a")].map(a=>a.getAttribute("href"))`),TRACKER_PAGES.filter(page=>page.href!=="/lists").map(page=>page.href));
   assert.equal(await evalPage(visible(".down-header-pair button[aria-label]")),false);
  }finally{
+  socket?.close();
   browser.kill();
-  await running;
+  await stopped;
   server.closeAllConnections();
   await new Promise(resolve=>server.close(resolve));
   await rm(profile,{force:true,recursive:true,maxRetries:3});
