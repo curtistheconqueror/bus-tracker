@@ -261,7 +261,7 @@ button,input,select,textarea{font:inherit}
 .down-header h1{color:var(--down-page-title-color,var(--app-header-text,#fff));font-size:var(--down-page-title-size,25px)}
 .down-summary span{color:var(--down-summary-color,#657590);font-size:var(--down-summary-size,8px)}
 .quick-notes label b{color:var(--down-quick-notes-color,#163765);font-size:var(--down-quick-notes-size,10px)}
-.sheet-title span{color:var(--down-sheet-title-color,#163765);font-size:var(--down-sheet-title-size,15px)}
+.sheet-title span{color:var(--down-sheet-title-color,#163765);font-size:var(--down-sheet-title-size,17px)}
 .down-table th{color:var(--down-column-header-color,#21395f);font-size:var(--down-column-header-size,8px)}
 .reason-button b{color:var(--down-reason-category-color,#075dbb);font-size:var(--down-reason-category-size,13px);font-weight:900;line-height:1.2}
 .reason-button span{color:var(--down-reason-details-color,#1c3154);font-size:var(--down-reason-details-size,10px);font-weight:700;line-height:1.3}

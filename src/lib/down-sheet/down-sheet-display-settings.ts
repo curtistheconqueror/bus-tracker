@@ -1,5 +1,5 @@
 export type DownSheetStyleKey="pageTitle"|"summary"|"quickNotes"|"sheetTitle"|"columnHeaders"|"reasonCategory"|"reasonDetails";
-export type DownSheetTextStyle={color:string;fontSize:number};
+export type DownSheetTextStyle={color:string;fontSize:number;customSize?:true};
 export type DownSheetLabels={
  pageTitle:string;subtitle:string;active:string;pending:string;accident:string;waiting:string;completed:string;activeLabor:string;currentView:string;capacity:string;
  quickNotes:string;sheetKicker:string;sheetTitle:string;line:string;busNumber:string;reasonDown:string;assignment:string;section:string;shift:string;workStatus:string;estimatedTime:string;updatedBy:string;
@@ -20,7 +20,7 @@ export const DEFAULT_DOWN_SHEET_DISPLAY:DownSheetDisplaySettings={
   quickNotes:"QUICK NOTES",sheetKicker:"MAINTENANCE FACILITY",sheetTitle:"Maintenance Down Sheet",line:"LINE",busNumber:"BUS NUMBER",reasonDown:"REASON DOWN",assignment:"MECHANIC / VENDOR",section:"SECTION",shift:"SHIFT",workStatus:"WORK STATUS",estimatedTime:"EST. TIME",updatedBy:"UPDATED BY",
  },
  styles:{
-  pageTitle:{color:"#ffffff",fontSize:25},summary:{color:"#657590",fontSize:8},quickNotes:{color:"#163765",fontSize:10},sheetTitle:{color:"#163765",fontSize:15},columnHeaders:{color:"#21395f",fontSize:8},reasonCategory:{color:"#075dbb",fontSize:13},reasonDetails:{color:"#1c3154",fontSize:10},
+  pageTitle:{color:"#ffffff",fontSize:25},summary:{color:"#657590",fontSize:8},quickNotes:{color:"#163765",fontSize:10},sheetTitle:{color:"#163765",fontSize:17},columnHeaders:{color:"#21395f",fontSize:8},reasonCategory:{color:"#075dbb",fontSize:13},reasonDetails:{color:"#1c3154",fontSize:10},
  },
 };
 
@@ -32,6 +32,10 @@ export function normalizeDownSheetDisplay(value:unknown):DownSheetDisplaySetting
  const saved=(value&&typeof value==="object"?value:{}) as Partial<DownSheetDisplaySettings>;
  const savedLabels=saved.labels||{} as Partial<DownSheetLabels>,savedStyles=saved.styles||{} as Partial<Record<DownSheetStyleKey,Partial<DownSheetTextStyle>>>;
  const labels=Object.fromEntries(Object.entries(DEFAULT_DOWN_SHEET_DISPLAY.labels).map(([key,fallback])=>[key,text(savedLabels[key as keyof DownSheetLabels],fallback)])) as unknown as DownSheetLabels;
- const styles=Object.fromEntries(Object.entries(DEFAULT_DOWN_SHEET_DISPLAY.styles).map(([key,fallback])=>{const candidate=savedStyles[key as DownSheetStyleKey];return [key,{color:color(candidate?.color,fallback.color),fontSize:size(candidate?.fontSize,fallback.fontSize)}]})) as Record<DownSheetStyleKey,DownSheetTextStyle>;
+ const styles=Object.fromEntries(Object.entries(DEFAULT_DOWN_SHEET_DISPLAY.styles).map(([key,fallback])=>{const candidate=savedStyles[key as DownSheetStyleKey];
+  const customSize=key==="sheetTitle"&&candidate?.customSize===true;
+  // Older visits persisted 15 even if the user never edited the size.
+  const legacyDefault=key==="sheetTitle"&&!customSize&&Number(candidate?.fontSize)===15;
+  return [key,{color:color(candidate?.color,fallback.color),fontSize:legacyDefault?fallback.fontSize:size(candidate?.fontSize,fallback.fontSize),...(customSize?{customSize:true}:{})}]})) as Record<DownSheetStyleKey,DownSheetTextStyle>;
  return {labels,styles};
 }
