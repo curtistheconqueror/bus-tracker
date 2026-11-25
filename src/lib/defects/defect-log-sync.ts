@@ -229,6 +229,20 @@ export function unexplainedDownSheetEntries(records:DefectLogRecord[],busId:stri
  const named=new Set(records.filter(record=>record.downSheetEntry).map(record=>record.downSheetEntry!.id));
  return downEntries.filter(entry=>entry.busId===busId&&entry.workflow!=="Completed"&&!named.has(entry.id));
 }
+/* The card's age is independent of search and feed windows. Use the original
+   logged stamp, not the record's parking-date fallback or its last edit. */
+export function oldestActiveDefectLoggedAtByBus(records:readonly DefectLogRecord[]):ReadonlyMap<string,string>{
+ const oldest=new Map<string,{stamp:string;time:number}>();
+ for(const {bus,defect} of records){
+  if(!isUnresolved(defect)||defect.defectLogHiddenAt||!defect.createdAt)continue;
+  const time=Date.parse(defect.createdAt);
+  if(!Number.isFinite(time))continue;
+  const previous=oldest.get(bus.id);
+  if(!previous||time<previous.time)oldest.set(bus.id,{stamp:defect.createdAt,time});
+ }
+ return new Map([...oldest].map(([busId,{stamp}])=>[busId,stamp]));
+}
+
 export function groupDefectLogRecords(records:DefectLogRecord[]):DefectLogBusGroup[]{
  const groups=new Map<string,DefectLogBusGroup>();
  records.forEach(record=>{
