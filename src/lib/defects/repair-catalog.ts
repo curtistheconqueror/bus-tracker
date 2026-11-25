@@ -293,7 +293,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
     fact. The two "will not release" wordings are the split a mechanic can
     actually make standing at the bus, and they narrow the valve without
     asserting it. A test holds that no wording in here names either valve. */
- "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","Brakes sticking / dragging","Brakes will not release - service (after pedal)","Brakes will not release - parking brake","Brake chamber leaking","ABS warning","Brake mod light","Parking brake","Other brake repair"],
+ "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","Brakes sticking / dragging","Brakes will not release - service (after pedal)","Brakes will not release - parking brake","Pulls to R/S when service brakes are applied","Pulls to C/S when service brakes are applied","Brake chamber leaking","ABS warning","Brake mod light","Parking brake","Other brake repair"],
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","Voltage regulator","Alternator failure","No crank","Crank no start","Intermittent no start","Front start INOP","Rear start INOP","Starter","Solid battery light","Flashing battery light","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
