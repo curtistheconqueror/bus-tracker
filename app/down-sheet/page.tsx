@@ -1,7 +1,6 @@
 "use client";
 
 import StatusReportModal from "@/src/components/reports/status-report-modal";
-import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
 import {DOWN_SHEET_FILTERS,downSheetFilterCounts,downSheetFilterEntries,type DownSheetFilterKey} from "@/src/lib/down-sheet/down-sheet-filters";
 import {downSheetShareFilename,downSheetShareHtml,downSheetShareScope,downSheetShareScopeLabel,downSheetShareText} from "@/src/lib/down-sheet/down-sheet-share";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
@@ -39,16 +38,18 @@ import {DeferredNavBadge,DeferredReviewPrompt} from "@/src/components/shared/def
 import {exportFleetBoardBackup} from "@/src/lib/storage/fleet-backup";
 import ShopCloudLive from "@/src/components/shared/shop-cloud-live";
 import {forgetRemovedEntries,rememberRemovedEntries} from "@/src/lib/cloud/cloud-sync";
-import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "@/src/components/down-sheet/mystery-board";
-import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "./_components/deferred-board";
-import RecommendedBoard,{RECOMMENDED_BOARD_COLLAPSED_KEY} from "./_components/recommended-board";
+import MysteryBoard from "@/src/components/down-sheet/mystery-board";
+import DeferredBoard from "./_components/deferred-board";
+import RecommendedBoard from "./_components/recommended-board";
+import {WATCH_LISTS,watchListCounts,watchListLabel,sheetToolFromSearch,SHEET_TOOL_PARAM,type WatchListKey} from "@/src/lib/down-sheet/down-sheet-watch-lists";
 import SheetSectionBoard from "./_components/sheet-section-board";
 /* The route this page is, as SCAN SHEET and the hand-off name it. */
 const PAPER_HERE="/down-sheet";
-/* Per device and collapsed by default, the same as the three boards above
-   them. Both are NEW names, so nothing already stored is renamed. */
-const SOFT_BOARD_COLLAPSED_KEY="pace-down-sheet-soft-collapsed-v1";
-const IDOT_BOARD_COLLAPSED_KEY="pace-down-sheet-idot-collapsed-v1";
+/* The five boards' own collapsed keys, the counts' open key and ADVANCED
+   ACTIONS' open key are NO LONGER READ (release 213): the boards open from
+   QUICK FILTERS, and the three rows under ADD DOWN BUS start closed on every
+   visit. Curtis: "Make sure that those 3 options ... are hidden by default".
+   The keys stay listed in CLAUDE.md and are left alone on devices. */
 import type {DefectLogDownEntry,DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
 import {answerDeferredBus} from "@/src/lib/defects/deferred-actions";
 import {answerRecommendedBus} from "@/src/lib/defects/recommended-actions";
@@ -121,12 +122,6 @@ const SCAN_UNDO_KEY="pace-down-sheet-scan-undo-v1";
    sheet, only one can be the most recent, and a foreman who has just pressed
    the wrong one wants the same words in the same place either way. */
 const ENTRY_UNDO_KEY="pace-down-sheet-entry-undo-v1";
-const ADVANCED_OPEN_KEY="pace-down-sheet-advanced-open-v1";
-/* Per device, like ADVANCED ACTIONS above it. Absent means COLLAPSED, which is
-   the opposite of the usual "absent means on" here and is deliberate: fourteen
-   tiles was a wall to scroll past before reaching the sheet, and a board nobody
-   asked to open should not be the first thing on the page. */
-const COUNTS_OPEN_KEY="pace-down-sheet-counts-open-v1";
 /* This key holds more than this page writes to it — the Settings page owns some
    of the same blob — so the sheet's own write merges over what is stored rather
    than replacing it. It used to replace, which meant any field the sheet did
@@ -230,7 +225,9 @@ function isToday(value:string){return Boolean(value)&&new Date(value).toDateStri
 function timeLabel(value:string){if(!value)return "Not updated";return new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(value))}
 
 export default function DownSheet(){
- const [advancedOpen,setAdvancedOpen]=useState(false);
+ /* SHARE in the header opens the whole-sheet share and STATUS REPORT below
+    it (release 213). Closed on every visit. */
+ const [shareOpen,setShareOpen]=useState(false);
  const [saveProblem,setSaveProblem]=useState<FleetWriteReason|"">("");
  const [fleet,setFleet]=useState<FleetBus[]>([]);
  const [entries,setEntries]=useState<DownEntry[]>([]);
@@ -251,10 +248,6 @@ export default function DownSheet(){
     can put the keyboard on the blank card. Forgotten with the editor. */
  const [reopened,setReopened]=useState(false);
  useEffect(()=>{if(!editing){setCarriedInitials("");setReopened(false)}},[editing]);
- /* Absent means closed, like the Defect Log's. A device that has never opened
-    the panel does not have to write anything to say so. */
- useEffect(()=>{setAdvancedOpen(localStorage.getItem(ADVANCED_OPEN_KEY)==="1")},[]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,ADVANCED_OPEN_KEY,advancedOpen?"1":"0")},[advancedOpen,hydrated]);
  const [scannerOpen,setScannerOpen]=useState(false);
  /* SCAN SHEET IS THE DOOR, NOT THE SCANNER. Pressing it opens the box that
     takes the photos and works out which sheet they are (`paperOpen`); the
@@ -277,11 +270,16 @@ export default function DownSheet(){
  const [defaultShift,setDefaultShift]=useState<Shift>("1st");
  const [extraTiles,setExtraTiles]=useState<OptionalDownTile[]>([]);
  const [showQuickNotes,setShowQuickNotes]=useState(false);
- const [countsOpen,setCountsOpen]=useState(false);
- const [deferredCollapsed,setDeferredCollapsed]=useState(true);
- const [recommendedCollapsed,setRecommendedCollapsed]=useState(true);
- const [softCollapsed,setSoftCollapsed]=useState(true);
- const [idotCollapsed,setIdotCollapsed]=useState(true);
+ /* THE THREE TABS UNDER SEARCH — SHIFT, COUNTS, FILTERS — and which one's
+    panel is open, if any (release 213). One at a time, none on every visit, and
+    the open tab's second tap hides it again. Not stored. Curtis: "I don't want
+    the screen just defaulting to them being expanded already." */
+ const [openTab,setOpenTab]=useState<"shift"|"counts"|"filters"|null>(null);
+ const toggleTab=(tab:"shift"|"counts"|"filters")=>setOpenTab(current=>current===tab?null:tab);
+ /* Which of the five watch lists is open where the boards used to stand, if
+    any. One at a time, and never together with a sheet filter: QUICK FILTERS
+    holds one choice. */
+ const [watchList,setWatchList]=useState<WatchListKey|null>(null);
  const appMode=useAppMode();
  const [displaySettings,setDisplaySettings]=useState<DownSheetDisplaySettings>(DEFAULT_DOWN_SHEET_DISPLAY);
  const [quickNotes,setQuickNotes]=useState("");
@@ -343,24 +341,7 @@ export default function DownSheet(){
     sheet holding two active entries is exactly the failure the sheet exists
     to prevent. */
  const [mintSkipped,setMintSkipped]=useState("");
- const [mysteryCollapsed,setMysteryCollapsed]=useState(false);
  const [mysteryDisplay,setMysteryDisplay]=useState(DEFAULT_DEFECT_LOG_DISPLAY);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,MYSTERY_COLLAPSED_KEY,mysteryCollapsed?"1":"0")},[mysteryCollapsed,hydrated]);
- useEffect(()=>{setCountsOpen(localStorage.getItem(COUNTS_OPEN_KEY)==="1")},[]);
- /* Absent means COLLAPSED, like the count board: it is a second panel above the
-    rows, and a foreman who never opened it should not have to scroll past it. */
- useEffect(()=>{setDeferredCollapsed(localStorage.getItem(DEFERRED_BOARD_COLLAPSED_KEY)!=="0")},[]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,DEFERRED_BOARD_COLLAPSED_KEY,deferredCollapsed?"1":"0")},[deferredCollapsed,hydrated]);
- /* Absent means COLLAPSED here too, for the reason the two boards above it are:
-    this is now the THIRD panel between the counts and the rows, and a foreman
-    who never opened it should not be scrolling past it to reach the sheet. */
- useEffect(()=>{setRecommendedCollapsed(localStorage.getItem(RECOMMENDED_BOARD_COLLAPSED_KEY)!=="0")},[]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,RECOMMENDED_BOARD_COLLAPSED_KEY,recommendedCollapsed?"1":"0")},[recommendedCollapsed,hydrated]);
- useEffect(()=>{setSoftCollapsed(localStorage.getItem(SOFT_BOARD_COLLAPSED_KEY)!=="0")},[]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,SOFT_BOARD_COLLAPSED_KEY,softCollapsed?"1":"0")},[softCollapsed,hydrated]);
- useEffect(()=>{setIdotCollapsed(localStorage.getItem(IDOT_BOARD_COLLAPSED_KEY)!=="0")},[]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,IDOT_BOARD_COLLAPSED_KEY,idotCollapsed?"1":"0")},[idotCollapsed,hydrated]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,COUNTS_OPEN_KEY,countsOpen?"1":"0")},[countsOpen,hydrated]);
 
  // Restore the existing device-local fleet and down sheet once after hydration.
  /* A BUS THAT ALREADY HAS A ROW DOES NOT GET A SECOND ONE, AND A COMPLETED ROW
@@ -392,7 +373,7 @@ export default function DownSheet(){
     one of them cited wrongly, on a project whose stated rule is that a rule in
     two places is the hazard. The rule is in `src/lib/down-sheet/sheet-mint.ts`
     now and both paths here call it. */
- useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),minted=addMintedEntries(restored,entriesFromFleet(nextFleet),MINT_RULES);setEntries(minted.entries);setMintSkipped(mintSkippedMessage(minted.skipped,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setSectionOrder(normalizeDownSheetSectionOrder(settings.sectionOrder));setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
+ useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),minted=addMintedEntries(restored,entriesFromFleet(nextFleet),MINT_RULES);setEntries(minted.entries);setMintSkipped(mintSkippedMessage(minted.skipped,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setSectionOrder(normalizeDownSheetSectionOrder(settings.sectionOrder));setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
  /* A door on ANOTHER page sends a Vehicle Down Sheet here to be read. No
     page has one today — the Defect Log's was taken off — and this is kept so
     that putting SCAN SHEET on any other page is one button and no plumbing.
@@ -506,18 +487,24 @@ export default function DownSheet(){
     carrying for a fault, which is what the old single number counted — so
     hardDownCount + softDownCount + the IDOT-only rows equals the old total, and
     no bus has gone missing from the page by being reclassified. */
- const hardDownCount=useMemo(()=>shown.filter(entry=>downSheetAvailability(entry)==="down").length,[shown]);
+ /* OPEN rows only (release 213, found in review). With SHOW COMPLETED or
+    COMPLETED TODAY on, `shown` carries finished rows, and the sheet title read
+    "7 DOWN" over seven fixed buses. A completed row is not a bus that is down. */
+ const hardDownCount=useMemo(()=>shown.filter(entry=>isActive(entry)&&downSheetAvailability(entry)==="down").length,[shown]);
  /* The soft buses nobody has put on a run. A bus the yard has decided to use
     is not part of the morning's shortage, which is the whole point of the
     switch, so the number follows the decision. */
- const softDownCount=useMemo(()=>shown.filter(entry=>isSoftDownEntry(entry)&&!isEntryInService(entry)).length,[shown]);
- const inServiceCount=useMemo(()=>shown.filter(entry=>isSoftDownEntry(entry)&&isEntryInService(entry)).length,[shown]);
+ const softDownCount=useMemo(()=>shown.filter(entry=>isActive(entry)&&isSoftDownEntry(entry)&&!isEntryInService(entry)).length,[shown]);
+ const inServiceCount=useMemo(()=>shown.filter(entry=>isActive(entry)&&isSoftDownEntry(entry)&&isEntryInService(entry)).length,[shown]);
  /* Every row that MENTIONS the state inspection, down or not: the section
     exists to keep an eye on what is coming due, and a bus can be both. */
  const idotEntries=useMemo(()=>shown.filter(downSheetMentionsIdot),[shown]);
  /* The board lists EVERY soft bus, in service or not — taking one off the list
     the moment it is switched on would hide the control that switched it. */
  const softEntries=useMemo(()=>shown.filter(isSoftDownEntry),[shown]);
+ /* What each watch list in QUICK FILTERS would open on, counted by the same
+    functions the boards list from (`down-sheet-watch-lists.ts`). */
+ const watchCounts=useMemo(()=>watchListCounts({fleet:fleet as unknown as Parameters<typeof watchListCounts>[0]["fleet"],downEntries:entries as DefectLogDownEntry[],activeDownBusIds:active.map(entry=>entry.busId),softRows:softEntries.length,idotRows:idotEntries.length}),[fleet,entries,active,softEntries,idotEntries]);
  /* Flipping writes to the entry and saves the sheet, so it reaches the other
     devices the way every other entry change does. */
  const toggleInService=(entryId:string,on:boolean)=>{
@@ -673,6 +660,27 @@ export default function DownSheet(){
      server and the next pull handed every one of them back — which is why
      clearing the sheet and watching it refill was reproducible. */
   rememberRemovedEntries(localStorage,entries.map(entry=>entry.id),new Date().toISOString());writeDownSheetStorage(localStorage,result.entries);writeFleetStorage(localStorage,result.fleet);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(true)};
+ /* CLEAR DOWNSHEET ARRIVES FROM SETTINGS (release 213). Once, after the sheet
+    has been read, with the parameter off the address before the confirm, and
+    refused in LITE: Settings hides nothing in LITE, and LITE never reached this
+    button behind ADVANCED ACTIONS. */
+ /* TWO STEPS, found in review: the load-time reconcile queues a fleet write
+    in the same commit that sets `hydrated`, and a clear run in that commit was
+    then written over by the board as it was before. So arrival only marks the
+    clear as pending; the confirm and the clear run in the next commit, after
+    the reconcile has landed. */
+ const sheetToolDone=useRef(false);
+ const [clearPending,setClearPending]=useState(false);
+ useEffect(()=>{
+  if(!hydrated||sheetToolDone.current)return;
+  sheetToolDone.current=true;
+  if(!sheetToolFromSearch(window.location.search))return;
+  const url=new URL(window.location.href);url.searchParams.delete(SHEET_TOOL_PARAM);
+  window.history.replaceState(window.history.state,"",url.pathname+url.search+url.hash);
+  if(hiddenInLite(appMode,"advancedActions")){alert("CLEAR DOWNSHEET is not part of LITE. Turn LITE off in Settings to use it.");return}
+  setClearPending(true);
+ },[hydrated]);// eslint-disable-line react-hooks/exhaustive-deps
+ useEffect(()=>{if(!clearPending)return;setClearPending(false);clearEntireDownSheet()},[clearPending]);// eslint-disable-line react-hooks/exhaustive-deps
  const undoClear=()=>{const snapshot=readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY));if(!snapshot){setUndoClearAvailable(false);alert("There is no cleared down sheet to restore.");return}const restoredAt=new Date().toISOString(),held=new Set(entries.map(entry=>entry.id)),plain=restoreDownSheetState(entries,fleet,snapshot);
   /* Off the removal ledger, and restamped as touched now.
 
@@ -915,104 +923,93 @@ export default function DownSheet(){
   <header className="down-header">
    <div><AppName/><span>FLEET MAINTENANCE</span><h1>{displaySettings.labels.pageTitle}</h1><p>{displaySettings.labels.subtitle}</p></div>
    <TrackerNav active="/down-sheet"/>
-   {/* One column so ADVANCED ACTIONS sits directly under REFRESH at every
-       width, the same shape the Defect Log's header uses. */}
+   {/* REFRESH, then SCAN and SHARE (release 213) - the Defect Log's header,
+       and for the same reason. Curtis: "Let's try to clean this up like we did
+       the Defect tab." SCAN opens SCAN SHEET's door directly; it was inside
+       ADVANCED ACTIONS. SHARE opens the whole-sheet share and STATUS REPORT,
+       which used to sit on the page. ADVANCED ACTIONS is gone: SHOW COMPLETED
+       is on the sheet's own title and CLEAR DOWNSHEET is in Settings. */}
    <div className="down-header-actions">
     <RefreshButton/>
-    {!hiddenInLite(appMode,"advancedActions")&&<button className="down-advanced-toggle" type="button" aria-expanded={advancedOpen} aria-controls={advancedOpen?"down-advanced-drawer":undefined} onClick={()=>setAdvancedOpen(value=>!value)}>
-     <span><b>ADVANCED ACTIONS</b><small>Shifts, completed, scan sheet and clearing</small></span><i aria-hidden="true">{advancedOpen?"CLOSE":"OPEN"}</i>
-    </button>}
+    <div className="down-header-pair">
+     {!hiddenInLite(appMode,"advancedActions")&&<button className="down-header-button" type="button" onClick={()=>setPaperOpen(true)} aria-label={"Scan: "+PAPER_DOOR} title="Photograph any shop sheet: the app works out which one it is and opens its scanner"><svg className="down-header-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7l2-3h4l2 3"/><circle cx="12" cy="13.5" r="3.5"/></svg><b>SCAN</b></button>}
+     <button className="down-header-button" type="button" aria-expanded={shareOpen} aria-controls={shareOpen?"down-share-drawer":undefined} onClick={()=>setShareOpen(value=>!value)}><svg className="down-header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M6 12H5a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1h-1"/></svg><b>SHARE</b><i aria-hidden="true">{shareOpen?"\u25B4":"\u25BE"}</i></button>
+    </div>
    </div>
   </header>
 
-  {/* ADVANCED ACTIONS, the Down Sheet's own.
-
-      Same idea as the Defect Log's and deliberately not the same colour: both
-      headers are navy, so a translucent-white button on this one would have
-      been indistinguishable from that one at a glance. This wears the purple
-      the Down Sheet already uses for SCAN SHEET, which is the tell for which
-      page you are on.
-
-      What went in: the shift filter and SHOW COMPLETED, which change what the
-      sheet shows, and SCAN SHEET with the recovery buttons, which act on the
-      sheet itself. What stayed out: the two things used on every visit, ADD
-      DOWN BUS and SEARCH, which now sit together instead of with a block of
-      controls wedged between them. */}
-  {advancedOpen&&!hiddenInLite(appMode,"advancedActions")&&<section className="down-advanced open" id="down-advanced-drawer">
+  {/* SHARE's drawer: the whole-sheet share that used to sit on the page
+      between the boards and the sheet, plus STATUS REPORT, which is also a
+      thing somebody sends. Drawn as ADVANCED ACTIONS' drawer was. */}
+  {shareOpen&&<section className="down-advanced open down-share-drawer" id="down-share-drawer">
    <div className="down-advanced-body">
     <div className="down-advanced-group">
-     <b className="down-advanced-label">VIEW</b>
-
-     <label className="completed-toggle"><input type="checkbox" checked={showCompleted} onChange={event=>setShowCompleted(event.target.checked)}/><span/>SHOW COMPLETED</label>
-    </div>
-    <div className="down-advanced-group">
-     <b className="down-advanced-label">TOOLS</b>
-     {/* Clearing the sheet and undoing an import are recovery, not daily work.
-         They were the loudest things on the page — a red CLEAR DOWNSHEET beside
-         two amber buttons — sitting above the button that adds a bus. The undos
-         still appear only when there is something to undo. */}
-     <button className="scan-sheet-button" type="button" onClick={()=>setPaperOpen(true)} title="Photograph any shop sheet: the app works out which one it is and opens its scanner">▣ {PAPER_DOOR}</button>
-     {undoScanAvailable&&<button className="undo-scan" type="button" onClick={undoScan}>UNDO IMPORT</button>}
-     {undoClearAvailable&&<button className="undo-clear" type="button" onClick={undoClear}>UNDO CLEAR</button>}
-     <button className="clear-downsheet" type="button" onClick={clearEntireDownSheet} disabled={!entries.length&&!fleet.some(bus=>bus.down)}>CLEAR DOWNSHEET</button>
+     {/* Its own class rather than the road note's, deliberately: that rule gives
+         every button inside it width:100% below 760px, which reads correctly for
+         one SHOW THE WHOLE SHEET button and would stack these four down the
+         screen. */}
+     {/* NO LONGER BEHIND A QUICK FILTER. The same three actions, always on the
+         page, because the thing most often wanted is the sheet itself and that
+         was the one thing they could not send. The row only CHANGES scope with a
+         filter on; with none it sends what is drawn, and says which of the two
+         that is. SHOW THE WHOLE SHEET and the filter's hint stay filter-only:
+         neither means anything when no filter is set. */}
+     <section className={"down-quick-filter-note"+(quickFilter?"":" sheet-share")} aria-label={shareLabel+" — share the sheet"}>
+      {/* ONE LINE UNDER THE SCOPE, holding either the hint or what just
+          happened. The four status messages used to mount as SIBLINGS of this
+          <p>, where `.down-quick-filter-note>small` gives them flex-basis:100%
+          and so a row of their own: measured, SHARE TEXT succeeding grew the bar
+          101px -> 123px at 390 and 52px -> 74px at 1180 and pushed the sheet
+          down about 22px, every time, now that the bar is always on screen.
+          Reserving an empty slot instead would have cost those 22px on EVERY
+          visit to save them on a few; the hint is the thing worth yielding.
+          The live region is here and not on the scope line above it, which is
+          why that line is a plain <p>: this text changes on a deliberate press
+          or a filter change, never on a keystroke in SEARCH. */}
+      <p><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small role="status" className={shareNote.said?"said":undefined}>{shareNote.text}</small></p>
+      <div className="down-quick-filter-actions">
+       <button type="button" onClick={copyFilteredList}>{shareStatus==="copied"?"COPIED!":"COPY LIST"}</button>
+       <button type="button" onClick={shareFilteredList}>SHARE TEXT</button>
+       <button type="button" onClick={shareFilteredPage}>SHARE PAGE</button>
+       {quickFilter&&<button type="button" className="down-quick-filter-clear" onClick={()=>{setQuickFilter(null);setShareStatus("")}}>SHOW THE WHOLE SHEET</button>}
+      </div>
+     </section>
+     <button className="down-status-report-action" type="button" onClick={()=>setReportOpen(true)}>STATUS REPORT</button>
     </div>
    </div>
   </section>}
 
+  {/* ADD DOWN BUS and SEARCH, the two things used on every visit, together.
+      UNDO IMPORT and UNDO CLEAR come up here only while there is something to
+      undo; they used to sit in ADVANCED ACTIONS. */}
   <section className="down-controls">
-   {/* The one thing this page is for, first and full width — and now directly
-       above SEARCH rather than separated from it by six other controls. */}
    <button className="down-primary-action" type="button" onClick={openNewEntry} disabled={active.length>=MAX_ENTRIES} title={active.length>=MAX_ENTRIES?"The sheet is full at "+MAX_ENTRIES+" buses":"Add a bus to the Down Sheet"}>+ ADD DOWN BUS</button>
-   {/* Beside ADD DOWN BUS, never in front of it. That row was deliberately
-       cleared — SHOW COMPLETED and CLEAR DOWNSHEET went behind ADVANCED
-       ACTIONS — so the primary action still leads it. Curtis asked for the
-       report here because here is where the round ends. */}
-   <button className="down-status-report-action" type="button" onClick={()=>setReportOpen(true)}>STATUS REPORT</button>
-  </section>
-
-  <section className="down-shifts" aria-label="Down Sheet shifts">
-     <div className="shift-filter" aria-label="Filter down sheet by shift">
-      {/* "1ST" on its own said nothing — Curtis read the row and could not tell
-          what it was filtering. The word is on each button rather than only in
-          the SHOW label, because the button is what gets looked at. */}
-      <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value&&value!=="All"?"All":value)} key={value}>{value==="All"?"ALL SHIFTS":value.toUpperCase()+" SHIFT"}{value!=="All"&&<i>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</i>}</button>)}
-     </div>
-  </section>
-  <section className="down-view-controls" aria-label="Search and order Down Sheet">
    <label className="down-search"><b>SEARCH</b><input type="search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, repair, mechanic or vendor" aria-label="Search Down Sheet"/></label>
    {search&&<button className="clear-search" type="button" onClick={()=>setSearch("")}>CLEAR</button>}
-   {/* Beside SEARCH rather than behind ADVANCED ACTIONS. Both narrow the sheet
-       to the rows somebody is about to read or send, and a filter nobody can
-       see is a filter nobody uses. */}
-   <QuickFilterMenu<DownSheetFilterKey> active={quickFilter} counts={quickFilterCounts} items={DOWN_SHEET_FILTERS} title="QUICK FILTERS" menuLabel="Quick down sheet filters" onSelect={value=>{setQuickFilter(value);setShareStatus("")}}/>
-   <span className="view-results"><b>{visible.length}</b> IN VIEW</span>
+   {(undoScanAvailable||undoClearAvailable)&&!hiddenInLite(appMode,"undoTools")&&<div className="down-undo-row">
+    {undoScanAvailable&&<button className="undo-scan" type="button" onClick={undoScan}>UNDO IMPORT</button>}
+    {undoClearAvailable&&<button className="undo-clear" type="button" onClick={undoClear}>UNDO CLEAR</button>}
+   </div>}
+   {/* THREE TABS ACROSS (release 213), the Defect Log's ALL · DETAILED ·
+       COMPACT row for this page. Curtis chose this layout, with nothing open
+       until a tab is tapped and a second tap hiding it again. A tab is filled
+       while its panel is open, and outlined in blue while what it controls is
+       narrowing the sheet, so a closed tab still says the sheet is filtered. */}
+   <div className="down-tabs" role="group" aria-label="Shift, counts and filters">
+    <button type="button" className={"down-tab"+(filter!=="All"?" set":"")} aria-expanded={openTab==="shift"} aria-controls={openTab==="shift"?"down-tab-shift":undefined} onClick={()=>toggleTab("shift")}>{filter==="All"?"ALL SHIFTS":filter.toUpperCase()+" SHIFT"}<i aria-hidden="true">{openTab==="shift"?"\u25B4":"\u25BE"}</i></button>
+    <button type="button" className={"down-tab"+(fixedToday||roadFilter?" set":"")} aria-expanded={openTab==="counts"} aria-controls={openTab==="counts"?"down-counts-tiles":undefined} onClick={()=>toggleTab("counts")}>COUNTS<i aria-hidden="true">{openTab==="counts"?"\u25B4":"\u25BE"}</i></button>
+    <button type="button" className={"down-tab"+(watchList||quickFilter?" set":"")} aria-expanded={openTab==="filters"} aria-controls={openTab==="filters"?"down-tab-filters":undefined} aria-label={"Filters: "+(watchList?WATCH_LISTS.find(item=>item.key===watchList)?.shortLabel+" ("+watchListLabel(watchList)+")":quickFilter?DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.shortLabel?.toUpperCase()+" ("+DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.label+")":"none")} onClick={()=>toggleTab("filters")}><svg className="down-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>{watchList?WATCH_LISTS.find(item=>item.key===watchList)?.shortLabel:quickFilter?DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.shortLabel?.toUpperCase():"FILTERS"}</button>
+   </div>
   </section>
 
-  {/* The totals the sheet is read for, collapsed to one number until asked.
-
-      It had grown to fourteen tiles — a wall to scroll past before reaching the
-      rows, on the page where the rows are the point. Curtis: "this is a bit
-      overwhelming and there is no hide button."
-
-      So DOWN BUSES stands alone by default, because that is the number the shop
-      opens this page for, and the rest are one press away. The eight it expands
-      to are hard-coded in the order he set; the six beyond them are ticked on
-      per device in the Down Sheet settings, still counted either way. */}
-  <section className="down-counts-board" aria-label="Down sheet section counts">
-   <div className="down-counts-head">
-    <button type="button" className="down-counts-toggle" aria-expanded={countsOpen} aria-controls="down-counts-tiles" onClick={()=>setCountsOpen(value=>!value)}>
-     {/* THE LEAD IS THE HARD NUMBER, and SOFT rides beside it rather than
-         under it, so the one press it takes to open the tiles is not needed to
-         learn that four of these buses can still work. Curtis: "a person can
-         easily tell if they're not making pull out that hey, we got buses that
-         are down that are not contributing to our pullout numbers." Shown only
-         when there are any, so an ordinary morning still reads as one number. */}
-     <span className="down-counts-lead"><strong>{hardDownCount}</strong><span>DOWN BUSES</span></span>
-     {softDownCount>0&&<span className="down-counts-soft"><strong>{softDownCount}</strong><span>SOFT</span></span>}
-     <span className="down-counts-more">{countsOpen?"HIDE COUNTS":"SHOW COUNTS"}<i aria-hidden="true">{countsOpen?"\u25B2":"\u25BC"}</i></span>
-    </button>
+  {/* THE OPEN TAB'S PANEL, directly under the box, one at a time. */}
+  {openTab==="shift"&&<section className="down-tab-panel" id="down-tab-shift" aria-label="Shift">
+   <div className="shift-filter" aria-label="Filter down sheet by shift">
+      {(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>{setFilter(current=>current===value&&value!=="All"?"All":value);setOpenTab(null)}} key={value}>{value==="All"?"ALL SHIFTS":value.toUpperCase()+" SHIFT"}{value!=="All"&&<i>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</i>}</button>)}
    </div>
-   {countsOpen&&<div className="down-group-counts" id="down-counts-tiles">
+  </section>}
+  {openTab==="counts"&&<section className="down-tab-panel" aria-label="Counts">
+   <div className="down-group-counts" id="down-counts-tiles">
     <div className="group-count total"><strong>{shown.length}</strong><span>TOTAL ON SHEET</span></div>
     <div className="group-count down-buses"><strong>{hardDownCount}</strong><span>DOWN BUSES</span></div>
     {/* The three that answer the pullout question together, in the order Curtis
@@ -1056,48 +1053,40 @@ export default function DownSheet(){
         number as EST. ACTIVE LABOR to the minute, and printing 244h 30m twice
         side by side is exactly the duplication this was meant to clear. */}
     {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("labor")&&visibleMinutes!==counters.activeMinutes&&<div className="group-count group-view-labor"><strong>{formatRepairTime(visibleMinutes)}</strong><span>{displaySettings.labels.currentView||"EST. CURRENT VIEW"}</span></div>}
-   </div>}
-  </section>
+   </div>
+  </section>}
+  {/* The five boards that stood above the sheet are the first section; a pick
+      opens that board under the box. The sheet's own filters follow. One choice
+      at a time, and a pick hides the panel, as the menu it replaced closed. */}
+  {openTab==="filters"&&<section className="down-tab-panel down-filter-list" id="down-tab-filters" aria-label="Filters">
+    <b className="down-filter-sec">WATCH LISTS</b>
+    {WATCH_LISTS.filter(item=>item.key!=="deferred"||!hiddenInLite(appMode,"deferred")).map(item=><button type="button" key={item.key} className={watchList===item.key?"active":undefined} aria-pressed={watchList===item.key} onClick={()=>{setQuickFilter(null);setShareStatus("");setWatchList(current=>current===item.key?null:item.key);setOpenTab(null)}}><span>{item.label}</span><b>{watchCounts[item.key]}</b></button>)}
+    <b className="down-filter-sec">ON THE SHEET</b>
+    {DOWN_SHEET_FILTERS.map(item=><button type="button" key={item.key} className={quickFilter===item.key?"active":undefined} aria-pressed={quickFilter===item.key} onClick={()=>{setWatchList(null);setQuickFilter(current=>current===item.key?null:item.key);setShareStatus("");setOpenTab(null)}}><span>{item.label}</span><b>{quickFilterCounts[item.key]}</b></button>)}
+    {(watchList||quickFilter)&&<button type="button" className="down-filter-clear" onClick={()=>{setWatchList(null);setQuickFilter(null);setShareStatus("");setOpenTab(null)}}>CLEAR</button>}
+  </section>}
 
   {/* Loud, and on the page rather than behind MORE. An accidental delete is
       exactly when nobody goes hunting through a menu for the way back. */}
   {rowAction&&<p className={"down-deleted-note"+(rowAction.kind==="fixed"?" fixed":"")} role="status">Bus <b>{rowAction.busNumber||"—"}</b> {rowAction.kind==="fixed"?"was marked fixed and closed out.":"was deleted from the sheet. Its defects, status and location were kept."} <button type="button" onClick={undoDeleteEntry}>{rowAction.kind==="fixed"?"UNDO":"PUT BACK"}</button></p>}
-  {/* Under the counts and above the sheet: it answers "what is in the building
-      that this sheet does not know about", which is read right after the
-      totals and before the rows themselves. */}
-  <MysteryBoard fleet={fleet} activeDownBusIds={active.map(entry=>entry.busId)}
+  {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
+  {/* THE WATCH LIST PICKED IN QUICK FILTERS, open where the five boards used
+      to stand; its own close button puts it away. */}
+  {watchList==="mystery"&&<MysteryBoard fleet={fleet} activeDownBusIds={active.map(entry=>entry.busId)}
    title={mysteryDisplay.labels.mysteryTitle} subtitle={mysteryDisplay.labels.mysterySubtitle}
-   collapsed={mysteryCollapsed} onCollapsedChange={setMysteryCollapsed}
+   collapsed={false} onCollapsedChange={collapsed=>{if(collapsed)setWatchList(null)}}
    describe={bus=>{const open=(bus.defects||[]).filter(isUnresolved);return open.length?open.slice(0,2).map(defect=>[defect.category,defect.issue].filter(Boolean).join(" — ")).join("; ")+(open.length>2?" +"+(open.length-2)+" more":""):"No known defects logged"}}
    /* The move is written through this page's own fleet write rather than
       inside the board, so a refused write is reported here like every other
       one and the board never saves behind the page's back. */
-   onMoved={nextFleet=>{const result=writeFleetStorageResult(localStorage,nextFleet);setSaveProblem(result.reason||"");if(!result.ok)return false;setFleet(nextFleet);return true}}/>
-  {/* Directly under MYSTERY BUSES, because between them they answer one
-      question: a bus on property that the sheet does not explain is very often
-      a bus somebody deferred. Separate lists on purpose — a mystery is
-      unexplained and a deferral is a decision, and folding them together would
-      dilute the one thing MYSTERY BUSES is for. */}
-  {!hiddenInLite(appMode,"deferred")&&<DeferredBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
-   collapsed={deferredCollapsed} onCollapsedChange={setDeferredCollapsed} onAnswer={answerDeferred}/>}
-  {/* Third and last of the three, directly under DEFERRED. Curtis asked for it
-      "right under both of them, same color and everything". The three read down
-      the page as one question getting narrower: nobody knows why this bus is
-      here (MYSTERY), somebody decided to hold it (DEFERRED), somebody asked for
-      it to go on the sheet and nobody has answered (RECOMMENDED).
-
-      Not gated on Lite, unlike DEFERRED. Holding a bus back from service is a
-      judgement Curtis reserved; saying "I think this one belongs on the sheet"
-      is not, and the quick filter that shows the same list has always been
-      available in Lite — hiding only the board would be the odd half. */}
-  <RecommendedBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
-   collapsed={recommendedCollapsed} onCollapsedChange={setRecommendedCollapsed} onAnswer={answerRecommended}/>
-  {/* THE TWO THE SHEET COULD NOT SAY BEFORE. SOFT is the buses the paper has
-      explicitly said still run; IDOT is what is coming due for the state
-      inspection, which is not a repair and never a reason a bus is down. */}
-  <SheetSectionBoard className="soft-down-board" title="SOFT DOWN — CAN STILL BE USED"
+   onMoved={nextFleet=>{const result=writeFleetStorageResult(localStorage,nextFleet);setSaveProblem(result.reason||"");if(!result.ok)return false;setFleet(nextFleet);return true}}/>}
+  {watchList==="deferred"&&!hiddenInLite(appMode,"deferred")&&<DeferredBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
+   collapsed={false} onCollapsedChange={collapsed=>{if(collapsed)setWatchList(null)}} onAnswer={answerDeferred}/>}
+  {watchList==="recommended"&&<RecommendedBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
+   collapsed={false} onCollapsedChange={collapsed=>{if(collapsed)setWatchList(null)}} onAnswer={answerRecommended}/>}
+  {watchList==="soft"&&<SheetSectionBoard className="soft-down-board" title="SOFT DOWN — CAN STILL BE USED"
    hint="ON THE SHEET, AND THE SHEET SAYS THEY STILL RUN" entries={softEntries} locations={locations}
-   collapsed={softCollapsed} onCollapsedChange={setSoftCollapsed}
+   collapsed={false} onCollapsedChange={collapsed=>{if(collapsed)setWatchList(null)}}
    action={entry=>{
     const stamp=entryInServiceStamp(entry);
     return <button type="button" className={"in-service-toggle"+(stamp?" on":"")}
@@ -1106,42 +1095,10 @@ export default function DownSheet(){
      aria-label={(stamp?"Take bus ":"Put bus ")+entry.busNumber+(stamp?" back out of service":" into service today")}>
      {stamp?"IN SERVICE"+(stamp.by?" — "+stamp.by:"")+" · TAKE OFF":"USING THIS ONE"}
     </button>;
-   }}/>
-  <SheetSectionBoard className="idot-board" title="IDOT — STATE INSPECTION DUE"
+   }}/>}
+  {watchList==="idot"&&<SheetSectionBoard className="idot-board" title="IDOT — STATE INSPECTION DUE"
    hint="KEEP AN EYE ON THESE. NOT COUNTED AS DOWN" entries={idotEntries} locations={locations}
-   collapsed={idotCollapsed} onCollapsedChange={setIdotCollapsed}/>
-  {/* Its own class rather than the road note's, deliberately: that rule gives
-      every button inside it width:100% below 760px, which reads correctly for
-      one SHOW THE WHOLE SHEET button and would stack these four down the
-      screen. */}
-  {/* NO LONGER BEHIND A QUICK FILTER. The same three actions, always on the
-      page, because the thing most often wanted is the sheet itself and that
-      was the one thing they could not send. The row only CHANGES scope with a
-      filter on; with none it sends what is drawn, and says which of the two
-      that is. SHOW THE WHOLE SHEET and the filter's hint stay filter-only:
-      neither means anything when no filter is set. */}
-  <section className={"down-quick-filter-note"+(quickFilter?"":" sheet-share")} aria-label={shareLabel+" — share the sheet"}>
-   {/* ONE LINE UNDER THE SCOPE, holding either the hint or what just
-       happened. The four status messages used to mount as SIBLINGS of this
-       <p>, where `.down-quick-filter-note>small` gives them flex-basis:100%
-       and so a row of their own: measured, SHARE TEXT succeeding grew the bar
-       101px -> 123px at 390 and 52px -> 74px at 1180 and pushed the sheet
-       down about 22px, every time, now that the bar is always on screen.
-       Reserving an empty slot instead would have cost those 22px on EVERY
-       visit to save them on a few; the hint is the thing worth yielding.
-       The live region is here and not on the scope line above it, which is
-       why that line is a plain <p>: this text changes on a deliberate press
-       or a filter change, never on a keystroke in SEARCH. */}
-   <p><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small role="status" className={shareNote.said?"said":undefined}>{shareNote.text}</small></p>
-   <div className="down-quick-filter-actions">
-    <button type="button" onClick={copyFilteredList}>{shareStatus==="copied"?"COPIED!":"COPY LIST"}</button>
-    <button type="button" onClick={shareFilteredList}>SHARE TEXT</button>
-    <button type="button" onClick={shareFilteredPage}>SHARE PAGE</button>
-    {quickFilter&&<button type="button" className="down-quick-filter-clear" onClick={()=>{setQuickFilter(null);setShareStatus("")}}>SHOW THE WHOLE SHEET</button>}
-   </div>
-  </section>
-  {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
-
+   collapsed={false} onCollapsedChange={collapsed=>{if(collapsed)setWatchList(null)}}/>}
   {/* Off by default now. It sat permanently between the counts and the sheet
       on a page whose whole problem was how much you scroll past to reach the
       rows. The note itself is untouched on every device that has one — the
@@ -1151,7 +1108,15 @@ export default function DownSheet(){
    <div className="quick-notes-editor"><textarea id="down-quick-notes" value={quickNotes} onChange={event=>setQuickNotes(event.target.value)} placeholder="Example: 3 road calls today; follow up with vendor; check late-shift parts delivery."/><button type="button" onClick={saveQuickNote} disabled={quickNotes===savedQuickNotes}>SAVE NOTE</button></div>
   </section>}
   <section className="sheet-wrap">
-   <div className="sheet-title"><div><b>{displaySettings.labels.sheetKicker||"MAINTENANCE FACILITY"}</b><span>{displaySettings.labels.sheetTitle}</span></div><p>{filter==="All"?"ALL SHIFTS":filter+" SHIFT"} · {visible.length} ROW{visible.length===1?"":"S"} · {formatRepairTime(visibleMinutes)} ESTIMATED</p></div>
+   <div className="sheet-title"><div><b>{displaySettings.labels.sheetKicker||"MAINTENANCE FACILITY"}</b><span>{displaySettings.labels.sheetTitle}</span></div><p>{/* The two numbers the shop opens this page for, on the sheet's own title
+       since the counts bar went (release 213), so they show with COUNTS shut. */}{/* Not while COMPLETED TODAY is on: the rows are then the finished ones,
+       and a red "0 DOWN" over them reads as a clear sheet (review). A " · "
+       after, so "3 SOFT ALL SHIFTS · PARTS" does not read as one phrase. */}{!fixedToday&&<><b className="sheet-title-down">{hardDownCount} DOWN</b>{softDownCount>0&&<>{" "}<b className="sheet-title-soft">{softDownCount} SOFT</b></>}{" · "}</>}{filter==="All"?"ALL SHIFTS":filter+" SHIFT"}{/* What is narrowing the rows, said where the rows are: the FILTERS and
+       COUNTS tabs are closed most of the time, and a sheet that is filtered
+       must say so on the sheet (found in review). */}{watchList?"":quickFilter?" · "+(DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.shortLabel||"").toUpperCase():""}{fixedToday?" · COMPLETED TODAY":""} · {visible.length} ROW{visible.length===1?"":"S"} · {formatRepairTime(visibleMinutes)} ESTIMATED</p>
+    {/* SHOW COMPLETED, on the title of the thing it changes; it was in
+        ADVANCED ACTIONS, and LITE still does not offer it. */}
+    {!hiddenInLite(appMode,"advancedActions")&&<label className="completed-toggle sheet-completed"><input type="checkbox" checked={showCompleted} onChange={event=>setShowCompleted(event.target.checked)}/><span/>SHOW COMPLETED</label>}</div>
    <div className="sheet-scroll">
     <table className="down-table">
      <thead><tr><th>{displaySettings.labels.line}</th><th>{displaySettings.labels.busNumber}</th><th>{displaySettings.labels.reasonDown}</th><th>{displaySettings.labels.assignment}</th><th>{displaySettings.labels.section}</th><th>{displaySettings.labels.shift}</th><th>{displaySettings.labels.workStatus}</th><th>{displaySettings.labels.estimatedTime}</th><th>{displaySettings.labels.updatedBy}</th><th className="row-actions-head">ACTIONS</th></tr></thead>

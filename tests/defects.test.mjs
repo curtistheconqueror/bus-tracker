@@ -112,16 +112,20 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
   assert.equal(quickFilterShareText("Defect / Condition Not Duplicated",[buses[9]],"not-duplicated"),"Defect / Condition Not Duplicated — 1 bus\n\nBus 8\n   Electrical / Multiplex — Intermittent electrical — Reported cutting out");
 });
 
-test("the Mystery list renders on the Down Sheet, and the Defect Log packs its controls away", async () => {
+test("the Mystery list is reached from the Down Sheet's quick filters, and the Defect Log packs its controls away", async () => {
   /* MYSTERY BUSES moved: every bus it lists is a bus that is NOT on the Down
-     Sheet, so it belongs beside that sheet rather than on the Defect Log. */
+     Sheet, so it belongs beside that sheet rather than on the Defect Log.
+     Since release 213 it is the first watch list in the Down Sheet's QUICK
+     FILTERS and opens only when picked, so the page opens without it. */
   const downResponse=await render("/down-sheet");
   assert.equal(downResponse.status,200);
   const downHtml=await downResponse.text();
-  assert.match(downHtml,/MYSTERY BUSES/);
-  assert.match(downHtml,/ON-SITE WORK AREAS NOT ON DOWN SHEET/);
-  assert.match(downHtml,/class="mystery-board"/);
-  assert.match(downHtml,/class="mystery-toggle"/);
+  assert.match(downHtml,/class="down-tab"[^>]*aria-label="Filters: none"/);
+  assert.doesNotMatch(downHtml,/class="mystery-board/,"closed until somebody picks it");
+  const downPage=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+  assert.match(downPage,/\{watchList==="mystery"&&<MysteryBoard fleet=\{fleet\}/);
+  const {WATCH_LISTS}=await import("../src/lib/down-sheet/down-sheet-watch-lists.ts");
+  assert.equal(WATCH_LISTS[0].key,"mystery");
 
   const response=await render("/defect-log");
   assert.equal(response.status,200);
@@ -743,8 +747,9 @@ test("a search ends when somebody ends it, and never says so silently", async ()
  assert.match(page, /const unsearched=stateOnly\.filter\(matchesFeedWindow\)/);
  assert.match(page, /const visible=unsearched\.filter\(matchesSearch\)/);
  assert.match(page, /const hiddenBySearch=search\.trim\(\)\?groupDefectLogRecords\(unsearched\)\.length-visibleGroups\.length:0/);
- assert.match(page, /const hiddenByFeedWindow=feedWindowLimit===null\?0:groupDefectLogRecords\(stateOnly\)\.length-groupDefectLogRecords\(unsearched\)\.length/,
-  "the window's own bar is measured against the state filter's result, not the whole board");
+ /* The window's own bar and its count left in release 212; ALL ▾ names the
+    window on its face. */
+ assert.doesNotMatch(page, /hiddenByFeedWindow/);
 });
 
 test("a repair already on the Down Sheet follows its record when the bus number changes", () => {
@@ -6196,7 +6201,7 @@ test("the sweep scanner refuses a page that is not a sweep sheet",async()=>{
  assert.match(scanner,/if\(verdict!=="not-a-sweep-sheet"\)scanned\.push\(\.\.\.pageRows\)/);
  assert.match(scanner,/unsure\.has\(finding\.pageNumber\)\?\{\.\.\.finding,selected:false\}:finding/);
  assert.match(scanner,/IS NOT A FAREBOX OR VENTRA SHEET/);
- assert.match(scanner,/A down sheet goes through SCAN SHEET on the Down Sheet page/);
+ assert.match(scanner,/A down sheet goes through SCAN on the Down Sheet page/);
  assert.match(scanner,/DOES NOT LOOK LIKE A SWEEP SHEET/);
  assert.match(css,/\.sweep-warning\{/);
 });
@@ -7941,7 +7946,7 @@ test("the LIVE REPAIR FEED can be narrowed to a shift or a day without touching 
  assert.doesNotMatch(shared,/today/i,"the shared module must not have learned about TODAY");
 });
 
-test("WHEN LOGGED narrows the feed, says so outside the drawer, and never outranks a search",async()=>{
+test("the feed window narrows the feed, says so when it cannot apply, and never outranks a search",async()=>{
  const [page,css]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
@@ -7968,26 +7973,17 @@ test("WHEN LOGGED narrows the feed, says so outside the drawer, and never outran
  assert.match(page,/const \[feedWindowNow,setFeedWindowNow\]=useState\(\(\)=>new Date\(\)\)/);
  assert.match(page,/const feedWindowSpan=search\.trim\(\)\?null:feedWindowRange\(feedWindow,feedWindowNow,shiftSettings\)/,
   "a search must stand the window down, not merely be applied after it");
- assert.match(page,/const feedWindowText=search\.trim\(\)\?"":feedWindowLabel\(feedWindow,feedWindowNow,shiftSettings\)/,
-  "and the bar has to go quiet with it, or it would claim a window that is not in force");
+ /* The window bar that had to go quiet with it left in release 212: Curtis,
+    "we don't need this badge banner about other buses hidden." */
+ assert.doesNotMatch(page.replace(/\/\*[\s\S]*?\*\//g,"").replace(/\{\/\*[\s\S]*?\*\/\}/g,""),/feedWindowText|OLDER BUS|OTHER BUS/,"in the code; the comments may still tell its story");
  assert.match(page,/SEARCHING EVERY DATE/,"the search bar says why the window stopped applying");
 
- /* THE STATE AND THE WAY OUT LIVE OUTSIDE THE DRAWER. The control sits in VIEW,
-    which is collapsed by default, so a narrowed board that explained itself
-    only in there would be the trap this control could have been. */
- assert.match(page,/\{feedWindowText&&<div className="log-window-filtered" role="status">/);
- assert.match(page,/className="show-all-buses" onClick=\{\(\)=>setFeedWindow\("all"\)\}/,"one tap back to the whole board");
- assert.match(page,/OLDER BUS/,"it says how many buses the window is holding back");
- /* Pinned by what sits BETWEEN the two bars rather than by their order. A bare
-    "the window bar comes after the drawer opens" passes with the bar moved
-    inside the drawer, which is exactly the regression worth catching — found by
-    making that move and watching the assertion stay green. The search bar is
-    known to be outside the drawer, so: the window bar follows it, and nothing
-    belonging to the drawer comes between them. */
- const searchBar=page.indexOf('className="log-search-filtered"'),windowBar=page.indexOf('className="log-window-filtered"');
- assert.ok(searchBar>0&&windowBar>searchBar,"the window bar renders beside the search bar, not before it");
- assert.doesNotMatch(page.slice(searchBar,windowBar),/log-advanced/,
-  "nothing of the collapsible drawer may come between them: the bar has to be reachable with VIEW shut");
+ /* THE STATE AND THE WAY OUT ARE ON THE DROP-DOWN'S OWN FACE since release
+    208, which is why the bar under SEARCH could go in 212. The one case kept is
+    the window that cannot be applied - hours that cover no window now - where
+    the face says THIS SHIFT and the feed shows every date. */
+ assert.match(page,/\{feedWindowBroken&&<div className="log-window-filtered log-window-broken" role="status">/);
+ assert.match(page,/className="show-all-buses" onClick=\{\(\)=>setFeedWindow\("all"\)\}/,"one tap back to the whole board in that case");
 
  /* STICKY, NOT STORED. The shop computer's tab does not reload, so useState is
     permanent in practice; a storage key would instead mean somebody walks up to
@@ -8083,9 +8079,9 @@ test("one clock reaches the limit, the ages and the label",async()=>{
  assert.match(page,/defectWithinFeedWindow\(record\.defect,feedWindowLimit,feedWindowNow,feedWindowSpan\?\.min\)/,
   "the ages read the same instant as the limit");
  assert.match(page,/feedWindowRange\(feedWindow,feedWindowNow,shiftSettings\)/);
- assert.match(page,/feedWindowLabel\(feedWindow,feedWindowNow,shiftSettings\)/);
+ assert.match(page,/feedWindowUnresolved\(feedWindow,feedWindowNow,shiftSettings\)/);
  /* No fourth reading anywhere in the window's own code path. */
- const span=page.slice(page.indexOf("const [feedWindowNow,setFeedWindowNow]"),page.indexOf("const hiddenByFeedWindow="));
+ const span=page.slice(page.indexOf("const [feedWindowNow,setFeedWindowNow]"),page.indexOf("const feedWindowBroken="));
  const reads=span.match(/new Date\(\)/g)||[];
  assert.equal(reads.length,3,
   "expected exactly three clock reads in this span — the initial state, the effect's immediate read and the interval's — found "+reads.length);

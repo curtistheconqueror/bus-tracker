@@ -105,7 +105,7 @@ export default function HeatScanner({fleet,onClose,onFile,handed}:Props){
    setFindings(review.findings);
    setHeld(review.held);
    setRead(true);
-   if(review.held.length===photos.length&&review.held.every(item=>item.verdict==="not-a-heat-sheet"))setError("None of these photos is a heat check sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN SHEET on the Down Sheet page, and a farebox or Ventra sheet through SCAN, then FAREBOX / VENTRA SWEEP."+(fromPaper&&start.wrong?" "+start.wrong:""));
+   if(review.held.length===photos.length&&review.held.every(item=>item.verdict==="not-a-heat-sheet"))setError("None of these photos is a heat check sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN on the Down Sheet page, and a farebox or Ventra sheet through SCAN on the Defect Log, then FAREBOX / VENTRA SWEEP."+(fromPaper&&start.wrong?" "+start.wrong:""));
    else if(!review.findings.length)setError("No bus lines were found. Try a clearer photo, with the whole sheet in frame.");
   }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false);setProgress("")}
  };

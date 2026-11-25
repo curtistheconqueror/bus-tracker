@@ -71,6 +71,7 @@ import {mergeSheetLedgers,readSheetLedger,writeSheetLedger} from "@/src/lib/down
 import ShiftSettingsPanel from "./_components/shift-settings";
 import SheetBackfillPanel from "./_components/sheet-backfill";
 import {logToolHref} from "@/src/lib/defects/defect-log-tools";
+import {clearSheetHref} from "@/src/lib/down-sheet/down-sheet-watch-lists";
 
 /* The map's duty-cycle average reads two histories the Defect Log's bus type
    never needed to know about. */
@@ -509,7 +510,7 @@ export default function SettingsPage(){
      <SettingsDrawer title="THIS DEVICE" note="Header colour, sound and vibration, Lite mode, and showing the first-time welcome screen again.">
      <section className="settings-lite-switch">
       <label className="settings-check"><input type="checkbox" checked={appMode==="lite"} onChange={event=>setAppMode(event.target.checked?"lite":"full")}/>
-       <span><b>LITE MODE ON THIS DEVICE</b><small>Draws less of the app so a new person can learn the workflow: Fleet Campaigns, the advanced actions on both sheets, DEFERRED, and the diagnosis half of the defect form all stand down. Nothing changes about what is saved or synced — a Lite phone and a full phone write the same records to the same Shop Cloud.</small></span></label>
+       <span><b>LITE MODE ON THIS DEVICE</b><small>Draws less of the app so a new person can learn the workflow: Fleet Campaigns, the scan buttons and sheet tools on both sheets, DEFERRED, and the diagnosis half of the defect form all stand down. Nothing changes about what is saved or synced — a Lite phone and a full phone write the same records to the same Shop Cloud.</small></span></label>
      </section>
      {/* Curtis: "make sure the sound is off by default ok? Any sounds.
          Toggleable in settings." Two switches rather than one because a buzz
@@ -691,6 +692,18 @@ export default function SettingsPage(){
     <SectionBody id="down-sheet" open={open.down}>
      <p className="settings-section-blurb">Defaults for new entries, the sheet's wording and text style, and moving the sheet to another device.</p>
      <DownSheetSettings inline transfer={downTransfer} defaultInitials={down.defaultInitials} setDefaultInitials={value=>updateDown({defaultInitials:value})} defaultShift={down.defaultShift} setDefaultShift={value=>updateDown({defaultShift:value})} showCompleted={down.showCompleted} setShowCompleted={value=>updateDown({showCompleted:value})} extraTiles={down.extraTiles} setExtraTiles={value=>updateDown({extraTiles:value})} sectionOrder={down.sectionOrder} setSectionOrder={value=>updateDown({sectionOrder:value})} showQuickNotes={down.showQuickNotes} setShowQuickNotes={value=>updateDown({showQuickNotes:value})} display={down.display} setDisplay={value=>updateDown({display:value})} onClose={noop}/>
+     {/* Moved here from the Down Sheet's ADVANCED ACTIONS in release 213, when
+         that page's header became REFRESH · SCAN · SHARE. It still runs on the
+         Down Sheet, which holds the sheet and UNDO CLEAR, so this opens it and
+         that page asks its own confirm (`down-sheet-watch-lists.ts`). Not
+         hidden in LITE: nothing on this page is. */}
+     <section className="log-settings-group settings-tools" aria-labelledby="sheet-tools-heading">
+      <h3 id="sheet-tools-heading">CLEAR THE SHEET</h3>
+      <p>Takes every bus off the Down Sheet and unchecks the map badges, after asking. UNDO CLEAR on the Down Sheet puts it back. It opens the Down Sheet to do it.</p>
+      <div className="settings-tool-row">
+       <button type="button" className="sheet-tool-clear" onClick={()=>window.location.assign(clearSheetHref())}>CLEAR DOWNSHEET</button>
+      </div>
+     </section>
     </SectionBody>
    </section>
    <section id="defect-log" className={sectionClass("log","log")} aria-labelledby="defect-log-heading" style={logStyle}>
