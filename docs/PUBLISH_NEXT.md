@@ -1,15 +1,18 @@
 # Publish next
 
-**STATUS: NONE PENDING.** Application release 221 is live as Sites Version 207,
-deployed 2026-11-25 23:43:23.549182 UTC from `29538b916d5029ab3c11068424872db2cf2f142b`.
+**STATUS: NONE PENDING.** Application release 222 is live as Sites Version 208,
+deployed 2026-11-25 23:48:20.875605 UTC from `ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f`.
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
-Previous-live rollback: Sites 206 / application 220 at `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`. PR39 MCP remains held and excluded.
+Previous-live rollback: Sites 207 / application 221 at `29538b916d5029ab3c11068424872db2cf2f142b`. PR39 MCP remains held and excluded.
 
 Publication evidence is in [RELEASES.md](RELEASES.md).
 
 ## Remaining device checks
+
+In the Defect Log and Down Sheet repair pickers, open Brakes and look for the
+two service-brake pull directions. Cancel without saving a real record.
 
 On a physical iPad or Android tablet, verify REFRESH on its own row, SCAN and
 SHARE together, and PAGES below. PAGES starts closed; opening it overlays the

@@ -4,8 +4,8 @@ Updated: 2026-11-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 207 (application release 221)
-Live feature checkpoint: commit 29538b916d5029ab3c11068424872db2cf2f142b
+Live release: Sites Version 208 (application release 222)
+Live feature checkpoint: commit ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f
 
 ## Read this first
 
@@ -23,6 +23,16 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 208 / application release 222 deployed 2026-11-25 23:48:20.875605 UTC from `ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f`. Adds distinct Brakes symptoms “Pulls to R/S when service brakes are applied” and “Pulls to C/S when service brakes are applied” in the shared repair picker. Search returns both, and opposite-side reports are not mistakenly treated as duplicates. No migration or change to the tablet header, scan flow, storage, defect save rules, sync, or hosting. PR39 remains held.
+
+ESLint, production build and diff checks passed. [CI run 534](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45723711693) passed 497 tests. [CodeRabbit PR #66](https://github.com/curtistheconqueror/bus-tracker/pull/66#issuecomment-7178007435) covered all changed files at the exact release head. Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200, and the served catalog asset matched the production build. No real fleet records were changed to verify.
+
+Native deployment `appgdep_6b0773bf76888191942cba9bd80328c2` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_555579f40ae8819180d1ad3648f69fe5`. Public access and runtime revisions remain 2. Immediate rollback: Sites 207 / application 221 at `29538b916d5029ab3c11068424872db2cf2f142b`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_cfed301bf56081918b6d591d7a096b6d`.
+
+No other release is pending.
+
+### Previous publication — Sites 207 / application 221
 
 Sites Version 207 / application release 221 deployed 2026-11-25 23:43:23.549182 UTC from `29538b916d5029ab3c11068424872db2cf2f142b`. Tablet-size touch viewports (761–1400 px wide and at least 600 px tall) use a compact Down Sheet header: REFRESH on its own row, SCAN and SHARE side by side, and PAGES below. PAGES starts closed and overlays the sheet without moving it. It uses the shared destinations, highlights Down Sheet, and respects Lite Mode. The existing tablet frame, phone/desktop navigation, other pages, Scan, Share, records, storage and hosting are unchanged. PR39 remains held.
 
