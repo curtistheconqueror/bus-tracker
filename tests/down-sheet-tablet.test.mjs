@@ -130,21 +130,25 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
    await call("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:touch});
    await call("Emulation.setTouchEmulationEnabled",{enabled:touch});
   };
-  const openPage=async(path="/down-sheet",mode="full")=>{
-   const script=await call("Page.addScriptToEvaluateOnNewDocument",{
-    source:`localStorage.setItem("pace-app-mode-v1",JSON.stringify({mode:${JSON.stringify(mode)},answered:true}))`,
-   });
+  const openPage=async(path="/down-sheet")=>{
    await call("Page.navigate",{url:origin+path});
    await wait(`location.pathname===${JSON.stringify(path)} && !!document.querySelector(".tracker-mobile-shell")`);
-   await call("Page.removeScriptToEvaluateOnNewDocument",script);
   };
-  const visible=selector=>`!!document.querySelector(${JSON.stringify(selector)})?.getClientRects().length`;
+ const visible=selector=>`!!document.querySelector(${JSON.stringify(selector)})?.getClientRects().length`;
   const pages=".down-tablet-pages-toggle",panel=".down-tablet-pages-panel",legacy=".down-header > nav[data-tracker-nav]",dock=".tracker-bottom-nav";
   const click=async selector=>{
    await evalPage(`{const button=document.querySelector(${JSON.stringify(selector)});button.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));button.click()}`);
   };
+  const chooseWelcomeMode=async mode=>{
+   await wait(visible(".welcome-gate .welcome-"+mode));
+   await click(".welcome-gate .welcome-"+mode);
+   await wait(visible(".welcome-step-skip"));
+   await click(".welcome-step-skip");
+   await wait("!document.querySelector('.welcome-gate')");
+  };
   await viewport(1024,768,true);
   await openPage();
+  await chooseWelcomeMode("full");
   // CSS visibility reflects both the route scope and the interaction media query.
   assert.equal(await evalPage(visible(pages)),true);
   assert.equal(await evalPage(visible(legacy)),false);
@@ -206,7 +210,9 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
   await openPage("/defect-log");
   assert.equal(await evalPage(visible(pages)),false);
   assert.equal(await evalPage(visible(".defect-log-app nav[data-tracker-nav]")),true);
-  await openPage("/down-sheet","lite");
+  await openPage();
+  await evalPage('window.dispatchEvent(new CustomEvent("pace-show-welcome"))');
+  await chooseWelcomeMode("lite");
   await click(pages);
   assert.equal(await evalPage(visible(panel)),true);
   assert.deepEqual(await evalPage(`[...document.querySelectorAll("${panel} a")].map(a=>a.getAttribute("href"))`),TRACKER_PAGES.filter(page=>page.href!=="/lists").map(page=>page.href));
