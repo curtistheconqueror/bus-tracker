@@ -4,8 +4,8 @@ Updated: 2026-11-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 204 (application release 218)
-Live feature checkpoint: commit 50340aef96e9bc87f9b8d43b7c485af97fab3d9d
+Live release: Sites Version 205 (application release 219)
+Live feature checkpoint: commit d7df976b0cd7fec682407c9cc335a836dab6a6d6
 
 ## Read this first
 
@@ -23,6 +23,16 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 205 / application release 219 deployed 2026-11-25 23:04:58.042903 UTC from `d7df976b0cd7fec682407c9cc335a836dab6a6d6`. Addresses all four SD-QG findings on PR #62. The Detailed light-theme frame stays 1 px in every work state; the status color paints inside it so the header, rows, and footer do not shift. The outline swatch follows the saved card view and theme unless customized. The labeled closing line and its visibility settings are preserved. Added runtime geometry and source-binding regressions and declared the existing PostCSS 8.5.14 build-time dependency. Compact, fleet records, storage, sync, and hosting are unchanged. PR39 remains held.
+
+ESLint and production build passed. [CI run 523](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45717734939) ran 494 tests, all passing including the Chromium geometry check at 320, 390 and 1280 px. [CodeRabbit PR #63](https://github.com/curtistheconqueror/bus-tracker/pull/63#issuecomment-7177017490) reviewed the exact source with no actionable findings; its default lockfile exclusion was independently checked (one root dev-dependency entry, exact version retained, clean npm ci). Map, Down Sheet, Defect Log, Fixed Repairs and Settings returned HTTP 200; live Defect Log CSS matched the build bytes. Physical iPhone and real fleet data were not exercised.
+
+Native deployment `appgdep_6b076993b7608191935489bfc35e7ede` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_f9d22b00e324819193666243659b5794`. Public access and runtime revisions remain 2. Immediate rollback: Sites 204 / application 218 at `50340aef96e9bc87f9b8d43b7c485af97fab3d9d`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_ede58b709fac81918d39415c9ef46061`.
+
+No other release is pending.
+
+### Previous publication — Sites 204 / application 218
 
 Sites Version 204 / application release 218 deployed 2026-11-25 22:39:33.488072 UTC from `50340aef96e9bc87f9b8d43b7c485af97fab3d9d`. Detailed light-theme Defect Log cards have thin black bus and defect outlines, preserving chosen bus outline colors and colored work-state rails. When the existing Closing Line preference shows the footer, it is solid black with its original white-on-black label and height, including with the optional number rail. Compact, timestamps, records, storage, sync, and hosting are unchanged. PR39 MCP remains held and excluded.
 

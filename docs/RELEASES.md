@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 204 / application release 218 | Live | 50340aef96e9bc87f9b8d43b7c485af97fab3d9d | Detailed Defect Log black outlines and solid black labeled closing line. |
+| 205 / application release 219 | Live | d7df976b0cd7fec682407c9cc335a836dab6a6d6 | Stable Detailed card positions, accurate Settings outline swatch, and browser regression checks. |
+| 204 / application release 218 | Previous live; rollback | 50340aef96e9bc87f9b8d43b7c485af97fab3d9d | Detailed Defect Log black outlines and solid black labeled closing line. |
 | 203 / application release 217 | Previous live; rollback | 2c00cf88bbe51894ad588ac3585122fe025fdf92 | Shows the oldest active logged date, removes repeated detailed card descriptions, and enlarges Defect Log dates. |
 | 202 / application release 216 | Previous live; rollback | 8cdd02358b07301ca4739a5416865736c9686ef4 | Enlarges emoji/category subtitles in Fixed Repairs only. |
 | 201 / application release 215 | Previous live; rollback | 24ccb374a578f7ffa80fa4037399aaa6ab5b953b | Slightly enlarges the Maintenance Down Sheet title. |
@@ -410,3 +411,11 @@ No other release is pending.
 - ESLint, production build, all 491 local tests, and diff checks passed. [CI run 520](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45714445250) passed. [CodeRabbit PR #62 review](https://github.com/curtistheconqueror/bus-tracker/pull/62#issuecomment-7176541937) covered the exact source commit and all four changed files with no actionable comments. Map, Down Sheet, Defect Log, and Fixed Repairs returned HTTP 200. The live Defect Log CSS and JavaScript matched the build byte-for-byte. Managed preview could not start; physical iPhone appearance and local fleet data were not verified.
 - Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_ede58b709fac81918d39415c9ef46061`; deployment: `appgdep_6b07639f63408191a9bb53e4e03e9ea2`. Archive: `sha256:bf84ad804df87642674d8509f85a174c8aabe506c11e94a70654e1088cf779b6`.
 - Immediate rollback: Sites 203 / application release 217 at `2c00cf88bbe51894ad588ac3585122fe025fdf92`. Public URL and access/runtime revisions are unchanged.
+
+## Sites 205 / application 219 — 2026-11-25
+
+- Live source: `d7df976b0cd7fec682407c9cc335a836dab6a6d6`, published 2026-11-25 23:04:58.042903 UTC.
+- Addresses all four SD-QG findings on PR #62. The Detailed light-theme frame stays 1 px in every work state; the status color paints inside it so the header, rows, and footer do not shift. The outline swatch follows the saved card view and theme unless customized. The labeled closing line and its visibility settings are preserved. Added runtime geometry and source-binding regressions and declared the existing PostCSS 8.5.14 build-time dependency. Compact, fleet records, storage, sync, and hosting are unchanged. PR39 remains held.
+- ESLint and production build passed. [CI run 523](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45717734939) ran 494 tests, all passing including the Chromium geometry check at 320, 390 and 1280 px. [CodeRabbit PR #63](https://github.com/curtistheconqueror/bus-tracker/pull/63#issuecomment-7177017490) reviewed the exact source with no actionable findings; its default lockfile exclusion was independently checked (one root dev-dependency entry, exact version retained, clean npm ci). Map, Down Sheet, Defect Log, Fixed Repairs and Settings returned HTTP 200; live Defect Log CSS matched the build bytes. Physical iPhone and real fleet data were not exercised.
+- Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_f9d22b00e324819193666243659b5794`; deployment: `appgdep_6b076993b7608191935489bfc35e7ede`; archive: `sha256:fbde327f7c28810ae42c3be47ba0d0a227ed1ae3ce649a6a445f375f03261dcb`.
+- Immediate rollback: Sites 204 / application 218 at `50340aef96e9bc87f9b8d43b7c485af97fab3d9d`. Public URL and access/runtime revisions are unchanged.

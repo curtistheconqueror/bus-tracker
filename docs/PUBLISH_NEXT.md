@@ -1,15 +1,19 @@
 # Publish next
 
-**STATUS: NONE PENDING.** Application release 218 is live as Sites Version 204,
-deployed 2026-11-25 22:39:33.488072 UTC from `50340aef96e9bc87f9b8d43b7c485af97fab3d9d`.
+**STATUS: NONE PENDING.** Application release 219 is live as Sites Version 205,
+deployed 2026-11-25 23:04:58.042903 UTC from `d7df976b0cd7fec682407c9cc335a836dab6a6d6`.
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
-Previous-live rollback: Sites 203 / application release 217 at `2c00cf88bbe51894ad588ac3585122fe025fdf92`. PR39 MCP remains held and excluded.
+Previous-live rollback: Sites 204 / application 218 at `50340aef96e9bc87f9b8d43b7c485af97fab3d9d`. PR39 MCP remains held and excluded.
 
 Publication evidence is in [RELEASES.md](RELEASES.md).
 
 ## Remaining device checks
+
+On phone-sized hardware, verify the status stripe and footer positioning using
+synthetic defects only. Chromium confirmed fixed geometry and footer coverage.
+
 
 On a physical iPhone, check Detailed light-theme card and defect outlines and,
 where Closing Line is enabled, the white label on the black closing strip.
