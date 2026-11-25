@@ -266,7 +266,7 @@
    the Logged line 7–8px. Same step as the Defect Log cards took in the same
    release, so the two feeds read at the same size. */
 .fixed-card-head>span small{font-size:8px}
-.fixed-card-head>div b{font-size:9px}
+.fixed-card-head>div b{font-size:12px}
 .fixed-card-head time{font-size:9px}
 .fixed-card-body section>b{font-size:9px}
 .fixed-card-body section>small{font-size:9px}
