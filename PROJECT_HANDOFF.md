@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-11-24
+Updated: 2026-11-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 198 (application release 210)
-Live feature checkpoint: commit 8ed0ce2dbf5c5eea6025b846440d43a650d4183c
+Live release: Sites Version 199 (application release 211)
+Live feature checkpoint: commit db6683d66884c3a25de88c896561a3226e1f67b2
 
 ## Read this first
 
@@ -23,6 +23,16 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 199 / application release 211 deployed 2026-11-25 at 00:12:04.200721 UTC from `db6683d66884c3a25de88c896561a3226e1f67b2`. DAILY STATS and its five tiles are removed from the Defect Log; + LOG DEFECT and SEARCH sit under the header, or under the Scan drawer when open. The retired stats key is left untouched on existing devices. No migration, sync, storage-key addition, hosting change or fleet-record modification. PR39 MCP remains held and excluded.
+
+Exact-source production build, 485 tests (zero failures or skips), ESLint and `git diff --check` passed. Live Facility Map, Down Sheet and Defect Log returned HTTP 200. The live Defect Log response contains the header actions, then LOG DEFECT and SEARCH, then LIVE DEFECT FEED, with no DAILY STATS bar. The cloud browser could not open the managed preview or bind the live tab, so visual spacing and a physical iPhone are not independently verified. The queue records the prior developer width checks.
+
+Native deployment `appgdep_6b0627cca0708191a332f0b1b29af2c3` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_c5dabcca09ec819181a8579372e1621f`. The public URL, audience revision 2 and runtime environment revision 2 are unchanged. Immediate rollback: Sites 198 / application release 210 at `8ed0ce2dbf5c5eea6025b846440d43a650d4183c`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_e08cb5db2244819183afb7d356bac441`.
+
+The approved queue is archived in [PUBLISH_RELEASE_211.md](docs/archive/PUBLISH_RELEASE_211.md). The publish queue is reset to NONE PENDING.
+
+### Previous publication — Sites 198 / application 210
 
 Sites Version 198 / application release 210 deployed 2026-11-24 at 23:04:43.361149 UTC from `8ed0ce2dbf5c5eea6025b846440d43a650d4183c`. The Defect Log header is REFRESH, SCAN and SHARE. SCAN offers three sheet-specific tiles; SHARE opens Defects Logged; QUICK FILTERS is on the feed row; UNDO LAST is shown only when usable. SCAN BATCHES and CLEAN UP moved to Settings; AI Operator is on the map and reachable in the phone More menu. No migration, storage-key rename, sync or hosting configuration change. PR39 MCP remains held and excluded.
 
