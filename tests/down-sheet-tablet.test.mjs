@@ -40,7 +40,7 @@ test("the tablet override is bounded and the Down Sheet ships a closed disclosur
  ]);
 });
 
-test("Chromium: the real Down Sheet replaces navigation only on tablets, without changing Scan or Share",{timeout:50000},async t=>{
+test("Chromium: the real Down Sheet replaces navigation only on tablets, without changing Scan or Share",{timeout:85000},async t=>{
  const candidates=process.env.CHROME_BIN?[process.env.CHROME_BIN]:["google-chrome","chromium","chromium-browser"];
  const chrome=candidates.find(bin=>spawnSync(bin,["--version"],{timeout:4000}).status===0);
  if(!chrome){
@@ -67,25 +67,33 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
   }catch{res.writeHead(500);res.end()}
  });
  const browser=spawn(chrome,["--headless","--disable-gpu","--disable-dev-shm-usage","--disable-background-networking",
-  "--no-first-run","--remote-debugging-port=0","--user-data-dir="+profile,"about:blank"],
+  "--no-first-run","--no-default-browser-check","--disable-extensions","--remote-debugging-port=0","--user-data-dir="+profile,"about:blank"],
   {stdio:["ignore","ignore","pipe"]});
- let errors="",socket;
- browser.stderr.on("data",chunk=>{errors=(errors+chunk).slice(-1600)});
- const stopped=new Promise(resolve=>{browser.once("exit",resolve);browser.once("error",error=>{errors+=error.message;resolve()})});
+ let errors="",socket,browserFailure;
+ browser.stderr.on("data",chunk=>{errors=(errors+chunk).slice(-2000)});
  let seq=0;
  const requests=new Map();
+ const stopped=new Promise(resolve=>{
+  const stop=reason=>{
+   browserFailure=Error("Test browser stopped ("+reason+"): "+errors);
+   for(const request of requests.values())request.fail(browserFailure);
+   resolve();
+  };
+  browser.once("exit",(code,signal)=>stop(signal??"exit "+code));
+  browser.once("error",error=>stop(error.message));
+ });
  const send=(method,params={},sessionId)=>new Promise((resolve,reject)=>{
+  if(browserFailure){reject(browserFailure);return}
   const id=++seq;
-  const timer=setTimeout(()=>{
-   requests.delete(id);
-   reject(Error(method+" timed out: "+errors));
-  },7000);
-  requests.set(id,message=>{
-   requests.delete(id);clearTimeout(timer);
+  const clear=()=>{requests.delete(id);clearTimeout(timer)};
+  const fail=error=>{clear();reject(error)};
+  const timer=setTimeout(()=>fail(Error(method+" timed out: "+errors)),12000);
+  requests.set(id,{fail,reply:message=>{
+   clear();
    if(message.error)reject(Error(method+": "+message.error.message));
    else resolve(message.result);
-  });
-  socket.send(JSON.stringify({id,method,params,sessionId}));
+  }});
+  try{socket.send(JSON.stringify({id,method,params,sessionId}))}catch(error){fail(error)}
  });
  try{
   server.listen(0,"127.0.0.1");
@@ -93,7 +101,9 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
   const origin="http://127.0.0.1:"+server.address().port;
   const portFile=join(profile,"DevToolsActivePort");
   let endpoint;
-  for(let i=0;i<120;i++){
+  const launchDeadline=Date.now()+30000;
+  while(Date.now()<launchDeadline){
+   if(browserFailure)throw browserFailure;
    let data="";
    try{data=await readFile(portFile,"utf8")}catch(error){if(error.code!=="ENOENT")throw error}
    const [port,path]=data.trim().split("\n");
@@ -105,12 +115,17 @@ test("Chromium: the real Down Sheet replaces navigation only on tablets, without
   }
   assert.ok(endpoint,"Chrome did not expose its loopback testing endpoint: "+errors);
   socket=new WebSocket(endpoint);
-  await once(socket,"open",{signal:AbortSignal.timeout(7000)});
+  await Promise.race([
+   once(socket,"open",{signal:AbortSignal.timeout(12000)}),
+   stopped.then(()=>{throw browserFailure}),
+  ]);
   socket.addEventListener("message",event=>{
    const message=JSON.parse(event.data);
-   requests.get(message.id)?.(message);
+   requests.get(message.id)?.reply(message);
   });
-  const {targetId}=await send("Target.createTarget",{url:"about:blank"});
+  const {targetInfos}=await send("Target.getTargets");
+  const targetId=targetInfos.find(target=>target.type==="page")?.targetId;
+  assert.ok(targetId,"Chrome did not launch its blank test tab");
   const {sessionId}=await send("Target.attachToTarget",{targetId,flatten:true});
   const call=(method,params)=>send(method,params,sessionId);
   const evalPage=async expression=>{
