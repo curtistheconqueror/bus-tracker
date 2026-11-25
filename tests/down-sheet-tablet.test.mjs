@@ -1,24 +1,201 @@
 import assert from "node:assert/strict";
-import {readFile} from "node:fs/promises";
+import {spawn,spawnSync} from "node:child_process";
+import {createServer} from "node:http";
+import {mkdtemp,readFile,rm} from "node:fs/promises";
+import {tmpdir} from "node:os";
+import {join} from "node:path";
+import {once} from "node:events";
 import {test} from "node:test";
 import postcss from "postcss";
+import {TRACKER_PAGES} from "../src/lib/settings/tracker-pages.ts";
+import {render} from "./helpers/setup.mjs";
 
 const read=name=>readFile(new URL("../app/down-sheet/"+name,import.meta.url),"utf8");
 
-test("tablet spacing and outline are scoped to the actual Down Sheet wrapper and not phones",async()=>{
- const [page,source]=await Promise.all([read("page.tsx"),read("down-sheet-tablet.css")]);
- assert.match(page,/import "\.\/down-sheet-tablet\.css";/);
- assert.match(page,/<main className="down-app"/);
- assert.match(page,/<section className="sheet-wrap">/);
- const [media,...rest]=postcss.parse(source).nodes.filter(node=>node.type!=="comment");
- assert.equal(rest.length,0,"no unscoped overrides");
- assert.equal(media.type,"atrule");
+test("the tablet override is bounded and the Down Sheet ships a closed disclosure after the existing actions",async()=>{
+ const [source,component,response]=await Promise.all([
+  read("down-sheet-tablet.css"),read("_components/tablet-pages.tsx"),render("/down-sheet"),
+ ]);
+ assert.equal(response.status,200);
+ const html=await response.text(),header=html.match(/<header class="down-header">.*?<\/header>/s)?.[0];
+ assert.ok(header);
+ const refresh=header.indexOf("Refresh and check for app updates");
+ const scan=header.indexOf("Scan: SCAN SHEET");
+ const share=header.indexOf(">SHARE<");
+ const pages=header.indexOf(">PAGES<");
+ assert.ok(refresh>=0&&refresh<scan&&scan<share&&share<pages);
+ assert.match(header,/down-tablet-pages-toggle"[^>]+aria-expanded="false"/);
+ assert.doesNotMatch(header,/down-tablet-pages-panel/);
+ const nodes=postcss.parse(source).nodes.filter(node=>node.type!=="comment");
+ assert.equal(nodes.length,2);
+ assert.equal(nodes[0].selector,".down-tablet-pages");
+ assert.deepEqual(nodes[0].nodes.map(({prop,value})=>[prop,value]),[["display","none"]]);
+ const media=nodes[1];
  assert.equal(media.name,"media");
  assert.equal(media.params,"(min-width:761px) and (max-width:1400px) and (min-height:600px) and (any-pointer:coarse)");
- assert.equal(media.nodes.length,1,"only the sheet frame changes");
- const [rule]=media.nodes;
- assert.equal(rule.selector,".down-app > .sheet-wrap");
- assert.deepEqual(rule.nodes.map(({prop,value})=>[prop,value]),[
+ assert.ok(component.includes(JSON.stringify(media.params)),"resize dismissal uses the same tablet query");
+ const frame=media.nodes.find(node=>node.selector===".down-app > .sheet-wrap");
+ assert.deepEqual(frame?.nodes.map(({prop,value})=>[prop,value]),[
   ["margin-block-start","18px"],["border","2px solid #000"],
  ]);
+});
+
+test("Chromium: the real Down Sheet replaces navigation only on tablets, without changing Scan or Share",{timeout:50000},async t=>{
+ const candidates=process.env.CHROME_BIN?[process.env.CHROME_BIN]:["google-chrome","chromium","chromium-browser"];
+ const chrome=candidates.find(bin=>spawnSync(bin,["--version"],{timeout:4000}).status===0);
+ if(!chrome){
+  assert.notEqual(process.env.GITHUB_ACTIONS,"true","CI requires Chrome for the Down Sheet tablet regression");
+  t.skip("Chrome unavailable; set CHROME_BIN to run the tablet check");
+  return;
+ }
+ const profile=await mkdtemp(join(tmpdir(),"fleet-tablet-browser-"));
+ const server=createServer(async(req,res)=>{
+  try{
+   const path=new URL(req.url,"http://localhost").pathname;
+   if(path.startsWith("/assets/")){
+    const asset=await readFile(new URL("../dist/client"+path,import.meta.url));
+    res.setHeader("Content-Type",path.endsWith(".css")?"text/css":"text/javascript");
+    res.end(asset);
+   }else if(path==="/down-sheet"||path==="/defect-log"){
+    const response=await render(path);
+    res.writeHead(response.status,{
+     "Content-Type":"text/html",
+     "Content-Security-Policy":"connect-src 'self'; worker-src 'none'; form-action 'none'",
+    });
+    res.end(await response.text());
+   }else{res.writeHead(404);res.end()}
+  }catch{res.writeHead(500);res.end()}
+ });
+ const browser=spawn(chrome,["--headless","--disable-gpu","--disable-dev-shm-usage","--disable-background-networking",
+  "--no-first-run","--remote-debugging-pipe","--user-data-dir="+profile,"about:blank"],
+  {stdio:["ignore","ignore","pipe","pipe","pipe"]});
+ let errors="";
+ browser.stderr.on("data",chunk=>{errors=(errors+chunk).slice(-1600)});
+ const running=once(browser,"exit");
+ let seq=0,buffer="";
+ const requests=new Map();
+ browser.stdio[4].setEncoding("utf8").on("data",data=>{
+  buffer+=data;
+  let end;
+  while((end=buffer.indexOf("\0"))>=0){
+   const message=JSON.parse(buffer.slice(0,end));
+   buffer=buffer.slice(end+1);
+   requests.get(message.id)?.(message);
+  }
+ });
+ const send=(method,params={},sessionId)=>new Promise((resolve,reject)=>{
+  const id=++seq;
+  const timer=setTimeout(()=>{
+   requests.delete(id);
+   reject(Error(method+" timed out: "+errors));
+  },4500);
+  requests.set(id,message=>{
+   requests.delete(id);clearTimeout(timer);
+   if(message.error)reject(Error(method+": "+message.error.message));
+   else resolve(message.result);
+  });
+  browser.stdio[3].write(JSON.stringify({id,method,params,sessionId})+"\0");
+ });
+ try{
+  server.listen(0,"127.0.0.1");
+  await once(server,"listening");
+  const origin="http://127.0.0.1:"+server.address().port;
+  const {targetId}=await send("Target.createTarget",{url:"about:blank"});
+  const {sessionId}=await send("Target.attachToTarget",{targetId,flatten:true});
+  const call=(method,params)=>send(method,params,sessionId);
+  const evalPage=async expression=>{
+   const outcome=await call("Runtime.evaluate",{expression,returnByValue:true});
+   assert.ok(!outcome.exceptionDetails,outcome.exceptionDetails?.exception?.description);
+   return outcome.result.value;
+  };
+  const wait=async expression=>{
+   for(let i=0;i<60;i++){
+    if(await evalPage(expression))return;
+    await new Promise(resolve=>setTimeout(resolve,50));
+   }
+   assert.fail("Timed out waiting for "+expression);
+  };
+  const viewport=async(width,height,touch)=>{
+   await call("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:touch});
+   await call("Emulation.setTouchEmulationEnabled",{enabled:touch});
+  };
+  const openPage=async(path="/down-sheet",mode="full")=>{
+   const script=await call("Page.addScriptToEvaluateOnNewDocument",{
+    source:`localStorage.setItem("pace-app-mode-v1",JSON.stringify({mode:${JSON.stringify(mode)},answered:true}))`,
+   });
+   await call("Page.navigate",{url:origin+path});
+   await wait(`location.pathname===${JSON.stringify(path)} && !!document.querySelector(".tracker-mobile-shell")`);
+   await call("Page.removeScriptToEvaluateOnNewDocument",script);
+  };
+  const visible=selector=>`!!document.querySelector(${JSON.stringify(selector)})?.getClientRects().length`;
+  const pages=".down-tablet-pages-toggle",panel=".down-tablet-pages-panel",legacy=".down-header > nav[data-tracker-nav]",dock=".tracker-bottom-nav";
+  const click=async selector=>{
+   await evalPage(`{const button=document.querySelector(${JSON.stringify(selector)});button.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));button.click()}`);
+  };
+  await viewport(1024,768,true);
+  await openPage();
+  // CSS visibility reflects both the route scope and the interaction media query.
+  assert.equal(await evalPage(visible(pages)),true);
+  assert.equal(await evalPage(visible(legacy)),false);
+  assert.equal(await evalPage(visible(dock)),false);
+  assert.equal(await evalPage(visible(panel)),false);
+  const layout=await evalPage(`[...document.querySelectorAll(".down-header-actions > .app-refresh,.down-header-pair > button,.down-tablet-pages-toggle")].map(el=>{const {left,right,top,bottom}=el.getBoundingClientRect();return {left,right,top,bottom}})`);
+  const [refresh,scan,share,pageButton]=layout;
+  assert.ok(refresh.bottom<scan.top&&scan.top===share.top&&scan.right<share.left&&scan.bottom<pageButton.top);
+  assert.deepEqual([refresh.left,refresh.right],[pageButton.left,pageButton.right]);
+  const sheetY=await evalPage('document.querySelector(".sheet-wrap").getBoundingClientRect().top');
+  await click(pages);
+  assert.equal(await evalPage(visible(panel)),true);
+  assert.equal(await evalPage('document.querySelector(".sheet-wrap").getBoundingClientRect().top'),sheetY,"Pages must not push the sheet down");
+  assert.deepEqual(await evalPage(`[...document.querySelectorAll("${panel} a")].map(a=>a.getAttribute("href"))`),TRACKER_PAGES.map(page=>page.href));
+  assert.equal(await evalPage(`document.querySelector('${panel} [aria-current=page]').getAttribute("href")`),"/down-sheet");
+  assert.equal(await evalPage(`{const a=document.querySelector("${panel} a"),r=a.getBoundingClientRect();document.elementFromPoint(r.left+12,r.top+12)===a}`),true,"the overlay is above the sheet controls");
+  await evalPage(`document.querySelector("${panel} a").focus()`);
+  await call("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+  await call("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+  assert.equal(await evalPage(visible(panel)),false);
+  assert.equal(await evalPage(`document.activeElement.matches("${pages}")`),true);
+  await click(pages);
+  await click(pages);
+  assert.equal(await evalPage(visible(panel)),false,"a second tap closes Pages");
+  await click(pages);
+  await click(".down-header-pair button[aria-label]");
+  assert.equal(await evalPage(visible(panel)),false);
+  assert.equal(await evalPage(visible(".paper-modal")),true);
+  assert.equal(await evalPage('document.querySelector(".paper-read").disabled'),true);
+  assert.match(await evalPage('document.querySelector(".paper-pickers").textContent'),/TAKE PHOTO.*UPLOAD FILE/s);
+  await click(".paper-actions button");
+  await click(pages);
+  await click(".down-header-pair button[aria-expanded]");
+  assert.equal(await evalPage(visible(panel)),false);
+  assert.equal(await evalPage(visible(".down-share-drawer")),true);
+  await click(".down-header-pair button[aria-expanded]");
+  // The oldest tablet width overlaps the shared mobile dock breakpoint.
+  await viewport(768,1024,true);
+  assert.equal(await evalPage(visible(pages)),true);
+  assert.equal(await evalPage(visible(dock)),false);
+  await click(pages);
+  for(const [width,height,touch] of [[390,844,true],[844,390,true],[1280,800,false],[700,1024,true],[1440,900,true]]){
+   await viewport(width,height,touch);
+   assert.equal(await evalPage(visible(pages)),false,`unexpected tablet UI at ${width}x${height}, touch=${touch}`);
+   assert.equal(await evalPage(visible(legacy)),true);
+   assert.equal(await evalPage(visible(dock)),width<=800);
+  }
+  await viewport(1024,768,true);
+  assert.equal(await evalPage(visible(panel)),false,"an open menu cannot survive leaving the tablet layout");
+  await openPage("/defect-log");
+  assert.equal(await evalPage(visible(pages)),false);
+  assert.equal(await evalPage(visible(".defect-log-app nav[data-tracker-nav]")),true);
+  await openPage("/down-sheet","lite");
+  await click(pages);
+  assert.equal(await evalPage(visible(panel)),true);
+  assert.deepEqual(await evalPage(`[...document.querySelectorAll("${panel} a")].map(a=>a.getAttribute("href"))`),TRACKER_PAGES.filter(page=>page.href!=="/lists").map(page=>page.href));
+  assert.equal(await evalPage(visible(".down-header-pair button[aria-label]")),false);
+ }finally{
+  browser.kill();
+  await running;
+  server.closeAllConnections();
+  await new Promise(resolve=>server.close(resolve));
+  await rm(profile,{force:true,recursive:true,maxRetries:3});
+ }
 });
