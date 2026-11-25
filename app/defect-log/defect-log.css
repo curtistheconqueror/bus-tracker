@@ -1361,7 +1361,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    as they are — they simply start 38px further right. The rail runs alongside
    them, never across them, and a test measures that no row's left edge is
    inside the rail. */
-.defect-log-app[data-bus-rail="always"] .log-card-group{grid-template-columns:minmax(0,1fr);padding-left:38px}
+.defect-log-app[data-bus-rail="always"] .log-card-group{--log-group-number-rail-width:38px;grid-template-columns:minmax(0,1fr);padding-left:var(--log-group-number-rail-width)}
 .defect-log-app[data-bus-rail="always"] .log-bus-column{position:absolute;grid-column:auto;left:0;top:0;bottom:0;width:38px;justify-content:flex-start;align-items:center;gap:0;padding:9px 0;background:color-mix(in srgb,var(--log-accent) 9%,var(--log-surface));border-right:1px solid var(--log-border)}
 .defect-log-app[data-bus-rail="always"] .log-bus{flex-direction:row;align-items:center;gap:5px;writing-mode:vertical-rl;text-orientation:mixed}
 .defect-log-app[data-bus-rail="always"] .log-bus>small{font-size:6px;letter-spacing:1.4px}
@@ -1468,7 +1468,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-location-inline{display:none;width:auto;max-width:calc(100% - 24px);justify-self:start;margin:0 12px 9px}
 
 @media(max-width:620px){
- .defect-log-app[data-bus-rail="phone"] .log-card-group{grid-template-columns:minmax(0,1fr);padding-left:38px}
+ .defect-log-app[data-bus-rail="phone"] .log-card-group{--log-group-number-rail-width:38px;grid-template-columns:minmax(0,1fr);padding-left:var(--log-group-number-rail-width)}
  .defect-log-app[data-bus-rail="phone"] .log-bus-column{position:absolute;grid-column:auto;left:0;top:0;bottom:0;width:38px;justify-content:flex-start;align-items:center;gap:0;padding:9px 0;background:color-mix(in srgb,var(--log-accent) 9%,var(--log-surface));border-right:1px solid var(--log-border)}
  .defect-log-app[data-bus-rail="phone"] .log-bus{flex-direction:row;align-items:center;gap:5px;writing-mode:vertical-rl;text-orientation:mixed}
  .defect-log-app[data-bus-rail="phone"] .log-bus>small{font-size:6px;letter-spacing:1.4px}
@@ -1828,3 +1828,25 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 /* The same for a bus left out of the share, whose struck-through number is
    15px in the same fixed 52px column (review). */
 .quick-filter-drawer .quick-filter-bus-card.left-out{grid-template-columns:minmax(52px,max-content) minmax(0,1fr) auto}
+
+
+/* The approved Detailed look: thin black outlines on the light theme.
+   Explicit outline colors and the left-edge work-state cues still win.
+   Theme-derived edges remain on darker themes for separation. */
+.defect-log-app[data-card-view="detailed"]{--log-detailed-frame:#000}
+.defect-log-app[data-card-view="detailed"][data-log-theme="light"]{--log-card-border:var(--log-detailed-frame)}
+.defect-log-app[data-card-view="detailed"][data-log-theme="light"] .log-card-group{
+ border-top-width:1px;border-right-width:1px;border-bottom-width:1px
+}
+.defect-log-app[data-card-view="detailed"][data-log-theme="light"] .log-card-group:not(:is(.in-progress,.deferred,.completed,.downing)){
+ border-left:1px solid var(--log-card-border)
+}
+.defect-log-app[data-card-view="detailed"][data-log-theme="light"] .grouped-defect-row{border-color:var(--log-detailed-frame)}
+
+/* Style the existing footer without changing its saved Off / Phone / Always
+   visibility. Extend over the optional vertical number rail so the strip
+   still sits flush with both inner card edges. */
+.defect-log-app[data-card-view="detailed"] .log-card-group>.log-bus-end-marker{
+ background:var(--log-detailed-frame);color:#fff;border-top-color:var(--log-detailed-frame);
+ position:relative;z-index:1;margin-left:calc(-1 * var(--log-group-number-rail-width,0px))
+}
