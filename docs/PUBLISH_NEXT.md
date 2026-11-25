@@ -1,16 +1,23 @@
 # Publish next
 
-**STATUS: NONE PENDING.** Application release 216 is live as Sites Version 202,
-deployed 2026-11-25 04:30:06.350181 UTC from `8cdd02358b07301ca4739a5416865736c9686ef4`.
+**STATUS: NONE PENDING.** Application release 217 is live as Sites Version 203,
+deployed 2026-11-25 22:06:08.501348 UTC from `2c00cf88bbe51894ad588ac3585122fe025fdf92`.
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
-Previous-live rollback: Sites 201 / application release 215 at
-`24ccb374a578f7ffa80fa4037399aaa6ab5b953b`. PR39 MCP remains held and excluded.
+Previous-live rollback: Sites 202 / application release 216 at
+`8cdd02358b07301ca4739a5416865736c9686ef4`. PR39 MCP remains held and excluded.
 
 Publication evidence is in [RELEASES.md](RELEASES.md).
 
 ## Remaining device checks
+
+On a physical iPhone, confirm that LATEST and OLDEST are readable and stacked
+without crowding VIEW or CLOSE; a filtered bus card still shows the oldest
+dated active defect. Expand the card to confirm full issue details and the
+larger original LOGGED, UPDATED, and LAST REPORTED labels; do not change any
+real record to verify.
+
 
 On a physical iPhone, confirm the Fixed Repairs emoji/category subtitles are
 easier to read and longer names wrap without covering the repair description.

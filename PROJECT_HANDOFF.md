@@ -4,8 +4,8 @@ Updated: 2026-11-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 202 (application release 216)
-Live feature checkpoint: commit 8cdd02358b07301ca4739a5416865736c9686ef4
+Live release: Sites Version 203 (application release 217)
+Live feature checkpoint: commit 2c00cf88bbe51894ad588ac3585122fe025fdf92
 
 ## Read this first
 
@@ -23,6 +23,16 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 203 / application release 217 deployed 2026-11-25 22:06:08.501348 UTC from `2c00cf88bbe51894ad588ac3585122fe025fdf92`. Detailed Defect Log bus cards show OLDEST directly below LATEST, using the original logged time of the oldest dated, not-completed, non-removed Defect Log record on that bus across feed windows and search. The repeated issue preview is removed from the detailed card face; the individual expanded rows and Compact preview are preserved. LATEST, OLDEST, and the expanded LOGGED, UPDATED, and LAST REPORTED timestamps grow from 9 px to 12 px at the default root size. Their underlying timestamps, sorting, data, storage, sync, and hosting configuration are unchanged. PR39 MCP remains held and excluded.
+
+Exact-source ESLint, production build, 489 local tests, and diff checks passed. A mutation using the last update instead of the original logged time failed the new regression test. GitHub CI [run 518](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45708842602) passed. [CodeRabbit reviewed the exact PR #61 head](https://github.com/curtistheconqueror/bus-tracker/pull/61#issuecomment-7175650210). The public Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200. The served Defect Log JavaScript and stylesheet matched the checked production artifact byte-for-byte. The managed browser preview could not start, so actual physical iPhone layout and fleet data are unverified.
+
+Native deployment `appgdep_6b075bc8d554819192aeefb860b2267e` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_71cfdae29cf88191bec50026bef6d549`. Public access and runtime revisions remain 2. Immediate rollback: Sites 202 / application release 216 at `8cdd02358b07301ca4739a5416865736c9686ef4`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_27f08c6b3e00819191b39b6a1a12bf47`.
+
+No other release is pending.
+
+### Previous publication — Sites 202 / application 216
 
 Sites Version 202 / application release 216 deployed 2026-11-25 04:30:06.350181 UTC from `8cdd02358b07301ca4739a5416865736c9686ef4`. In Fixed Repairs → Completed Repair History, emoji/category subtitles such as Amerex and Suspension and Steering increase from 9 px to 12 px. Issue descriptions, other headings, data, storage, sync, and hosting configuration do not change. PR39 MCP remains held and excluded.
 
