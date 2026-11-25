@@ -67,8 +67,8 @@ The next major phase is an offline-first shared backend with real-time device sy
 
 The private GitHub origin is the code backup. The sites remote belongs to the existing OpenAI Sites deployment. A coding agent may implement, test, and commit locally, but publishing must use the existing Sites project and must never create a replacement site.
 
-- Current live release: Sites Version 208 (application release 222; service-brake pull symptoms)
-- Current live feature checkpoint: commit ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f
+- Current live release: Sites Version 209 (application release 223; clearer tablet Down Sheet section labels)
+- Current live feature checkpoint: commit e0054a9dfca54281bfe112c3d5cd14c76a174e82
 - What is waiting to be published: docs/PUBLISH_NEXT.md
 - Release reference: docs/RELEASES.md
 - Publishing and recovery runbook: docs/SITES_PUBLISHING_RUNBOOK.md

@@ -4,8 +4,8 @@ Updated: 2026-11-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 208 (application release 222)
-Live feature checkpoint: commit ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f
+Live release: Sites Version 209 (application release 223)
+Live feature checkpoint: commit e0054a9dfca54281bfe112c3d5cd14c76a174e82
 
 ## Read this first
 
@@ -23,6 +23,16 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 209 / application release 223 deployed 2026-11-25 23:56:12.045352 UTC from `e0054a9dfca54281bfe112c3d5cd14c76a174e82`. On tablet-size touch viewports only, hides the floating blue information strip that could cover Down Sheet rows. Section names (Off Property, Scheduled, Unscheduled, and Inspection) grow from 11 to 14 px, and their descriptions from 8 to 12 px. Count chips, the black frame, phone and desktop layouts, records, storage, and hosting are unchanged. PR39 remains held.
+
+ESLint, production build and diff checks passed. [CI run 537](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45724678311) passed 497 tests, including Chromium measurements of the actual tablet styles and the unchanged phone and desktop styles. [CodeRabbit PR #67](https://github.com/curtistheconqueror/bus-tracker/pull/67#issuecomment-7178172516) covered the exact release head. Public Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200; the served Down Sheet CSS matched the build. Physical-device rendering and live repair data were not exercised.
+
+Native deployment `appgdep_6b0775972e14819185f1c174f7514af7` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_bb9cfbe271708191b6be8cc1cc22d07e`. Public access and runtime revisions remain 2. Immediate rollback: Sites 208 / application 222 at `ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_555579f40ae8819180d1ad3648f69fe5`.
+
+No other release is pending.
+
+### Previous publication — Sites 208 / application 222
 
 Sites Version 208 / application release 222 deployed 2026-11-25 23:48:20.875605 UTC from `ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f`. Adds distinct Brakes symptoms “Pulls to R/S when service brakes are applied” and “Pulls to C/S when service brakes are applied” in the shared repair picker. Search returns both, and opposite-side reports are not mistakenly treated as duplicates. No migration or change to the tablet header, scan flow, storage, defect save rules, sync, or hosting. PR39 remains held.
 
