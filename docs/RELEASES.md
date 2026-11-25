@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 199 / application release 211 | Live | db6683d66884c3a25de88c896561a3226e1f67b2 | Removes DAILY STATS from the Defect Log, keeping + LOG DEFECT and SEARCH directly under the header. |
+| 200 / application releases 212–214 | Live | 4d205dbef009f1a74aff807dd6db474c6ddb97d3 | Defect Log window cleanup, compact Down Sheet controls and phone text fixes. |
+| 199 / application release 211 | Previous live; rollback | db6683d66884c3a25de88c896561a3226e1f67b2 | Removes DAILY STATS from the Defect Log, keeping + LOG DEFECT and SEARCH directly under the header. |
 | 198 / application release 210 | Previous live; rollback | 8ed0ce2dbf5c5eea6025b846440d43a650d4183c | Defect Log header shortcuts for Scan and Share, feed-row Quick Filters, conditional Undo, and relocated Settings tools and phone AI Operator entry. |
 | 197 / application releases 207–209 | Previous live; rollback | 9a7cc1f417c53689ee62b5f564609e2a0dc5b32a | Defect Log feed layout, time-window picker with PREVIOUS SHIFT, and neutral ALL control; PREVIOUS SHIFT in Fixed Repairs. |
 | 196 / application release 206 | Previous live; rollback | e649c644c28b66f4bc7d4494726a79834a80164b | Log Defect BUS wording, location pill and move undo; includes 198–205 already shipped in Sites 195. |
@@ -348,3 +349,16 @@ The approved queue is archived in [PUBLISH_RELEASE_211.md](archive/PUBLISH_RELEA
 
 - Native saved tar hash: `sha256:e80d36045464eea5bbe6933b17a94aa97900a9670905e371a17113e0097a25f7` (5,826,560 bytes; 128 files).
 - Rollback alias `sites-v199` was created locally; remote tag publication is not confirmed. Sites 199 and the exact source SHA are available independently of the tag.
+
+## Sites 200 / applications 212–214 — 2026-11-25
+
+Sites Version 200 / application release 214 deployed 2026-11-25 at 03:11:32.770199 UTC from `4d205dbef009f1a74aff807dd6db474c6ddb97d3`, carrying 212 and 213. The Defect Log no longer adds the normal older-buses banner when changing windows; the unavailable-window and search notices remain. The Down Sheet has REFRESH, SCAN and SHARE, compact shift/counts/filter tabs, five watch lists, and CLEAR DOWNSHEET in Settings. Phone CSS addresses crowded Defect Log bus numbers, the welcome heading and the Map DECOMMISSIONED tile. No migration, sync, storage-key addition or rename; seven retired panel keys are left untouched on devices. PR39 MCP remains held and excluded.
+
+Exact-source production build, 485 tests (zero failures or skips), ESLint and `git diff --check` passed. Managed Chromium preview verified closed-by-default panels, mutually exclusive switching and repeat-tap collapse, Mystery, Scan, the four Share drawer actions, Settings’ CLEAR DOWNSHEET control, and Maintenance → Union with all six roles and the heading below Close at desktop width. Preview and live Chromium verified THIS SHIFT and ALL without the normal older-buses banner or a feed-height change. Live Chromium opened the Down Sheet Share drawer, Mystery (open and close), and Scan dialog. No records were changed, no share or upload was performed, and Clear was not activated. Physical iPhone, phone CSS geometry (developer measurements in the archive), synthetic clear confirmation/undo, and installed/offline checks remain open.
+
+Native deployment `appgdep_6b0651dfd5408191b3484bc0edcff59c` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_b44b682c12d48191a184a89654ff3adc`. Public URL, access policy revision 2 and runtime environment revision 2 are unchanged. Immediate rollback: Sites 199 / release 211 at `db6683d66884c3a25de88c896561a3226e1f67b2`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_c5dabcca09ec819181a8579372e1621f`.
+
+The approved queue and detailed checks are archived in [PUBLISH_RELEASE_212_214.md](archive/PUBLISH_RELEASE_212_214.md). The publish queue is reset to NONE PENDING.
+
+- Native saved tar hash: `sha256:656105f9c6aba79b3f3958522eb36bd5cfe5c39afb965d9b2e5c3eed005c38f3` (5,847,040 bytes; 132 files).
+- The `sites-v200` alias was created locally; remote tag publication is not confirmed. The exact source and saved Sites checkpoint are available independently.
