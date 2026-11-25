@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 202 / application release 216 | Live | 8cdd02358b07301ca4739a5416865736c9686ef4 | Enlarges emoji/category subtitles in Fixed Repairs only. |
+| 203 / application release 217 | Live | 2c00cf88bbe51894ad588ac3585122fe025fdf92 | Shows the oldest active logged date, removes repeated detailed card descriptions, and enlarges Defect Log dates. |
+| 202 / application release 216 | Previous live; rollback | 8cdd02358b07301ca4739a5416865736c9686ef4 | Enlarges emoji/category subtitles in Fixed Repairs only. |
 | 201 / application release 215 | Previous live; rollback | 24ccb374a578f7ffa80fa4037399aaa6ab5b953b | Slightly enlarges the Maintenance Down Sheet title. |
 | 200 / application releases 212–214 | Previous live; rollback | 4d205dbef009f1a74aff807dd6db474c6ddb97d3 | Defect Log window cleanup, compact Down Sheet controls and phone text fixes. |
 | 199 / application release 211 | Previous live; rollback | db6683d66884c3a25de88c896561a3226e1f67b2 | Removes DAILY STATS from the Defect Log, keeping + LOG DEFECT and SEARCH directly under the header. |
@@ -387,3 +388,16 @@ Native deployment `appgdep_6b06644737e081918ca934338170efdd` succeeded; saved ve
 
 - Native saved tar hash: `sha256:9737bcd2b850dc6fb7f17790807083236a669c82260ba870e9bf9fc3c0412a9c`.
 - The `sites-v202` alias was created locally; remote tag publication is not confirmed.
+
+## Sites 203 / application 217 — 2026-11-25
+
+Sites Version 203 / application release 217 deployed 2026-11-25 22:06:08.501348 UTC from `2c00cf88bbe51894ad588ac3585122fe025fdf92`. Detailed Defect Log bus cards show OLDEST directly below LATEST, using the original logged time of the oldest dated, not-completed, non-removed Defect Log record on that bus across feed windows and search. The repeated issue preview is removed from the detailed card face; the individual expanded rows and Compact preview are preserved. LATEST, OLDEST, and the expanded LOGGED, UPDATED, and LAST REPORTED timestamps grow from 9 px to 12 px at the default root size. Their underlying timestamps, sorting, data, storage, sync, and hosting configuration are unchanged. PR39 MCP remains held and excluded.
+
+Exact-source ESLint, production build, 489 local tests, and diff checks passed. A mutation using the last update instead of the original logged time failed the new regression test. GitHub CI [run 518](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45708842602) passed. [CodeRabbit reviewed the exact PR #61 head](https://github.com/curtistheconqueror/bus-tracker/pull/61#issuecomment-7175650210). The public Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200. The served Defect Log JavaScript and stylesheet matched the checked production artifact byte-for-byte. The managed browser preview could not start, so actual physical iPhone layout and fleet data are unverified.
+
+Native deployment `appgdep_6b075bc8d554819192aeefb860b2267e` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_71cfdae29cf88191bec50026bef6d549`. Public access and runtime revisions remain 2. Immediate rollback: Sites 202 / application release 216 at `8cdd02358b07301ca4739a5416865736c9686ef4`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_27f08c6b3e00819191b39b6a1a12bf47`.
+
+- Native saved tar hash: `sha256:ec6c2e484c862e1ea4e85d26bcb37c970ea3db67a5f0d26d661610d6f4b77e6c`.
+- The `sites-v203` alias was recorded locally; remote tag publication is not confirmed.
+
+No other release is pending.
