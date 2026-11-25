@@ -386,7 +386,7 @@ test("the photos go from SCAN SHEET to a scanner once, in memory, whole or not a
   assert.equal(paperSentWrongWords(handed, "sweep"), "");
   assert.equal(paperSentWrongWords(null, "heat"), "");
   assert.equal(paperSentWrongWords({ kind: "heat", files: [], expected: 2, leftOut: 0 }, "heat"), "", "lost photos were never refused");
-  for (const [file, last] of [["../app/defect-log/_components/heat-scanner.tsx", "through SCAN, then FAREBOX / VENTRA SWEEP."], ["../app/defect-log/_components/sweep-scanner.tsx", "on the Down Sheet page."]]) {
+  for (const [file, last] of [["../app/defect-log/_components/heat-scanner.tsx", "through SCAN on the Defect Log, then FAREBOX / VENTRA SWEEP."], ["../app/defect-log/_components/sweep-scanner.tsx", "on the Down Sheet page."]]) {
     assert.ok(code(await read(file)).includes(last + '"+(fromPaper&&start.wrong?" "+start.wrong:""));'), file + " adds it to its refusal, while the photos are still the door's");
   }
 
@@ -559,8 +559,9 @@ test("SCAN SHEET on the screen: it identifies, hands on, and files nothing", asy
      receiver for a door on another page, and no page has one today.) */
   const { PAPER_DOOR } = await import("../src/lib/scan/paper-kinds.ts");
   assert.equal(PAPER_DOOR, "SCAN SHEET");
-  assert.match(downPage, /<button className="scan-sheet-button" type="button" onClick=\{\(\)=>setPaperOpen\(true\)\} title="[^"]+">▣ \{PAPER_DOOR\}<\/button>/);
-  assert.equal(count(downPage, /className="scan-sheet-button"/g), 1, "one SCAN SHEET button");
+  /* Since release 213 the door is SCAN in the Down Sheet's header. */
+  assert.match(downPage, /<button className="down-header-button" type="button" onClick=\{\(\)=>setPaperOpen\(true\)\} aria-label=\{"Scan: "\+PAPER_DOOR\}/);
+  assert.equal(count(code(downPage), /onClick=\{\(\)=>setPaperOpen\(true\)\}/g), 1, "one button opens the door");
   assert.match(downPage, /\{paperOpen&&<ScanPaper here=\{PAPER_HERE\} onClose=\{\(\)=>setPaperOpen\(false\)\} onHere=\{openPaperHere\}\/>\}/);
   assert.doesNotMatch(code(downPage), /onClick=\{\(\)=>setScannerOpen\(true\)\}/, "no button opens the scanner past the door");
   assert.equal(count(code(downPage), /setScannerOpen\(true\)/g), 2, "the scanner opens from the door on this page and from a hand-off off the address, and nowhere else");

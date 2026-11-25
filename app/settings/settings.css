@@ -453,3 +453,9 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
  .sheet-backfill-row{display:grid;grid-template-columns:1fr}
  .sheet-backfill-plan{grid-template-columns:1fr 1fr}
 }
+
+/* CLEAR THE SHEET (release 213) borrows the Defect Log section's tool group,
+   whose colours come from --log-* variables only that section defines. In the
+   Down Sheet section it drew with no border and no background (found in
+   review), so it is given the same values here, in plain colours. */
+.settings-section-down .log-settings-group.settings-tools{--log-border:#c9d3e1;--log-soft:#f6f8fb;--log-muted:#52647d;--log-text:#172b4d;--log-surface:#fff}

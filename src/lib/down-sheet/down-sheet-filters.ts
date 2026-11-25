@@ -35,21 +35,22 @@ export type DownSheetFilterEntry=DownSheetViewEntry&{
    this list is to produce the second one while it can still be acted on. */
 export const DOWN_SHEET_AGING_DAYS=3;
 
+/* WHAT QUICK FILTERS OFFERS ON THE SHEET, since release 213: four. Curtis,
+   shown all nine: "Get rid of everything under the first 3 options except
+   roadcalls." Down 3+ Days, On The Road Right Now, Body Shop / Accident,
+   Inspections & Scheduled Maintenance and No Time Estimate Set are no longer
+   offered. Their keys stay in the type and in `downSheetFilterMatch`, so a
+   saved or linked one is read as no filter rather than as an error, and the
+   counts tiles that cover the same ground (INSPECTIONS, the two ON ROAD
+   tallies) are untouched. The five watch lists sit above these in the menu
+   (`down-sheet-watch-lists.ts`). */
 export const DOWN_SHEET_FILTERS:{key:DownSheetFilterKey;label:string;shortLabel:string;hint:string}[]=[
  /* First, because it is the only one of these that names work nobody has picked
     up. Everything else on this list has somebody or somewhere attached to it. */
  {key:"unassigned",label:"Nobody Assigned Yet",shortLabel:"Unassigned",hint:"On the sheet with no mechanic or vendor named"},
  {key:"waiting-parts",label:"Waiting For Parts",shortLabel:"Parts",hint:"Work that cannot move until something arrives"},
  {key:"off-property",label:"Off Property",shortLabel:"Off Property",hint:"At a vendor or otherwise out of the yard"},
- {key:"on-road",label:"On The Road Right Now",shortLabel:"On Road",hint:"Still out working while carrying an open entry"},
- {key:"aging",label:"Down "+DOWN_SHEET_AGING_DAYS+"+ Days",shortLabel:"Aging",hint:"On the sheet longer than "+DOWN_SHEET_AGING_DAYS+" days"},
- {key:"body-shop",label:"Body Shop / Accident",shortLabel:"Body",hint:"Collision, paint and body work"},
  {key:"road-call",label:"Road Calls",shortLabel:"Road Calls",hint:"Rows written up off a road call"},
- {key:"inspection",label:"Inspections & Scheduled Maintenance",shortLabel:"Inspections",hint:"PMs, spark plugs, valve adjustments"},
- /* Last, and the only one here that is about the sheet's own bookkeeping rather
-    than about a bus. It is the list a foreman runs before handing the sheet to
-    somebody who is going to ask how long all this takes. */
- {key:"no-estimate",label:"No Time Estimate Set",shortLabel:"No Estimate",hint:"Rows carrying no estimated repair time"},
 ];
 
 export function downSheetFilterFromValue(value:unknown):DownSheetFilterKey|null{
@@ -103,8 +104,8 @@ export function downSheetFilterEntries<T extends DownSheetFilterEntry>(entries:T
  return entries.filter(entry=>downSheetFilterMatch(entry,locations[entry.busId||""]||"",key,now));
 }
 
-/* Every count in one pass, because the menu draws all nine at once and asking
-   nine separate times walks the sheet nine times on a phone. */
+/* Every count in one pass, because the menu draws all of them at once and
+   asking one at a time walks the sheet once per filter on a phone. */
 export function downSheetFilterCounts<T extends DownSheetFilterEntry>(entries:T[],locations:Record<string,string>={},now=new Date().toISOString()){
  const counts={} as Record<DownSheetFilterKey,number>;
  for(const item of DOWN_SHEET_FILTERS)counts[item.key]=0;
