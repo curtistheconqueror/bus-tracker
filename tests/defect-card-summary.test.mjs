@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
+import { cssRules, declaredFontSizePx, splitSelector } from "./helpers/css-rules.mjs";
 import { defectLogRecords, groupDefectLogRecords, oldestActiveDefectLoggedAtByBus } from "../src/lib/defects/defect-log-sync.ts";
 
 test("oldest active Defect Log stamp uses the original logged time before applying feed filters",()=>{
@@ -46,4 +47,13 @@ test("detailed bus header leaves issue descriptions to expanded rows while compa
  assert.doesNotMatch(header,/\{preview\}|more defect/);
  assert.match(page,/className="compact-issue"><strong>\{preview\}<\/strong>/);
  assert.match(page,/className="grouped-defect-main"[^]*?<strong>\{defectLabel\(record\.defect\)\}<\/strong>/);
+});
+
+test("bus-card and expanded-defect timestamps share the larger date size",async()=>{
+ const rules=cssRules(await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"));
+ const size=(selector)=>rules.filter(rule=>!rule.at.length&&splitSelector(rule.selector).includes(selector)).map(rule=>declaredFontSizePx(rule.body)).filter(px=>px!==null).at(-1);
+ assert.equal(size(".log-group-header .log-meta>time"),12,"LATEST also grows on cards with no dated active defect");
+ assert.equal(size(".log-group-header .log-group-times>time"),12,"LATEST and OLDEST grow together");
+ assert.equal(size(".grouped-defect-main .log-meta>time"),12,"LOGGED, UPDATED and LAST REPORTED use the same size in expanded defects");
+ assert.equal(size(".log-meta time"),9,"unrelated meta timestamps retain their default size");
 });

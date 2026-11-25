@@ -954,6 +954,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-meta>small,.log-meta .log-status-cell>small{font-size:10px;font-weight:900;white-space:nowrap}
 .log-meta time{font-size:9px;font-weight:800;letter-spacing:.2px;white-space:nowrap}
 .log-group-times{display:grid;gap:3px;min-width:0}
+.log-group-header .log-meta>time,.log-group-header .log-group-times>time,.grouped-defect-main .log-meta>time{font-size:.75rem;white-space:normal;overflow-wrap:anywhere}
 .log-badge-slot{display:grid;grid-template-columns:34px 38px;column-gap:4px;align-items:center}
 .log-badge-slot .inline-ds-badge{grid-column:1}
 .log-badge-slot .defect-count-badge{grid-column:2}
@@ -974,6 +975,8 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  .log-group-header .log-status-cell{grid-area:status}
  .log-group-header .log-meta>time{grid-area:time;justify-self:start}
  .log-group-header .log-group-times{grid-area:time;justify-self:start}
+ /* Let larger dates use the width beneath the status, keeping room for VIEW/CLOSE. */
+ .log-group-header .log-meta>time,.log-group-header .log-group-times{grid-column:1/-1;margin-inline-end:50px}
  .log-group-header .log-meta>.group-toggle{grid-area:view;justify-self:end;padding:6px 2px;margin:-6px -2px}
 }
 .log-meta .inline-deferred-history-badge{min-height:24px;height:auto;border-radius:12px;padding:0 8px;font-size:9px}
