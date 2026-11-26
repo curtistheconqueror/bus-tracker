@@ -83,3 +83,139 @@ Continue the native ALL picker and Previous Shift checks from
 [releases 207–209](archive/PUBLISH_RELEASE_207_209.md) and the Log Defect
 location and Down Sheet checks from [releases 198–206](archive/PUBLISH_RELEASE_198_206.md).
 These are device follow-ups, not pending source releases.
+
+## PR39 (MCP read surface) — NOT MERGED, and not part of any release above
+
+**Nothing in this section is pending publication.** PR39 is an open, unmerged
+pull request, held by Curtis's own release gates. The STATUS line at the top of
+this file is Codex's own, about Codex's release queue — pending, published or
+none — and says nothing about this section. No release is claimed in here as
+this section's own: it outlives the releases around it, so one claimed in it
+would be describing something else by the time anybody read it. The rollback
+block below names releases on purpose, each tied to a date. It is kept here so that
+the gates travel with the branch, and it becomes a release section only if and
+when PR39 is merged — at which point its STATUS, its source SHA and its
+rollback are all written fresh against whatever is live then.
+
+PR #39 adds five read-only MCP tools at `/api/mcp`. Last code-bearing source:
+`c784431c18d2fe1550bcaef3106ca4de12659f5b`. **`0e6d9aa` is NOT the code head** —
+it is the SHA CodeRabbit's clean pass covered, and four code commits followed
+it (`6d09cf3`, `eb65f07`, `aef93a9`, `c784431`), each fixing a defect found
+after that pass. Freeze and reverify the actual merged release SHA before packaging, and
+publish no build older than the code head — `347672f` and `0e6d9aa` are both
+older than it, and singling either out implies the rest are safe.
+CI [39532393605](https://github.com/curtistheconqueror/bus-tracker/actions/runs/39532393605)
+passed lint, build and 399 tests on merge candidate
+`86e84e51bae874e9c55c079ff2b1c891f065ce37` (`0e6d9aa` into `a7e1aa3`).
+Any newer code requires reconciliation and current-head checks.
+
+**THAT CI RUN AND ITS 399 TESTS DESCRIBE AN OLDER CANDIDATE, not this head.**
+`main` is merged into this branch rather than rebased onto, because the branch
+is published. **When that has been done, how often, and which releases it
+brought in are deliberately not written here**: that is history, and this file
+is not where it lives — the same reason no SHA below is authoritative. Read
+`git log --merges --first-parent` on the branch for the sequence, and
+`git show <merge>^2:docs/PUBLISH_NEXT.md` for the release each merge brought in.
+Use `--first-parent`: without it, the merges `main` carried in with it are mixed
+into the same list. Two rows of that list are this branch's own merges INTO
+`main` (`Merge pull request #37` and `#38`); for those `^2` is the branch side
+and answers with this file, not with a release.
+
+Two files are where such a merge conflicts, and each has one right resolution.
+`tests/helpers/modules.mjs` conflicts when this branch and `main` have both
+appended export lines at the same end: take the union, and check that every
+module path in the result exists. This file conflicts because Codex rewrites it
+whole for each release while this branch appends the section below it: take
+`main`'s version whole and re-append the section, so that a release's STATUS
+line is always Codex's own and PR39 never claims it.
+
+Measured on this head, in a container rather than in CI, rather than carried
+over from an earlier run: the production build succeeds, ESLint is clean, and
+**540 of 540 tests pass**. That figure is a measurement of one tree and nothing
+more — it moves with any change that adds a test, so re-measure it here, and CI
+must re-run on the actual merge SHA before anything is packaged.
+
+**A COUNT FROM A PR CHECK NEED NOT BE A COUNT OF THIS HEAD.**
+`.github/workflows/ci.yml` fires on `pull_request` and its `actions/checkout`
+step passes no `ref`, so what a check on this pull request builds and tests is
+the merge GitHub computes between this head and the base branch, not this head.
+The two differ by whatever tests `main` has gained since the last merge into
+this branch, and **while the base is an ancestor of this head that is nothing**:
+merging a base already contained in the head produces the head's own tree, so
+`refs/pull/39/merge^{tree}` and `HEAD^{tree}` are then the same object and the
+two counts must agree. They did on the merge above, at 540. They diverge again
+the moment `main` gains a test, and a check reporting more tests than are
+measured here is that gap rather than a file the container failed to run. So
+compare a count only against a run on the same tree, and establish that it is
+the same tree instead of assuming either way.
+
+**ONE BROWSER TEST NEEDS `CHROME_BIN` SET IN A CONTAINER LIKE THIS ONE, AND
+WITHOUT IT FAILS FOR A REASON THAT IS NOT A DEFECT.** Two test files read
+`CHROME_BIN` — this one and `tests/down-sheet-tablet.test.mjs`, which resolves
+the same wrapper and passes without it because it allows 85 seconds.
+`tests/defect-log-black-footer.test.mjs` tries `google-chrome`, `chromium` and
+`chromium-browser` in that order and spawns the first that answers `--version`,
+with a 30 second budget. Here the first is a wrapper onto full Chromium, which
+exceeds that budget and dies `ETIMEDOUT`. Pointing `CHROME_BIN` at Playwright's
+`chrome-headless-shell` instead is not enough on its own: the shell refuses to
+run as root without `--no-sandbox`, which this test does not pass, so it exits
+1 saying so. Both readings are environment, not behaviour — the test is sound
+and `main`-owned, and nothing in it touches the MCP.
+
+So `CHROME_BIN` wants a one-line wrapper that execs
+`chrome-headless-shell --no-sandbox "$@"`, and with that the file passes 5 of 5
+and the whole suite 540 of 540. Worth knowing before somebody reads a red
+`ETIMEDOUT` here as a regression: it is neither this branch's nor a defect.
+
+Nothing about the gates below changed. Merging `main` in, and correcting what
+this section says, are both maintenance so the branch can land when Curtis
+clears them; neither is a claim that any gate is met.
+
+Curtis authorized publication of the verified ready scope on 2026-10-21 and
+temporarily accepted the unresolved Major URL-token risk for his initial
+single-user read-only connection. Keep the
+[OPEN risk record](MCP_SECURITY_FOLLOWUP.md) in subsequent release handoffs;
+do not describe it as fixed or CodeRabbit-approved.
+
+Before merge/publication, confirm the coordinating Supabase work has verified
+effective reader isolation and dedicated reader authorization, then configure
+the five runtime variables through the approved secure path. This record does
+not assert provisioning, authorization checks or runtime configuration are done.
+Do not duplicate identity creation, bundle future writes, or disclose a real
+token or token-bearing URL. No application migration is executed by this
+documentation change; separately coordinated Supabase changes need their own
+verification record.
+
+After publishing to the existing site, verify the frozen source and application
+and Sites versions; smoke the existing UI routes, unauthenticated rejection,
+authenticated MCP initialization/discovery, and actual authorized cloud tool
+reads without exposing credentials or private records. Record outcomes and
+remaining client/device checks. A handshake alone is insufficient.
+
+**ROLLBACK IS THE LIVE BASELINE AT PUBLISH TIME, AND IT IS RE-PINNED WHENEVER
+`main` IS MERGED IN.** It read application 191 / Sites 187,
+`b33775685b61acafdf4325807c82e92281c9fc2c` (`sites-v187`) — written on 2026-10-20
+and carried through the merge of 2026-11-18 without being re-read. By then it was
+162 commits behind, so rolling this release back as written would have reverted
+application releases 192 through 197 as well, including 197's page-resume and
+hydration-readiness fix, when the only intent is to take `/api/mcp` away.
+Measured: `git rev-list --count b337756..5e2e139^2` = 162, pinned to that
+merge rather than to `origin/main`, which moves and now answers 251.
+
+**Rollback for this section is WHATEVER IS LIVE WHEN IT IS FROZEN. Read it off
+the top of this file at that moment; do not trust a SHA written here.** It is a
+rule now and not a number, because every number put here went out of date
+before the section was ever used:
+
+- 2026-11-18: still named Sites 187, from 20 October. Rolling back as written
+  would have reverted releases 192 through 197 when the only intent was to take
+  `/api/mcp` away — 162 commits stale.
+- re-pinned to Sites 194 / release 197; releases 198 to 206 overtook it.
+- re-pinned to 206; release 207 overtook it.
+- 2026-11-24: 207 and 209 are out, and live is Sites Version 197 / release 209.
+- 2026-11-24, later the same day: release 210 is out and live is Sites Version
+  198. The line above was stale within two hours.
+
+Five pins, five times stale. A rollback that undoes unrelated releases is a
+defect rather than a stale note, which is why this carries no number of its own.
+Do not mark live until deployment and these checks complete.
