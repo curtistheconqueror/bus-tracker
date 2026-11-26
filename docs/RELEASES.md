@@ -4,7 +4,10 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 206 / application release 220 | Live | 1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f | Adds space and a thicker black frame around the tablet Down Sheet only. |
+| 209 / application release 223 | Live | e0054a9dfca54281bfe112c3d5cd14c76a174e82 | Tablet Down Sheet: remove the floating strip and enlarge section names and descriptions. |
+| 208 / application release 222 | Previous live; rollback | ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f | Brakes catalog: separate R/S and C/S pull symptoms when service brakes are applied. |
+| 207 / application release 221 | Previous live; rollback | 29538b916d5029ab3c11068424872db2cf2f142b | Tablet Down Sheet: Refresh, Scan + Share, and a closed-by-default Pages overlay. |
+| 206 / application release 220 | Previous live; rollback | 1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f | Adds space and a thicker black frame around the tablet Down Sheet only. |
 | 205 / application release 219 | Previous live; rollback | d7df976b0cd7fec682407c9cc335a836dab6a6d6 | Stable Detailed card positions, accurate Settings outline swatch, and browser regression checks. |
 | 204 / application release 218 | Previous live; rollback | 50340aef96e9bc87f9b8d43b7c485af97fab3d9d | Detailed Defect Log black outlines and solid black labeled closing line. |
 | 203 / application release 217 | Previous live; rollback | 2c00cf88bbe51894ad588ac3585122fe025fdf92 | Shows the oldest active logged date, removes repeated detailed card descriptions, and enlarges Defect Log dates. |
@@ -428,3 +431,27 @@ No other release is pending.
 - ESLint, production build, diff checks, and [CI run 525](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45718896889) passed, with 495 tests and no skips in CI. [CodeRabbit PR #64](https://github.com/curtistheconqueror/bus-tracker/pull/64#issuecomment-7177182948) reviewed all three changed files at the exact commit with no actionable findings. Map, Down Sheet, Defect Log, and Fixed Repairs returned HTTP 200; the live Down Sheet CSS matched the compiled artifact byte-for-byte. Physical tablet, phone and local fleet data were not exercised.
 - Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_404d375ff7dc81918b452159f040826b`; deployment: `appgdep_6b076b2714808191ba75d4174e25ab3f`; archive: `sha256:84c59ea2bd5b5fb49778e9d923161c1115d7b7b375020aca0b0e295c106e9eda`.
 - Immediate rollback: Sites 205 / application 219 at `d7df976b0cd7fec682407c9cc335a836dab6a6d6`. Public URL and access/runtime revisions are unchanged.
+
+## Sites 207 / application 221 — 2026-11-25
+
+- Live source: `29538b916d5029ab3c11068424872db2cf2f142b`, published 2026-11-25 23:43:23.549182 UTC.
+- Tablet-size touch viewports (761–1400 px wide and at least 600 px tall) use a compact Down Sheet header: REFRESH on its own row, SCAN and SHARE side by side, and PAGES below. PAGES starts closed and overlays the sheet without moving it. It uses the shared destinations, highlights Down Sheet, and respects Lite Mode. The existing tablet frame, phone/desktop navigation, other pages, Scan, Share, records, storage and hosting are unchanged. PR39 remains held.
+- ESLint, production build, and diff checks passed. [CI run 531](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45723103426) passed 496 tests, including the Chromium check of the built Down Sheet on tablet, phone portrait/landscape, and desktop. The check also covers Pages overlay/dismissal, scanner entry and Share drawer, and Lite Mode. [CodeRabbit PR #65](https://github.com/curtistheconqueror/bus-tracker/pull/65#issuecomment-7177617066) covered all four changed files across the original and incremental reviews, including the exact release head; its browser-fixture exit finding was addressed and the final review had no new actionable findings. Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200. Live Down Sheet CSS and JavaScript matched the build. Physical devices, photos, actual sharing, and live records were not exercised.
+- Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_cfed301bf56081918b6d591d7a096b6d`; deployment: `appgdep_6b0772968e208191b749afff78caa678`; archive: `sha256:009d42e248237ca46c7533f22e4ccee2f06e2d4c77f0344fd0a280403b3a1d9d`.
+- Immediate rollback: Sites 206 / application release 220 at `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`. Public URL and access/runtime revisions are unchanged.
+
+## Sites 208 / application 222 — 2026-11-25
+
+- Live source: `ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f`, published 2026-11-25 23:48:20.875605 UTC.
+- Adds distinct Brakes symptoms “Pulls to R/S when service brakes are applied” and “Pulls to C/S when service brakes are applied” in the shared repair picker. Search returns both, and opposite-side reports are not mistakenly treated as duplicates. No migration or change to the tablet header, scan flow, storage, defect save rules, sync, or hosting. PR39 remains held.
+- ESLint, production build and diff checks passed. [CI run 534](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45723711693) passed 497 tests. [CodeRabbit PR #66](https://github.com/curtistheconqueror/bus-tracker/pull/66#issuecomment-7178007435) covered all changed files at the exact release head. Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200, and the served catalog asset matched the production build. No real fleet records were changed to verify.
+- Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_555579f40ae8819180d1ad3648f69fe5`; deployment: `appgdep_6b0773bf76888191942cba9bd80328c2`; archive: `sha256:65c78b3c98dc93d11ff334ef73c3a22496ed5de99639774363c27d4331d18a6f`.
+- Immediate rollback: Sites 207 / application release 221 at `29538b916d5029ab3c11068424872db2cf2f142b`. Public URL and access/runtime revisions are unchanged.
+
+## Sites 209 / application 223 — 2026-11-25
+
+- Live source: `e0054a9dfca54281bfe112c3d5cd14c76a174e82`, published 2026-11-25 23:56:12.045352 UTC.
+- On tablet-size touch viewports only, hides the floating blue information strip that could cover Down Sheet rows. Section names (Off Property, Scheduled, Unscheduled, and Inspection) grow from 11 to 14 px, and their descriptions from 8 to 12 px. Count chips, the black frame, phone and desktop layouts, records, storage, and hosting are unchanged. PR39 remains held.
+- ESLint, production build and diff checks passed. [CI run 537](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45724678311) passed 497 tests, including Chromium measurements of the actual tablet styles and the unchanged phone and desktop styles. [CodeRabbit PR #67](https://github.com/curtistheconqueror/bus-tracker/pull/67#issuecomment-7178172516) covered the exact release head. Public Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200; the served Down Sheet CSS matched the build. Physical-device rendering and live repair data were not exercised.
+- Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_bb9cfbe271708191b6be8cc1cc22d07e`; deployment: `appgdep_6b0775972e14819185f1c174f7514af7`; archive: `sha256:df826af8f9706a5418ab16edc88d19fdd255742136ffb494c0f2358473f8e21e`.
+- Immediate rollback: Sites 208 / application release 222 at `ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f`. Public URL and access/runtime revisions are unchanged.

@@ -1,8 +1,102 @@
+.down-tablet-pages{display:none}
+
 /* Tablet-sized touch viewports only. A phone in landscape still lacks the
    required height; narrow iPad split views keep the existing narrow layout. */
 @media (min-width:761px) and (max-width:1400px) and (min-height:600px) and (any-pointer:coarse) {
  .down-app > .sheet-wrap {
   margin-block-start:18px;
   border:2px solid #000;
+ }
+ /* The shared fixed footer was sitting over repair rows on tablets. */
+ .down-app > .down-footnote {
+  display:none;
+ }
+ .down-app .down-table .down-group-row td > b {
+  font-size:14px;
+ }
+ .down-app .down-table .down-group-row td > span {
+  font-size:12px;
+  line-height:1.35;
+ }
+ .fleetstep-shell .down-app > .down-header {
+  display:flex;
+  align-items:flex-start;
+  flex-wrap:nowrap;
+ }
+ .fleetstep-shell .down-app > .down-header > :first-child {
+  display:block;
+  min-width:0;
+  overflow-wrap:anywhere;
+ }
+ .fleetstep-shell .down-app > .down-header > .down-header-actions {
+  display:flex;
+  width:210px;
+  margin:0;
+ }
+ .down-app .down-header-actions > .app-refresh {
+  justify-content:center;
+  min-height:44px;
+ }
+ .down-app .down-header > nav[data-tracker-nav],
+ body:has(.down-app .down-header > nav[data-tracker-nav]) > .tracker-mobile-shell {
+  display:none;
+ }
+ .down-app .down-tablet-pages {
+  display:block;
+  position:relative;
+ }
+ .down-tablet-pages-toggle {
+  width:100%;
+  background:color-mix(in srgb,currentColor 8%,transparent);
+ }
+ .down-tablet-pages-toggle:focus-visible {
+  outline:2px solid currentColor;
+  outline-offset:2px;
+ }
+ .down-app .down-header .down-tablet-pages-panel {
+  position:absolute;
+  z-index:30;
+  top:calc(100% + 6px);
+  right:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  justify-content:stretch;
+  align-items:stretch;
+  gap:2px;
+  width:240px;
+  max-height:min(420px,calc(100dvh - 190px));
+  overflow:auto;
+  padding:6px;
+  border:1px solid #aabbd0;
+  border-radius:10px;
+  background:#fff;
+  box-shadow:0 10px 30px #041d4740;
+ }
+ .down-app .down-header .down-tablet-pages-panel a {
+  justify-content:flex-start;
+  min-width:0;
+  width:100%;
+  height:auto;
+  min-height:44px;
+  padding:8px 10px;
+  border:0;
+  border-radius:6px;
+  background:#fff;
+  color:#17365e;
+  text-shadow:none;
+  font-size:13px;
+  box-shadow:none;
+ }
+ .down-app .down-header .down-tablet-pages-panel a:hover {
+  background:#edf2f8;
+ }
+ .down-app .down-header .down-tablet-pages-panel a:focus-visible {
+  outline:2px solid #17365e;
+  outline-offset:-2px;
+ }
+ .down-app .down-header .down-tablet-pages-panel a[aria-current="page"] {
+  background:#e8f7ef;
+  color:#075b37;
+  box-shadow:inset 3px 0 #08794b;
  }
 }

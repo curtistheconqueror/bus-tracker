@@ -1,15 +1,28 @@
 # Publish next
 
-**STATUS: NONE PENDING.** Application release 220 is live as Sites Version 206,
-deployed 2026-11-25 23:11:41.557026 UTC from `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`.
+**STATUS: NONE PENDING.** Application release 223 is live as Sites Version 209,
+deployed 2026-11-25 23:56:12.045352 UTC from `e0054a9dfca54281bfe112c3d5cd14c76a174e82`.
 
 Site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
-Previous-live rollback: Sites 205 / application 219 at `d7df976b0cd7fec682407c9cc335a836dab6a6d6`. PR39 MCP remains held and excluded.
+Previous-live rollback: Sites 208 / application 222 at `ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f`. PR39 MCP remains held and excluded.
 
 Publication evidence is in [RELEASES.md](RELEASES.md).
 
 ## Remaining device checks
+
+On an iPad or Android tablet, scroll the Down Sheet and confirm the blue strip
+no longer covers rows. Section names and their descriptions should be larger,
+with count chips and phone rendering unchanged. Do not edit records to verify.
+
+In the Defect Log and Down Sheet repair pickers, open Brakes and look for the
+two service-brake pull directions. Cancel without saving a real record.
+
+On a physical iPad or Android tablet, verify REFRESH on its own row, SCAN and
+SHARE together, and PAGES below. PAGES starts closed; opening it overlays the
+sheet without movement, and tapping away closes it. On a phone in portrait or
+landscape, confirm the existing navigation and actions are unchanged. Open and
+cancel Scan to check the existing entry screen without selecting real photos.
 
 On iPad or another tablet, verify the added space after the control panel and
 the 2 px black border around Maintenance Down Sheet. Compare portrait and

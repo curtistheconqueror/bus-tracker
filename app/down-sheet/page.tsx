@@ -7,6 +7,7 @@ import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {Fragment,useEffect,useMemo,useRef,useState,type CSSProperties} from "react";
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
+import TabletPages from "./_components/tablet-pages";
 import "./down-sheet.css";
 import "./down-sheet-tablet.css";
 import DownSheetEditor from "./_components/down-sheet-editor";
@@ -936,6 +937,7 @@ export default function DownSheet(){
      {!hiddenInLite(appMode,"advancedActions")&&<button className="down-header-button" type="button" onClick={()=>setPaperOpen(true)} aria-label={"Scan: "+PAPER_DOOR} title="Photograph any shop sheet: the app works out which one it is and opens its scanner"><svg className="down-header-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7l2-3h4l2 3"/><circle cx="12" cy="13.5" r="3.5"/></svg><b>SCAN</b></button>}
      <button className="down-header-button" type="button" aria-expanded={shareOpen} aria-controls={shareOpen?"down-share-drawer":undefined} onClick={()=>setShareOpen(value=>!value)}><svg className="down-header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M6 12H5a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1h-1"/></svg><b>SHARE</b><i aria-hidden="true">{shareOpen?"\u25B4":"\u25BE"}</i></button>
     </div>
+    <TabletPages mode={appMode}/>
    </div>
   </header>
 

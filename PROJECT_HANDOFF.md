@@ -4,8 +4,8 @@ Updated: 2026-11-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 206 (application release 220)
-Live feature checkpoint: commit 1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f
+Live release: Sites Version 209 (application release 223)
+Live feature checkpoint: commit e0054a9dfca54281bfe112c3d5cd14c76a174e82
 
 ## Read this first
 
@@ -23,6 +23,36 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Latest publication
+
+Sites Version 209 / application release 223 deployed 2026-11-25 23:56:12.045352 UTC from `e0054a9dfca54281bfe112c3d5cd14c76a174e82`. On tablet-size touch viewports only, hides the floating blue information strip that could cover Down Sheet rows. Section names (Off Property, Scheduled, Unscheduled, and Inspection) grow from 11 to 14 px, and their descriptions from 8 to 12 px. Count chips, the black frame, phone and desktop layouts, records, storage, and hosting are unchanged. PR39 remains held.
+
+ESLint, production build and diff checks passed. [CI run 537](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45724678311) passed 497 tests, including Chromium measurements of the actual tablet styles and the unchanged phone and desktop styles. [CodeRabbit PR #67](https://github.com/curtistheconqueror/bus-tracker/pull/67#issuecomment-7178172516) covered the exact release head. Public Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200; the served Down Sheet CSS matched the build. Physical-device rendering and live repair data were not exercised.
+
+Native deployment `appgdep_6b0775972e14819185f1c174f7514af7` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_bb9cfbe271708191b6be8cc1cc22d07e`. Public access and runtime revisions remain 2. Immediate rollback: Sites 208 / application 222 at `ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_555579f40ae8819180d1ad3648f69fe5`.
+
+No other release is pending.
+
+### Previous publication — Sites 208 / application 222
+
+Sites Version 208 / application release 222 deployed 2026-11-25 23:48:20.875605 UTC from `ea7071dc7cd9cb662b93c1e7ffe4aaaf23cbbe4f`. Adds distinct Brakes symptoms “Pulls to R/S when service brakes are applied” and “Pulls to C/S when service brakes are applied” in the shared repair picker. Search returns both, and opposite-side reports are not mistakenly treated as duplicates. No migration or change to the tablet header, scan flow, storage, defect save rules, sync, or hosting. PR39 remains held.
+
+ESLint, production build and diff checks passed. [CI run 534](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45723711693) passed 497 tests. [CodeRabbit PR #66](https://github.com/curtistheconqueror/bus-tracker/pull/66#issuecomment-7178007435) covered all changed files at the exact release head. Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200, and the served catalog asset matched the production build. No real fleet records were changed to verify.
+
+Native deployment `appgdep_6b0773bf76888191942cba9bd80328c2` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_555579f40ae8819180d1ad3648f69fe5`. Public access and runtime revisions remain 2. Immediate rollback: Sites 207 / application 221 at `29538b916d5029ab3c11068424872db2cf2f142b`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_cfed301bf56081918b6d591d7a096b6d`.
+
+No other release is pending.
+
+### Previous publication — Sites 207 / application 221
+
+Sites Version 207 / application release 221 deployed 2026-11-25 23:43:23.549182 UTC from `29538b916d5029ab3c11068424872db2cf2f142b`. Tablet-size touch viewports (761–1400 px wide and at least 600 px tall) use a compact Down Sheet header: REFRESH on its own row, SCAN and SHARE side by side, and PAGES below. PAGES starts closed and overlays the sheet without moving it. It uses the shared destinations, highlights Down Sheet, and respects Lite Mode. The existing tablet frame, phone/desktop navigation, other pages, Scan, Share, records, storage and hosting are unchanged. PR39 remains held.
+
+ESLint, production build, and diff checks passed. [CI run 531](https://github.com/curtistheconqueror/bus-tracker/actions/runs/45723103426) passed 496 tests, including the Chromium check of the built Down Sheet on tablet, phone portrait/landscape, and desktop. The check also covers Pages overlay/dismissal, scanner entry and Share drawer, and Lite Mode. [CodeRabbit PR #65](https://github.com/curtistheconqueror/bus-tracker/pull/65#issuecomment-7177617066) covered all four changed files across the original and incremental reviews, including the exact release head; its browser-fixture exit finding was addressed and the final review had no new actionable findings. Map, Down Sheet, Defect Log and Fixed Repairs returned HTTP 200. Live Down Sheet CSS and JavaScript matched the build. Physical devices, photos, actual sharing, and live records were not exercised.
+
+Native deployment `appgdep_6b0772968e208191b749afff78caa678` succeeded; saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_cfed301bf56081918b6d591d7a096b6d`. Public access and runtime revisions remain 2. Immediate rollback: Sites 206 / application 220 at `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_404d375ff7dc81918b452159f040826b`.
+
+No other release is pending.
+
+### Previous publication — Sites 206 / application 220
 
 Sites Version 206 / application release 220 deployed 2026-11-25 23:11:41.557026 UTC from `1eaf1bbf63bf2c4b1268d241cab1b9be6abf069f`. Adds an 18 px leading gap and a 2 px black outline around the actual Maintenance Down Sheet at touch viewports 761–1400 px wide and at least 600 px tall. Styles are isolated in the Down Sheet tablet stylesheet. Phone layouts, narrower split views, mouse-only desktops, navigation, scanner, workflows, data, storage and hosting are unchanged. Pages and header layouts shared as mockups are not part of this release. PR39 remains held.
 
