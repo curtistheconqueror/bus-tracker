@@ -125,9 +125,18 @@ line is always Codex's own and PR39 never claims it.
 
 Measured on this head, in a container rather than in CI, rather than carried
 over from an earlier run: the production build succeeds, ESLint is clean, and
-**538 of 538 tests pass**. That figure is a measurement of one tree and nothing
+**540 of 540 tests pass**. That figure is a measurement of one tree and nothing
 more — it moves with any change that adds a test, so re-measure it here, and CI
 must re-run on the actual merge SHA before anything is packaged.
+
+**A COUNT FROM A PR CHECK IS NOT A COUNT OF THIS HEAD, and the two disagree
+without either being wrong.** `.github/workflows/ci.yml` fires on
+`pull_request` and its `actions/checkout` step passes no `ref`, so what a check
+on this pull request builds and tests is the merge GitHub computes between this
+head and the base branch — not this head. The two counts therefore differ by
+whatever tests `main` has gained since the last merge into this branch, and a
+check reporting more tests than are measured here is that gap and not a missing
+file. Compare a count only against a run on the same tree.
 
 **THE BROWSER TESTS NEED `CHROME_BIN` SET IN A CONTAINER LIKE THIS ONE, AND
 WITHOUT IT ONE OF THEM FAILS FOR A REASON THAT IS NOT A DEFECT.**
@@ -142,7 +151,7 @@ and `main`-owned, and nothing in it touches the MCP.
 
 So `CHROME_BIN` wants a one-line wrapper that execs
 `chrome-headless-shell --no-sandbox "$@"`, and with that the file passes 5 of 5
-and the whole suite 538 of 538. Worth knowing before somebody reads a red
+and the whole suite 540 of 540. Worth knowing before somebody reads a red
 `ETIMEDOUT` here as a regression: it is neither this branch's nor a defect.
 
 Nothing about the gates below changed. Merging `main` in, and correcting what
